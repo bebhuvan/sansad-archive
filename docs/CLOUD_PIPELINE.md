@@ -456,6 +456,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   native and 454 OCR, with 327 flagged `review`. Both route and status totals
   reconcile to the latest-run page count in all three scopes; these are
   checkpointed local-validation flags, not adjudicated accuracy rates.
+- The direct historical LS 01/I run `36037513021` finished successfully at
+  22:23 UTC after eighteen 100-page model chunks, each with zero page failures
+  or rate-limit/fatal flags. Its work deadline stopped a partial pass: the
+  final HF state has 1,803 of 2,826 pages model-covered, all 1,807 distinct
+  originals retained, and the run summary explicitly says
+  `session_complete=false` with no publication. The pending historical batch
+  is the planned continuation; a green workflow run alone is not a complete
+  archive claim.
 - The historical LS 01/II checkpoint's 2,017 review pages have 1,843
   inconsistent-table-width flags and 1,803 native/OCR numeric-disagreement
   flags; these can co-occur on a page. Only one page has a low-OCR-confidence
