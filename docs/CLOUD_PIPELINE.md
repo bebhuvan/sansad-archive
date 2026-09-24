@@ -345,8 +345,12 @@ for comparison and require language-aware review before a canonical claim.
   despite the no-publication request; it is not a complete-session claim.
   The workflow now installs the free Tesseract binary before auditing,
   makes audit failure fail the pass instead of appearing green, and converts
-  Boolean inputs explicitly so `false` remains `false`. A follow-up cloud
-  canary must verify these fixes before treating audit upload as proven.
+  Boolean inputs explicitly so `false` remains `false`. Follow-up cloud run
+  `36045777622` verified the fixes: the installed Tesseract 5.3.4 audited all
+  three OCR pages with zero failures, uploaded the transcript report under
+  `state/runs/20260924T190806Z-lok_sabha-p02-sIX/verification/`, and skipped
+  publication. Its run summary has `publish=false`, an empty tranche path and
+  no completion marker; the three stored model pages each report cost `0.0`.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
