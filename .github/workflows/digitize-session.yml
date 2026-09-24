@@ -159,6 +159,7 @@ jobs:
           fi
 
       - name: Acquire originals
+        id: acquire
         run: |
           set -x
           ARGS=(--house "$HOUSE" --session "$SESSION" --source current \
@@ -166,7 +167,28 @@ jobs:
           if [ "$HOUSE" = "lok_sabha" ]; then
             ARGS+=(--lok-sabha "$PARLIAMENT")
           fi
-          python -m sansad_pipeline acquire-census "${ARGS[@]}"
+          set +e
+          python -m sansad_pipeline acquire-census "${ARGS[@]}" | tee /tmp/acquire.json
+          RC=${PIPESTATUS[0]}
+          set -e
+          if [ "$RC" != "0" ] && [ ! -s /tmp/acquire.json ]; then
+            echo "acquire failed without a result summary" >&2
+            exit "$RC"
+          fi
+          read -r DOWNLOADED FAILED < <(python -c "import json;d=json.load(open('/tmp/acquire.json'));print(d.get('downloaded',0),d.get('failed',0))")
+          echo "downloaded=$DOWNLOADED failed=$FAILED"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Retry failed downloads once
+        if: steps.acquire.outputs.failed != '0'
+        run: |
+          set -x
+          ARGS=(--house "$HOUSE" --session "$SESSION" --source current \
+                --retry-failed --limit 0 --workers 4 --min-free-gib 2)
+          if [ "$HOUSE" = "lok_sabha" ]; then
+            ARGS+=(--lok-sabha "$PARLIAMENT")
+          fi
+          python -m sansad_pipeline acquire-census "${ARGS[@]}" || true
 
       - name: Checkpoint after acquisition
         if: env.HF_REPO != ''

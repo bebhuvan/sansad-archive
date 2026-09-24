@@ -22,7 +22,22 @@ def main() -> int:
     except (OSError, json.JSONDecodeError):
         print("empty=false")
         return 0
-    empty = int(status.get("records") or 0) == 0
+    records = int(status.get("records") or 0)
+    acquired = int(status.get("acquired_documents") or 0)
+    acquisition = status.get("acquisition") or {}
+    failed = int(acquisition.get("failed") or 0)
+    if records == 0:
+        reason = "census returned zero records for this scope"
+    elif acquired == 0:
+        reason = (
+            "no acquirable PDF originals (legacy HTML-only or dead links); "
+            "historical eLibrary phase covers these"
+        )
+    elif failed > 0:
+        reason = "acquisition failures remain after retry"
+    else:
+        reason = None
+    empty = reason is not None
     print(f"empty={'true' if empty else 'false'}")
     if empty:
         key = (
@@ -33,7 +48,7 @@ def main() -> int:
             "house": os.environ.get("HOUSE"),
             "parliament": os.environ.get("PARLIAMENT"),
             "session": os.environ.get("SESSION"),
-            "reason": "census returned zero records for this scope",
+            "reason": reason,
             "skipped_at": datetime.now(timezone.utc).isoformat(),
             "scope_status": status,
         }

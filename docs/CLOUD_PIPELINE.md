@@ -93,7 +93,13 @@ Scopes whose census returns zero records (typically pre-2000 sessions that the
 current API lists but does not serve) are classified as empty: the workflow
 skips publication, exits successfully, and uploads a skip marker to
 `state/skipped/session-skipped-<key>.json`. The planner skips both complete and
-skipped scopes, so empty sessions are attempted once, not nightly. To force a
+skipped scopes, so empty sessions are attempted once, not nightly. The same
+path covers legacy sessions whose records only link to `.htm` annexure pages
+instead of PDFs, for example Lok Sabha 13/4, where all 31 records resolve to
+`sansad.in/getFile/Annexture_New/...htm` with no PDF field. Those belong to the
+historical eLibrary phase. Acquisition failures get one retry pass in the same
+run; a scope with failures still remaining is marked skipped with the failure
+counts in the marker. To force a
 re-attempt, delete the marker from the dataset repository. A repository
 variable `BATCH_EXCLUDE` (comma-separated `house:parliament:session`) excludes
 scopes known to return persistent server errors, for example the eight Lok
