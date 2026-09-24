@@ -270,6 +270,14 @@ jobs:
             --sample "$VERIFY_SAMPLE" --models mimo-v2.6-flash \
             --output "results/verification/$STAMP" || true
 
+      - name: Free Tesseract layout audit
+        continue-on-error: true
+        run: |
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          python scripts/audit_ocr_layout.py \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --sample 12 --output "results/verification/tesseract-$STAMP"
+
       - name: Scope status
         run: |
           python -m sansad_pipeline scope-status \

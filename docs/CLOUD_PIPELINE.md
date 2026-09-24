@@ -312,7 +312,8 @@ for comparison and require language-aware review before a canonical claim.
   response for merely identical page images.
 - A source-image check of two distinct 1952 two-column scans (printed pages
   25 and 27) exposed a local-layout failure: LiteParse Markdown introduced
-  34 and 27 table-separator rows into ordinary prose and mixed words within
+  seven and six table-separator rows (34 and 27 separator cells) into ordinary
+  prose and mixed words within
   some questions. Tesseract `--psm 3` on the same rendered pages preserved the
   left-column-then-right-column reading order substantially better. Changing
   LiteParse's output format from Markdown to text did not fix its two-column
@@ -322,6 +323,18 @@ for comparison and require language-aware review before a canonical claim.
   is a promising independent QA signal, not yet a validated corpus-wide
   replacement. Preserve the originals and both existing text layers while
   evaluating that signal on more layouts, including genuine tables.
+- Each future cloud pass now samples up to twelve OCR-routed pages for a
+  separate, free Tesseract `--psm 3` layout audit. It prioritizes pages where
+  LiteParse has introduced several Markdown table separators, includes other
+  OCR pages for comparison, and uploads the independent transcript plus
+  similarity/numeric-agreement diagnostics under the run's `verification/`
+  path. This is non-mutating evidence, not an automatic canonical-text switch;
+  OCR and Space Bunny can both make errors, so disputed pages still require
+  source-image review. The first local end-to-end audit on a 1952 scan selected
+  one page from five OCR candidates, completed in 8.2 seconds with no error,
+  and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
+  the stored model transcription. Both numeric comparisons disagreed with
+  Tesseract, so similarity alone cannot adjudicate that page.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
