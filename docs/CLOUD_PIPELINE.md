@@ -185,6 +185,12 @@ size and SHA-256. Historical batch planning now pins the repo variable's
 snapshot root into every child run, so a later variable change cannot make
 one batch plan against one inventory and import another. The current active
 workers remain on the August snapshot until their runs finish.
+No-publication eLibrary canary `36048152991` imported this exact new snapshot
+into LS 02/IX at commit `73cf2d7`: its run summary records the SHA-256 above,
+3/3 OCR pages with stored Space Bunny outputs, a successful three-page
+standalone Tesseract layout audit, `publish=false`, no tranche, and no
+completion marker. This verifies the pinned snapshot import path without
+mistaking a two-PDF canary for a complete session.
 `digitize-historical-batch.yml` plans Lok Sabha sessions from the verified
 dated snapshot, running up to two scopes sequentially by default. It skips
 only `state/snapshot-complete/` markers with the same census SHA-256, full
@@ -281,6 +287,12 @@ for comparison and require language-aware review before a canonical claim.
   layers on every page, and `0.0` reported cost. This is a two-record canary,
   not a claim that the 2,950-record dated scope is complete. Those two source
   PDFs include one overlapping printed page; both originals remain preserved.
+  A second fresh HF read of its manifest and 512,000-byte WebDataset shard
+  verified that both embedded `*.original.pdf` bytes hash to their full manifest
+  SHA-256 keys; their separate `*.local.md` and `*.adjudicated.md` members are
+  nonempty (4,562/3,936 and 8,889/7,936 bytes respectively). The JSON members
+  contain one and two pages. This checks the retrievable archive artifact, not
+  only the publication code or its success log.
 - In the continuing LS 01/I run, an HF checkpoint at 18:18 UTC contained
   1,002 acquired question records mapped to 685 distinct PDF SHA-256s, with
   zero failed acquisitions and 1,948 records still discovered. This is source
