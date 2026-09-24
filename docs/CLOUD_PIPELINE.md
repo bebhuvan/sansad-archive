@@ -42,7 +42,9 @@ ledger, so extraction/publication cannot advance through an unresolved
 attachment backfill. Publication now includes every ledger PDF in the same
 WebDataset shard as the selected PDF and text, with per-bitstream source URL,
 name and SHA-256 in `manifest.jsonl` and document JSON. The verifier rehashes
-each attachment. Existing older publications and complete markers remain
+each attachment. The resolver also checks the official bitstream format link
+when a filename lacks `.pdf`, so an extensionless `application/pdf` attachment
+is included. Existing older publications and complete markers remain
 selected-PDF-only evidence until their scopes are replayed and republished;
 do not delete or replace them based solely on this discovery. A full cloud
 backfill and remote publication proof are still pending.
@@ -159,6 +161,13 @@ the claim to the dated census snapshot. That publication predates attachment
 backfill and must not be cited as proof that all ORIGINAL bitstream variants
 were retained. A direct replay is required because the historical planner
 would otherwise skip the snapshot-complete marker.
+At 23:18 UTC, direct replay `36072053119` was dispatched for LS 01/II on
+commit `5be09aa`, with the immutable 2026-09-24 census root, full scope,
+all-pages free-model policy, attachment backfill and publication enabled. It
+was in progress at 23:19 UTC; no attachment backfill or replacement publication
+is yet proven. Pending historical successor `36072076317` now carries the same
+code; GitHub cancelled the older pending `36071290681` without touching active
+batch `36039411879`.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep

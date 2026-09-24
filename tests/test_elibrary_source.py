@@ -28,6 +28,23 @@ class ElibrarySourceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "incomplete"):
                 list_original_pdfs("item")
 
+    def test_includes_pdf_bitstream_even_without_pdf_filename_suffix(self):
+        bundles = {"_embedded": {"bundles": [
+            {"name": "ORIGINAL", "_links": {"bitstreams": {"href": "https://example.test/bitstreams"}}}
+        ]}}
+        listing = {"page": {"number": 0, "totalElements": 1},
+                   "_embedded": {"bitstreams": [{
+                       "uuid": "bitstream", "name": "question scan",
+                       "_links": {
+                           "content": {"href": "https://example.test/content"},
+                           "format": {"href": "https://example.test/format"},
+                       },
+                   }]}}
+        with patch("sansad_pipeline.sources.elibrary.request_json",
+                   side_effect=[bundles, listing, {"mimetype": "application/pdf"}]):
+            resolved = list_original_pdfs("item")
+        self.assertEqual([pdf["uuid"] for _, pdf in resolved], ["bitstream"])
+
     def test_unlabelled_or_original_language_is_not_assumed_english(self):
         self.assertEqual(classify_language(["English"]), "en")
         self.assertEqual(classify_language(["Hindi"]), "hi")

@@ -214,10 +214,24 @@ def list_original_pdfs(item_id: str) -> list[tuple[str, dict[str, Any]]]:
         or int(page.get("totalElements", -1)) != len(bitstreams)
     ):
         raise RuntimeError(f"eLibrary item {item_id} ORIGINAL bitstream listing is incomplete")
-    pdfs = [
-        bitstream for bitstream in bitstreams
-        if str(bitstream.get("name") or "").casefold().endswith(".pdf")
-    ]
+    pdfs = []
+    for bitstream in bitstreams:
+        if str(bitstream.get("name") or "").casefold().endswith(".pdf"):
+            pdfs.append(bitstream)
+            continue
+        format_url = bitstream.get("_links", {}).get("format", {}).get("href")
+        if not format_url:
+            raise RuntimeError(
+                f"eLibrary item {item_id} has a bitstream of unknown format"
+            )
+        bitstream_format = request_json(str(format_url))
+        mimetype = str(bitstream_format.get("mimetype") or "").casefold()
+        if not mimetype:
+            raise RuntimeError(
+                f"eLibrary item {item_id} has a bitstream without a MIME type"
+            )
+        if mimetype == "application/pdf":
+            pdfs.append(bitstream)
     if not pdfs:
         raise RuntimeError(f"eLibrary item {item_id} has no PDF in ORIGINAL bundle")
     resolved = []
