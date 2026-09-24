@@ -238,7 +238,6 @@ def parser() -> argparse.ArgumentParser:
     prepare_publication.add_argument("--source-type", default="questions_answers")
     prepare_publication.add_argument("--output", required=True, type=Path)
     prepare_publication.add_argument("--limit", type=int)
-    prepare_publication.add_argument("--no-raw", action="store_true")
     prepare_publication.add_argument("--compact", action="store_true",
                                      help="Keep originals and text together in the WebDataset archive without per-document files")
     prepare_publication.add_argument("--complete-session", action="store_true",
@@ -867,7 +866,6 @@ def main(argv: list[str] | None = None) -> int:
             scope,
             args.output,
             limit=args.limit,
-            include_raw=not args.no_raw,
             minimum_pdf_saving_percent=args.minimum_pdf_saving_percent,
             canonical_policy=args.canonical_policy,
             compact=args.compact,

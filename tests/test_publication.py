@@ -155,6 +155,34 @@ class PublicationTests(unittest.TestCase):
                     source.read_bytes(),
                 )
             self.assertTrue(PublicationBuilder.verify(compact_output)["valid"])
+            with self.assertRaisesRegex(ValueError, "retain the original PDFs"):
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), root / "without-originals",
+                    include_raw=False,
+                )
+
+            shard = compact_output / "webdataset" / "shard-00000.tar"
+            altered = shard.with_name("altered.tar")
+            with tarfile.open(shard) as original, tarfile.open(altered, "w") as target:
+                for member in original:
+                    if member.name != f"{item.sha256}.original.pdf":
+                        target.addfile(member, original.extractfile(member))
+            altered.replace(shard)
+            checksum_file = compact_output / "SHA256SUMS"
+            lines = checksum_file.read_text(encoding="utf-8").splitlines()
+            checksum_file.write_text(
+                "\n".join(
+                    f"{sha256_file(shard)}  webdataset/shard-00000.tar"
+                    if line.endswith("  webdataset/shard-00000.tar") else line
+                    for line in lines
+                ) + "\n", encoding="utf-8",
+            )
+            verification = PublicationBuilder.verify(compact_output)
+            self.assertFalse(verification["valid"])
+            self.assertIn(
+                f"webdataset/shard-00000.tar:{item.sha256}.original.pdf",
+                [failure["path"] for failure in verification["failures"]],
+            )
 
 
 class NamingAndValidationTests(unittest.TestCase):

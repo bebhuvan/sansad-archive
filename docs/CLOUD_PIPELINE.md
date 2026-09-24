@@ -200,6 +200,12 @@ for comparison and require language-aware review before a canonical claim.
 - Publication succeeds only after the remote HF tranche has exactly the local
   file set, matching sizes, and matching Git blob or LFS SHA-256 content IDs.
   A partial or altered upload cannot produce a completion marker.
+- Every publication retains the source PDF. The local verifier checks each
+  manifest key has its original PDF and text layers inside the WebDataset
+  shard (and the readable files in small, non-compact tranches), in addition
+  to the outer SHA256SUMS. A bundle missing an original is rejected even if
+  its checksum file has been regenerated. The original and derived text share
+  the source PDF's SHA-256 key, so readers can retrieve and compare both.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
   previous one stopped. Isolated page failures are retried in the next chunk;

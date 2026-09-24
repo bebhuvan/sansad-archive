@@ -205,6 +205,8 @@ class PublicationBuilder:
     ) -> dict:
         if canonical_policy not in {"local", "model"}:
             raise ValueError("canonical_policy must be 'local' or 'model'")
+        if not include_raw:
+            raise ValueError("publications must retain the original PDFs")
         try:
             import duckdb
             import pyarrow as pa
@@ -570,6 +572,37 @@ class PublicationBuilder:
                 if actual != expected:
                     failures.append({"path": relative, "expected": expected, "actual": actual})
             checked += 1
+        metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+        if not metadata.get("raw_pdfs_included"):
+            failures.append({"path": "metadata.json", "error": "original PDFs omitted"})
+        manifest = [
+            json.loads(line)
+            for line in (output / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        if len(manifest) != metadata["document_count"]:
+            failures.append({"path": "manifest.jsonl", "error": "document count mismatch"})
+        shards: dict[str, list[dict]] = {}
+        for record in manifest:
+            shards.setdefault(record["webdataset_shard"], []).append(record)
+            if not metadata.get("compact"):
+                readable = output / record["path"]
+                for name in ("original.pdf", "document.md", "document.txt", "document.json"):
+                    if not (readable / name).is_file():
+                        failures.append({"path": f"{record['path']}/{name}", "error": "missing"})
+        for shard, records in shards.items():
+            with tarfile.open(output / shard) as archive:
+                members = {item.name: item for item in archive.getmembers() if item.isfile()}
+            for record in records:
+                digest = record["document_sha256"]
+                required = ("original.pdf", "md", "local.md", "txt", "json")
+                if record["adjudicated_page_count"]:
+                    required += ("adjudicated.md",)
+                for suffix in required:
+                    name = f"{digest}.{suffix}"
+                    if name not in members:
+                        failures.append({"path": f"{shard}:{name}", "error": "missing"})
+                    elif suffix == "original.pdf" and members[name].size == 0:
+                        failures.append({"path": f"{shard}:{name}", "error": "empty"})
         return {"checked": checked, "failures": failures, "valid": not failures}
 
     @staticmethod
