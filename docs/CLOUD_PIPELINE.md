@@ -71,6 +71,11 @@ label now hashes both page text and `manifest.jsonl`, including the source PDF
 inventory, so future provenance changes create a distinct tranche. Previously
 uploaded versions remain in HF Git history, but current HEAD only exposes the
 newest version at that old path.
+The older pending historical batch `36073146060` was cancelled before it
+started, and replacement batch `36074837899` was queued on commit `d05ab41`
+with two scopes and one runner. Its planner includes the attachment-complete
+marker gate and the manifest-sensitive tranche name; it remains pending behind
+the already-active historical batch, not evidence of another scope underway.
 
 The read-only HF inspector reports `checkpoint_status: not_found` while a
 scope is still in its first acquisition chunk. It propagates other Hub errors;
