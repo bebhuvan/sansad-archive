@@ -322,6 +322,13 @@ substitute for validating original PDF hashes on restore or in a publication.
   resumable starting checkpoint, not a completion claim. The complete marker
   and remotely verified PDF/text tranche are still required before calling
   this 1,499-record session finished.
+- At 21:32 UTC, the LS 17/15 V3 HF checkpoint contained 1,010 downloaded
+  records and 1,010 retained original-PDF entries, with 489 official records
+  still awaiting acquisition. Its two immutable raw shards were listed in the
+  checkpoint manifest. A remote HEAD check of the new 241,365,034-byte shard
+  found matching Hub LFS SHA-256 and size, without a local shard download.
+  Only the ten pilot PDFs had completed extraction at that checkpoint; this
+  is acquisition progress, not a complete text corpus or session publication.
 - LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
@@ -401,6 +408,11 @@ substitute for validating original PDF hashes on restore or in a publication.
   costs in those checkpoint scopes were explicitly zero. The latest-run page
   counts exclude superseded pilot runs; they should not be compared directly
   with the earlier all-run LS 18/8 page total of 17,989.
+- At 21:32 UTC, the same four live scopes had respectively 2,799, 2,400,
+  1,003 and 800 latest-run model pages. That is 1,800 more than at the 21:02
+  UTC read. Their checkpoint model-call costs remained explicitly zero, with
+  no unknown or nonzero reported costs. All four GitHub jobs were still in
+  adjudication, so no complete-session marker was inferred from page gains.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.
