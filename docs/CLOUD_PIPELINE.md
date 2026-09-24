@@ -85,6 +85,12 @@ fallback batch `36054404767` was queued on commit `6fdd63f` with
 four-scope/two-runner limits. Its pending state is protected by the batch
 concurrency group; a later scheduled pending run may replace it, in which
 case the cron branch must be checked before treating the replacement as safe.
+At 20:34 UTC, the historical batch `36039411879` was still processing its
+first scope. A manual continuation `36055804575` was queued behind it on
+commit `ed37ac1`. Its planner reads the current `ELIBRARY_SNAPSHOT_ROOT`
+variable, so the next pass uses the verified 2026-09-24 eLibrary inventory;
+a later scheduled run may replace this pending run under the same concurrency
+rule. Neither pending run is evidence that a new scope has started.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
@@ -360,6 +366,15 @@ substitute for validating original PDF hashes on restore or in a publication.
   LS 18/7 had 600 across 25,029 pages. Every one of those 1,853 calls had an
   explicit zero reported cost; no null or nonzero cost was stored. Both
   scopes were still in the model stage, not complete-session publications.
+- At 20:31 UTC, the bounded read-only HF inspector found 4,500 retained
+  originals and 17,306 latest-run pages in LS 18/8, including 1,799 pages
+  with a stored model layer. LS 18/7 had 6,974 retained originals, 25,029
+  latest-run pages and 1,200 model pages. Historical LS 01/I had 1,807
+  distinct originals, 2,826 pages and 403 model pages; LS 01/II had 1,365
+  distinct originals, 2,151 pages and 200 model pages. All reported model
+  costs in those checkpoint scopes were explicitly zero. The latest-run page
+  counts exclude superseded pilot runs; they should not be compared directly
+  with the earlier all-run LS 18/8 page total of 17,989.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.
