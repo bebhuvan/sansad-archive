@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sansad-pipeline"
+version = "0.1.0"
+description = "Local-first, provenance-preserving Sansad PDF extraction pipeline"
+requires-python = ">=3.11"
+dependencies = ["liteparse==2.10.1", "Pillow==12.3.0"]
+
+[project.optional-dependencies]
+publication = [
+    "duckdb>=1.2,<2",
+    "huggingface_hub>=1.2,<2",
+    "pyarrow>=18,<25",
+    "zstandard>=0.23,<1",
+]
+
+[project.scripts]
+sansad-pipeline = "sansad_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sansad_pipeline*"]

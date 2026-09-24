@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+from typing import Any, Iterator
+
+from .questions import QuestionRecord, request_json
+
+
+ELIBRARY_BASE = "https://elibrary.sansad.in"
+ELIBRARY_API = f"{ELIBRARY_BASE}/server/api"
+LS_QUESTIONS_COLLECTION = "75228d43-3a98-4b7d-b90f-ffec6aa9fa11"
+LS_QUESTIONS_PAGE = f"{ELIBRARY_BASE}/collections/{LS_QUESTIONS_COLLECTION}"
+MAX_PAGE_SIZE = 100
+
+
+def _values(metadata: dict[str, Any], key: str) -> list[str]:
+    return [
+        str(entry.get("value") or "").strip()
+        for entry in metadata.get(key, [])
+        if str(entry.get("value") or "").strip()
+    ]
+
+
+def _value(metadata: dict[str, Any], key: str) -> str:
+    values = _values(metadata, key)
+    return values[0] if values else ""
+
+
+def search_page(*, page: int = 0, page_size: int = 100) -> dict[str, Any]:
+    if not 1 <= page_size <= MAX_PAGE_SIZE:
+        raise ValueError(f"eLibrary page_size must be between 1 and {MAX_PAGE_SIZE}")
+    return request_json(
+        f"{ELIBRARY_API}/discover/search/objects",
+        params={
+            "scope": LS_QUESTIONS_COLLECTION,
+            "dsoType": "ITEM",
+            "page": page,
+            "size": page_size,
+        },
+    )
+
+
+def lok_sabha_question_count() -> int:
+    response = search_page(page=0, page_size=1)
+    result = response.get("_embedded", {}).get("searchResult", {})
+    return int(result.get("page", {}).get("totalElements") or 0)
+
+
+def records_from_search_response(
+    response: dict[str, Any], *, page: int
+) -> list[QuestionRecord]:
+    result = response.get("_embedded", {}).get("searchResult", {})
+    objects = result.get("_embedded", {}).get("objects", [])
+    records: list[QuestionRecord] = []
+    for hit in objects:
+        item = hit.get("_embedded", {}).get("indexableObject", {})
+        item_id = str(item.get("uuid") or item.get("id") or "").strip()
+        if not item_id:
+            continue
+        metadata = item.get("metadata") or {}
+        handle = str(item.get("handle") or "").strip()
+        source_url = _value(metadata, "dc.identifier.uri")
+        if not source_url and handle:
+            source_url = f"{ELIBRARY_BASE}/handle/{handle}"
+        if not source_url:
+            source_url = f"{ELIBRARY_API}/core/items/{item_id}"
+        # Keeping the entire HAL item for 1.15M rows would add roughly 4 GiB
+        # of duplicated metadata to SQLite. Normalized fields live in the
+        # census columns; retain only stable resolver/provenance identifiers.
+        raw = {
+            "_source_system": "sansad_elibrary_dspace",
+            "uuid": item_id,
+            "handle": handle,
+            "dc.language.iso": _values(metadata, "dc.language.iso"),
+            "dc.type": _values(metadata, "dc.type"),
+        }
+        records.append(
+            QuestionRecord(
+                record_id=f"elibrary_ls_question_{item_id}",
+                source_type="questions_answers",
+                house="lok_sabha",
+                parliament_number=_value(metadata, "dc.identifier.loksabhanumber"),
+                session=_value(metadata, "dc.identifier.sessionnumber"),
+                document_number=_value(metadata, "dc.identifier.questionnumber"),
+                document_subtype=_value(metadata, "dc.identifier.questiontype").upper(),
+                document_date=_value(metadata, "dc.date.issued"),
+                title=_value(metadata, "dc.title") or str(item.get("name") or "").strip(),
+                ministry=_value(metadata, "dc.relation.ministry"),
+                members=_values(metadata, "dc.contributor.members"),
+                language="en",
+                source_url=source_url,
+                official_page_url=LS_QUESTIONS_PAGE,
+                api_url=f"{ELIBRARY_API}/core/items/{item_id}",
+                api_params={"collection": LS_QUESTIONS_COLLECTION, "page": page},
+                raw=raw,
+            )
+        )
+    return records
+
+
+def discover_lok_sabha_questions(
+    *,
+    limit: int = 0,
+    page_size: int = 100,
+    start_page: int = 0,
+) -> Iterator[QuestionRecord]:
+    yielded = 0
+    page = start_page
+    while True:
+        response = search_page(page=page, page_size=page_size)
+        result = response.get("_embedded", {}).get("searchResult", {})
+        objects = result.get("_embedded", {}).get("objects", [])
+        page_info = result.get("page", {})
+        if not objects:
+            return
+        for record in records_from_search_response(response, page=page):
+            yield record
+            yielded += 1
+            if limit and yielded >= limit:
+                return
+        total_pages = int(page_info.get("totalPages") or 0)
+        page += 1
+        if total_pages and page >= total_pages:
+            return
+
+
+def resolve_original_pdf(item_id: str) -> tuple[str, dict[str, Any]]:
+    bundles = request_json(
+        f"{ELIBRARY_API}/core/items/{item_id}/bundles", params={"size": 100}
+    ).get("_embedded", {}).get("bundles", [])
+    original = next((bundle for bundle in bundles if bundle.get("name") == "ORIGINAL"), None)
+    if original is None:
+        raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bundle")
+    bitstreams_url = original.get("_links", {}).get("bitstreams", {}).get("href")
+    if not bitstreams_url:
+        raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bitstream link")
+    bitstreams = request_json(bitstreams_url, params={"size": 100}).get("_embedded", {}).get(
+        "bitstreams", []
+    )
+    pdf = next(
+        (
+            bitstream
+            for bitstream in bitstreams
+            if str(bitstream.get("name") or "").casefold().endswith(".pdf")
+        ),
+        None,
+    )
+    if pdf is None:
+        raise RuntimeError(f"eLibrary item {item_id} has no PDF in ORIGINAL bundle")
+    content_url = pdf.get("_links", {}).get("content", {}).get("href")
+    if not content_url:
+        raise RuntimeError(f"eLibrary item {item_id} PDF has no content link")
+    return str(content_url), pdf

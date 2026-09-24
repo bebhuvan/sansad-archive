@@ -1,0 +1,328 @@
+{
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "method": "one simultaneous wave per concurrency level; real pages with 200-6000 local characters",
+  "levels": [
+    {
+      "concurrency": 6,
+      "requests": 6,
+      "successes": 6,
+      "failures": 0,
+      "wall_seconds": 256.798,
+      "throughput_pages_per_minute": 1.402,
+      "median_latency_seconds": 17.687,
+      "max_latency_seconds": 256.76,
+      "http_status_counts": {
+        "200": 6
+      },
+      "results": [
+        {
+          "document_sha256": "31387157c142cbe9ad25a94eb2e50751acd5f676188159585fffef936d1bcbc9",
+          "run_id": 2214,
+          "page_number": 54,
+          "text_chars": 638,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 15.132,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "31387157c142cbe9ad25a94eb2e50751acd5f676188159585fffef936d1bcbc9",
+          "run_id": 2214,
+          "page_number": 56,
+          "text_chars": 293,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 19.51,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "40ac74f72c1d72fa59aab4fabc9a683c37150b420c0d893fb3a1156968cc1800",
+          "run_id": 2290,
+          "page_number": 9,
+          "text_chars": 632,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 29.77,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "44daac6059781eedd48c38c5108b7109fa898a3c6d959feebe2ff33957111a2e",
+          "run_id": 2390,
+          "page_number": 2,
+          "text_chars": 617,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 256.76,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "49260f7d3427586a471dbda05763778e41b5ea0c5498f713ade41394b96dd5b5",
+          "run_id": 2483,
+          "page_number": 5,
+          "text_chars": 505,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 13.572,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "3888eddd66f1793d151114fe4bc24d1342c69ce3b8cc562f0b565ee25a697ea3",
+          "run_id": 2498,
+          "page_number": 3,
+          "text_chars": 629,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 15.864,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 6,
+      "requests": 6,
+      "successes": 6,
+      "failures": 0,
+      "wall_seconds": 72.209,
+      "throughput_pages_per_minute": 4.986,
+      "median_latency_seconds": 32.157,
+      "max_latency_seconds": 72.168,
+      "http_status_counts": {
+        "200": 6,
+        "503": 1
+      },
+      "results": [
+        {
+          "document_sha256": "0a81dd055eb9f8293c4a636ef87f5675bdd36e7cc4fbb973f377cd2cedaf0015",
+          "run_id": 1197,
+          "page_number": 7,
+          "text_chars": 914,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 29.366,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "0c8fd76dd5414ee683fdc8570569846d3c310bdd824537f691eae17ac7c878f7",
+          "run_id": 1255,
+          "page_number": 4,
+          "text_chars": 947,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 72.168,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "31387157c142cbe9ad25a94eb2e50751acd5f676188159585fffef936d1bcbc9",
+          "run_id": 2214,
+          "page_number": 2,
+          "text_chars": 878,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 68.482,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "40ac74f72c1d72fa59aab4fabc9a683c37150b420c0d893fb3a1156968cc1800",
+          "run_id": 2290,
+          "page_number": 5,
+          "text_chars": 935,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 30.659,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "40ac74f72c1d72fa59aab4fabc9a683c37150b420c0d893fb3a1156968cc1800",
+          "run_id": 2290,
+          "page_number": 7,
+          "text_chars": 719,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 33.654,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "46962baef1055f75346872cd5ac23c2a0eff5d13c8e5790284633d57ac1f1626",
+          "run_id": 2439,
+          "page_number": 2,
+          "text_chars": 713,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 25.054,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 6,
+      "requests": 6,
+      "successes": 5,
+      "failures": 1,
+      "wall_seconds": 245.606,
+      "throughput_pages_per_minute": 1.221,
+      "median_latency_seconds": 34.312,
+      "max_latency_seconds": 245.579,
+      "http_status_counts": {
+        "200": 5,
+        "503": 1
+      },
+      "results": [
+        {
+          "document_sha256": "6361fc1acd702ce5dbef31e79144828d5ac0332b4b01e34e04ea231b47601dca",
+          "run_id": 381,
+          "page_number": 8,
+          "text_chars": 948,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 24.873,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "ac832cffbfbc377ed60eefc089d3de5d0facbdf5a6e3576e6d34ab659b9b2637",
+          "run_id": 642,
+          "page_number": 5,
+          "text_chars": 960,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 31.316,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "e26e585687a38f5f9889f119bba5a6f37308012e3b375b4b7b134b1c808e1b27",
+          "run_id": 841,
+          "page_number": 7,
+          "text_chars": 950,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 41.099,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "208307cb788f1d9a9d39bd4038994195e9ad4a3d0e38ee4a50fdf2d62d38b0c5",
+          "run_id": 1730,
+          "page_number": 3,
+          "text_chars": 966,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 245.579,
+          "success": false,
+          "failed": [
+            {
+              "page": 3,
+              "error": "NVIDIA request failed: The read operation timed out"
+            }
+          ],
+          "http_statuses": [],
+          "attempts": 0
+        },
+        {
+          "document_sha256": "31387157c142cbe9ad25a94eb2e50751acd5f676188159585fffef936d1bcbc9",
+          "run_id": 2214,
+          "page_number": 18,
+          "text_chars": 963,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 37.307,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "4ae6cdf6a540d3e8b1f9e97b170d6c38e290eefa1316c83bb908320e004d4f05",
+          "run_id": 2522,
+          "page_number": 3,
+          "text_chars": 970,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 26.012,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    }
+  ]
+}

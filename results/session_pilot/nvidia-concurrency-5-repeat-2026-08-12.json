@@ -1,0 +1,286 @@
+{
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "method": "one simultaneous wave per concurrency level; real pages with 200-6000 local characters",
+  "levels": [
+    {
+      "concurrency": 5,
+      "requests": 5,
+      "successes": 5,
+      "failures": 0,
+      "wall_seconds": 30.907,
+      "throughput_pages_per_minute": 9.706,
+      "median_latency_seconds": 25.707,
+      "max_latency_seconds": 30.878,
+      "http_status_counts": {
+        "200": 5,
+        "503": 2
+      },
+      "results": [
+        {
+          "document_sha256": "544554c479d2dd010084940a5283f4bc019938bb3f2ed77fb30fdc50a98fff0c",
+          "run_id": 2870,
+          "page_number": 2,
+          "text_chars": 397,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 29.192,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "544554c479d2dd010084940a5283f4bc019938bb3f2ed77fb30fdc50a98fff0c",
+          "run_id": 2870,
+          "page_number": 4,
+          "text_chars": 558,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 11.306,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "6bbf23e59b0f07187f1c7ed823e12463997fd574e920a1bc46347478109648a6",
+          "run_id": 3336,
+          "page_number": 7,
+          "text_chars": 527,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 30.878,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            503,
+            200
+          ],
+          "attempts": 3
+        },
+        {
+          "document_sha256": "6cc16ee6a6467e42cac34edf44c484ba6ad7703439c7c88a3ff99030e8f00142",
+          "run_id": 3347,
+          "page_number": 3,
+          "text_chars": 611,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 25.707,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "5df12aba9c33b62a580ec642489cef1f11c997fdde2fa21193f8c82821164a6e",
+          "run_id": 3501,
+          "page_number": 2,
+          "text_chars": 327,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 10.829,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 5,
+      "requests": 5,
+      "successes": 5,
+      "failures": 0,
+      "wall_seconds": 31.015,
+      "throughput_pages_per_minute": 9.673,
+      "median_latency_seconds": 26.475,
+      "max_latency_seconds": 30.989,
+      "http_status_counts": {
+        "200": 5,
+        "503": 1
+      },
+      "results": [
+        {
+          "document_sha256": "4f65565f5720a4da872075d00608d94c0e92b7db8db4eef85f1da4ee9c00760f",
+          "run_id": 3049,
+          "page_number": 3,
+          "text_chars": 764,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 23.398,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "4f6dd03547d4dff0578d15e2306e1a14a04a77202726795b8aa1fb3f51c21989",
+          "run_id": 3050,
+          "page_number": 2,
+          "text_chars": 872,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 26.475,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "5e8259712531c01c5b62708836e895125548fb37ad218fe091db4964b43fd40f",
+          "run_id": 3068,
+          "page_number": 5,
+          "text_chars": 755,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 29.429,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "6bbf23e59b0f07187f1c7ed823e12463997fd574e920a1bc46347478109648a6",
+          "run_id": 3336,
+          "page_number": 6,
+          "text_chars": 808,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 25.239,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "6f2651fa15057a43aee4810a81e7c0d541d7da7cf851a049c0e816b83e117584",
+          "run_id": 3400,
+          "page_number": 2,
+          "text_chars": 720,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 30.989,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 5,
+      "requests": 5,
+      "successes": 5,
+      "failures": 0,
+      "wall_seconds": 50.392,
+      "throughput_pages_per_minute": 5.953,
+      "median_latency_seconds": 32.226,
+      "max_latency_seconds": 50.377,
+      "http_status_counts": {
+        "200": 5,
+        "503": 4
+      },
+      "results": [
+        {
+          "document_sha256": "544554c479d2dd010084940a5283f4bc019938bb3f2ed77fb30fdc50a98fff0c",
+          "run_id": 2870,
+          "page_number": 6,
+          "text_chars": 885,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 32.226,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "4d391da27cf063721397e22d24a3299009201415dcd1cee8f88afde6eabf7560",
+          "run_id": 2993,
+          "page_number": 4,
+          "text_chars": 959,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 24.915,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "5e8259712531c01c5b62708836e895125548fb37ad218fe091db4964b43fd40f",
+          "run_id": 3068,
+          "page_number": 6,
+          "text_chars": 924,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 23.334,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "66f0beb0430c5336bdd191cdc03eb1d7efcd66c79051daa0fccfd553d9134071",
+          "run_id": 3255,
+          "page_number": 2,
+          "text_chars": 904,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 50.346,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            503,
+            503,
+            503,
+            200
+          ],
+          "attempts": 5
+        },
+        {
+          "document_sha256": "703f5ec945b49522e2155065b48231ca1b68317d6cdf3a32b0bb4af9d450c3a3",
+          "run_id": 3435,
+          "page_number": 2,
+          "text_chars": 879,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 50.377,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    }
+  ]
+}

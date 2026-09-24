@@ -1,0 +1,212 @@
+{
+  "cases": [
+    {
+      "sample": "india1985",
+      "page": 3,
+      "engine": "liteparse-ocr",
+      "word": {
+        "precision": 0.9820627802690582,
+        "recall": 0.9909502262443439,
+        "f1": 0.9864864864864865,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "table": null
+    },
+    {
+      "sample": "india1985",
+      "page": 3,
+      "engine": "qwen/qwen3.7-flash",
+      "word": {
+        "precision": 0.9866071428571429,
+        "recall": 1.0,
+        "f1": 0.9932584269662922,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "table": null
+    },
+    {
+      "sample": "india1985",
+      "page": 3,
+      "engine": "qwen/qwen3.5-9b",
+      "word": {
+        "precision": 0.9866071428571429,
+        "recall": 1.0,
+        "f1": 0.9932584269662922,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "table": null
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 2,
+      "engine": "liteparse-ocr",
+      "word": {
+        "precision": 0.976303317535545,
+        "recall": 0.9716981132075472,
+        "f1": 0.9739952718676123,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 0.968,
+        "recall": 0.9603174603174603,
+        "f1": 0.9641434262948207,
+        "exact_multiset": false
+      },
+      "table": {
+        "expected_rows": 25,
+        "found_rows": 24,
+        "missing_rows": [
+          "1"
+        ],
+        "exact_cells": 138,
+        "expected_cells": 150,
+        "cell_accuracy": 0.92
+      }
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 2,
+      "engine": "qwen/qwen3.7-flash",
+      "error": "provider moderation rejection"
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 2,
+      "engine": "qwen/qwen3.5-9b",
+      "word": {
+        "precision": 0.9592760180995475,
+        "recall": 1.0,
+        "f1": 0.9792147806004619,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 0.984375,
+        "recall": 1.0,
+        "f1": 0.9921259842519685,
+        "exact_multiset": false
+      },
+      "table": {
+        "expected_rows": 25,
+        "found_rows": 25,
+        "missing_rows": [],
+        "exact_cells": 150,
+        "expected_cells": 150,
+        "cell_accuracy": 1.0
+      }
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 3,
+      "engine": "liteparse-ocr",
+      "word": {
+        "precision": 0.975,
+        "recall": 0.9176470588235294,
+        "f1": 0.9454545454545454,
+        "exact_multiset": false
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 0.9491525423728814,
+        "f1": 0.9739130434782608,
+        "exact_multiset": false
+      },
+      "table": {
+        "expected_rows": 12,
+        "found_rows": 10,
+        "missing_rows": [
+          "29",
+          "total"
+        ],
+        "exact_cells": 41,
+        "expected_cells": 72,
+        "cell_accuracy": 0.5694444444444444
+      }
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 3,
+      "engine": "qwen/qwen3.7-flash",
+      "word": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "table": {
+        "expected_rows": 12,
+        "found_rows": 12,
+        "missing_rows": [],
+        "exact_cells": 72,
+        "expected_cells": 72,
+        "cell_accuracy": 1.0
+      }
+    },
+    {
+      "sample": "controlled_table_scan",
+      "page": 3,
+      "engine": "qwen/qwen3.5-9b",
+      "word": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "numeric": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "exact_multiset": true
+      },
+      "table": {
+        "expected_rows": 12,
+        "found_rows": 12,
+        "missing_rows": [],
+        "exact_cells": 72,
+        "expected_cells": 72,
+        "cell_accuracy": 1.0
+      }
+    }
+  ],
+  "model_totals": {
+    "qwen/qwen3.7-flash": {
+      "successful_pages": 2,
+      "failed_pages": 1,
+      "prompt_tokens": 5506,
+      "completion_tokens": 7527,
+      "total_tokens": 13033,
+      "reported_cost": 0.0011436900000000002
+    },
+    "qwen/qwen3.5-9b": {
+      "successful_pages": 3,
+      "failed_pages": 0,
+      "prompt_tokens": 8706,
+      "completion_tokens": 7040,
+      "total_tokens": 15746,
+      "reported_cost": 0.0019266
+    }
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "method": "one simultaneous wave per concurrency level; real pages with 200-6000 local characters",
+  "levels": [
+    {
+      "concurrency": 4,
+      "requests": 4,
+      "successes": 4,
+      "failures": 0,
+      "wall_seconds": 272.013,
+      "throughput_pages_per_minute": 0.882,
+      "median_latency_seconds": 26.956,
+      "max_latency_seconds": 271.967,
+      "http_status_counts": {
+        "200": 4
+      },
+      "results": [
+        {
+          "document_sha256": "3b62ff862a45dd2853c0387876d12844d6e6d85d2fd6616d1c27034a685f02dc",
+          "run_id": 2554,
+          "page_number": 4,
+          "text_chars": 782,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 27.097,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "40c6d87995077afc7c9cfbf44bbdb930e8ef3d3104adb5d7e7b2123553a651a9",
+          "run_id": 2626,
+          "page_number": 3,
+          "text_chars": 773,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 26.814,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "41ce8558028704ccfd62857c7fb578148de84420e25e25f532810574ccf8ac34",
+          "run_id": 2643,
+          "page_number": 5,
+          "text_chars": 476,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 271.967,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "4d9720564a631926c77231368f34090d42a60888cd609339ff5cb81242865fab",
+          "run_id": 2696,
+          "page_number": 7,
+          "text_chars": 901,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 24.745,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 4,
+      "requests": 4,
+      "successes": 4,
+      "failures": 0,
+      "wall_seconds": 269.384,
+      "throughput_pages_per_minute": 0.891,
+      "median_latency_seconds": 27.236,
+      "max_latency_seconds": 269.339,
+      "http_status_counts": {
+        "200": 4
+      },
+      "results": [
+        {
+          "document_sha256": "d218b8b7009ad4034efa6599a5641294a9fd9b101cfad3224ae5f7159c77bc28",
+          "run_id": 770,
+          "page_number": 6,
+          "text_chars": 986,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 24.319,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "e94ed7fb51d2fa6efc50c6618c2abf71cdfa0c548808f6b29f72b337bfc4c36d",
+          "run_id": 874,
+          "page_number": 2,
+          "text_chars": 988,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 28.547,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "225a6aa0004260d923017ab08666e6d80366424bf43602b1e92723d062973a78",
+          "run_id": 1654,
+          "page_number": 39,
+          "text_chars": 977,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 25.925,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "208307cb788f1d9a9d39bd4038994195e9ad4a3d0e38ee4a50fdf2d62d38b0c5",
+          "run_id": 1730,
+          "page_number": 3,
+          "text_chars": 966,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 269.339,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        }
+      ]
+    },
+    {
+      "concurrency": 4,
+      "requests": 4,
+      "successes": 4,
+      "failures": 0,
+      "wall_seconds": 462.839,
+      "throughput_pages_per_minute": 0.519,
+      "median_latency_seconds": 153.526,
+      "max_latency_seconds": 462.825,
+      "http_status_counts": {
+        "200": 4,
+        "503": 1
+      },
+      "results": [
+        {
+          "document_sha256": "3b1b64af450f6c595062a86bdb0fdb9fbfe2ae4c25dce84459662daf2f104b0c",
+          "run_id": 240,
+          "page_number": 5,
+          "text_chars": 1010,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 31.116,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "4cdf581c6e4f9dcc04c7fb4899768f72f69064b42a19572f2a6ab7e21cf6514c",
+          "run_id": 305,
+          "page_number": 32,
+          "text_chars": 1013,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 462.825,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "a9c94e8b2a1c40bd68a71bffdb0d7b1cb763666c49fe47d673143d6b22a3dd38",
+          "run_id": 635,
+          "page_number": 4,
+          "text_chars": 1008,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 29.579,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            503,
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "41a99a8f49bbfc42c78e7e7c1e6fbf39a779bd0ad1292b4e4f44fdc1265c6fd9",
+          "run_id": 2641,
+          "page_number": 19,
+          "text_chars": 1003,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 275.936,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        }
+      ]
+    }
+  ]
+}

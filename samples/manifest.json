@@ -1,0 +1,45 @@
+{
+  "notes": [
+    "All parliamentary samples are official English Lok Sabha question-answer PDFs.",
+    "The 1985 file is an official Indian government scan used only as a historical scan proxy; it is not a parliamentary document.",
+    "The rasterized q1948 file is a controlled image-only derivative whose born-digital source supplies a reference transcription."
+  ],
+  "samples": [
+    {
+      "file": "raw/ls2026_q0560.pdf",
+      "description": "Implementation of PMAY-G in Kerala, Lok Sabha question 560, 3 pages",
+      "source_url": "https://sansad.in/getFile/loksabhaquestions/annex/187/AU560_YTe8tV.pdf?source=pqals",
+      "sha256": "6fdb18223ad435953ec5e6c548b4a457d48722a4087aa62261da34e2031cba9a",
+      "size_bytes": 512778
+    },
+    {
+      "file": "raw/ls2026_q1948.pdf",
+      "description": "Biogas Projects in Rajasthan, Lok Sabha question 1948, table-heavy, 4 pages",
+      "source_url": "https://sansad.in/getFile/loksabhaquestions/annex/187/AU1948_BVoBIH.pdf?source=pqals",
+      "sha256": "adbc7e0d8e65da4a9fb6f810706eb7806778b861245e09e03b12ed9952bb4750",
+      "size_bytes": 146906
+    },
+    {
+      "file": "raw/ls2026_q4519.pdf",
+      "description": "AirSewa Portal, Lok Sabha question 4519, long table annexure, 41 pages",
+      "source_url": "https://sansad.in/getFile/loksabhaquestions/annex/187/AU4519_h68Zxg.pdf?source=pqals",
+      "sha256": "195afc923fa9cecd4ad8d9c495214086ae2845f9fa50c09b00af2286fe134524",
+      "size_bytes": 940250
+    },
+    {
+      "file": "raw/ls2026_q1948_raster180_q65.pdf",
+      "description": "Controlled image-only derivative of q1948, rendered at 180 DPI as JPEG quality 65, 4 pages",
+      "derived_from": "raw/ls2026_q1948.pdf",
+      "sha256": "89d68a3f9c9d0210521fc561aa4e7d1053668bdcca3b75b88842570ece167345",
+      "size_bytes": 672841
+    },
+    {
+      "file": "raw/india1985_scan_proxy.pdf",
+      "description": "Official 1985 Indian government document scan, historical-scan proxy, 42 pages",
+      "sha256": "d2f0f9b71ff3ba553ceb5a4c1ca7ebd845390eba861c922b02f8eba364d404ce",
+      "size_bytes": 3570720,
+      "limitation": "Not a Lok Sabha or Rajya Sabha document"
+    }
+  ]
+}
+

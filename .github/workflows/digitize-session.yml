@@ -1,0 +1,228 @@
+name: Digitize session
+
+# Runs the whole cloud pipeline for one House/Parliament/session scope:
+# census -> acquire -> extract -> Space Bunny adjudication -> publication -> HF.
+# State is checkpointed to the Hugging Face dataset repo after every stage, so
+# an interrupted run resumes without repeating model calls.
+#
+# Required repository secrets: OPENROUTER_API_KEY, HF_TOKEN
+# Optional repository secret:  OPENCODE_API_KEY (cross-model verification)
+# Required repository variable: HF_DATASET_REPO (for example "user/sansad-corpus")
+# Optional repository variables: PILOT_HOUSE, PILOT_PARLIAMENT, PILOT_SESSION,
+#                                PILOT_LIMIT, PILOT_MAX_PAGES
+
+on:
+  workflow_dispatch:
+    inputs:
+      house:
+        description: House
+        type: choice
+        options: [lok_sabha, rajya_sabha]
+        default: lok_sabha
+      parliament:
+        description: Parliament number (blank for Rajya Sabha)
+        type: string
+        default: "18"
+      session:
+        description: Session number
+        type: string
+        default: "8"
+      limit:
+        description: Documents to acquire; 0 means the whole session
+        type: string
+        default: "200"
+      max_pages:
+        description: Model pages per adjudication chunk; 0 skips adjudication
+        type: string
+        default: "500"
+      all_pages:
+        description: Adjudicate every page, not only flagged pages
+        type: boolean
+        default: false
+      verify_sample:
+        description: Pages to cross-check with MiMo via OpenCode Go; 0 disables
+        type: string
+        default: "0"
+      publish:
+        description: Build and upload the publication tranche
+        type: boolean
+        default: true
+      tranche:
+        description: Tranche label (blank uses timestamp and run id)
+        type: string
+        default: ""
+  schedule:
+    - cron: "30 16 * * *"  # 22:00 IST nightly pilot; values come from repo variables
+
+concurrency:
+  group: digitize-session
+  cancel-in-progress: false
+
+jobs:
+  digitize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      HOUSE: ${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}
+      PARLIAMENT: ${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}
+      SESSION: ${{ inputs.session || vars.PILOT_SESSION || '8' }}
+      LIMIT: ${{ inputs.limit || vars.PILOT_LIMIT || '200' }}
+      MAX_PAGES: ${{ inputs.max_pages || vars.PILOT_MAX_PAGES || '500' }}
+      ALL_PAGES: ${{ inputs.all_pages || 'false' }}
+      VERIFY_SAMPLE: ${{ inputs.verify_sample || '0' }}
+      PUBLISH: ${{ inputs.publish || 'true' }}
+      TRANCHE_INPUT: ${{ inputs.tranche || '' }}
+      HF_REPO: ${{ vars.HF_DATASET_REPO }}
+      CHECKPOINT_PATH: state/checkpoints/${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          if [ -n "$AGENT_TOOLSDIRECTORY" ]; then
+            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          fi
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore checkpoint
+        if: env.HF_REPO != ''
+        run: python scripts/cloud_state.py restore --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+
+      - name: Census session
+        run: |
+          set -x
+          if [ "$HOUSE" = "lok_sabha" ]; then
+            python -m sansad_pipeline census-questions \
+              --lok-sabha "$PARLIAMENT" --session "$SESSION" \
+              --limit-per-session 0 --workers 4
+          else
+            python -m sansad_pipeline census-rs-questions \
+              --session "$SESSION" --limit-per-session 0 --workers 4
+          fi
+
+      - name: Acquire originals
+        run: |
+          set -x
+          ARGS=(--house "$HOUSE" --session "$SESSION" --source current \
+                --limit "$LIMIT" --workers 4 --min-free-gib 2)
+          if [ "$HOUSE" = "lok_sabha" ]; then
+            ARGS+=(--lok-sabha "$PARLIAMENT")
+          fi
+          python -m sansad_pipeline acquire-census "${ARGS[@]}"
+
+      - name: Checkpoint after acquisition
+        if: env.HF_REPO != ''
+        run: python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+
+      - name: Extract pages
+        run: |
+          python -m sansad_pipeline process-scope \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" --workers 2
+
+      - name: Adjudicate with Space Bunny in resumable chunks
+        if: env.MAX_PAGES != '0'
+        run: |
+          set -uo pipefail
+          ALL_FLAG=""
+          if [ "$ALL_PAGES" = "true" ]; then ALL_FLAG="--all-pages"; fi
+          for i in $(seq 1 8); do
+            python -m sansad_pipeline adjudicate-scope-openrouter \
+              --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+              --workers 3 --limit-pages "$MAX_PAGES" $ALL_FLAG \
+              --summary-out "/tmp/adjudication-$i.json" \
+              --log "data/logs/adjudication-$i.jsonl" || true
+            if [ -n "$HF_REPO" ]; then
+              python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH" || true
+            fi
+            if [ ! -f "/tmp/adjudication-$i.json" ]; then break; fi
+            CONSIDERED=$(python -c "import json;print(json.load(open('/tmp/adjudication-$i.json'))['pages_considered'])")
+            echo "chunk $i considered=$CONSIDERED"
+            if [ "$CONSIDERED" -lt "$MAX_PAGES" ]; then break; fi
+          done
+
+      - name: Cross-model verification (MiMo via OpenCode Go)
+        if: env.VERIFY_SAMPLE != '0' && env.OPENCODE_API_KEY != ''
+        run: |
+          set -uo pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          python scripts/verify_pages.py \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --sample "$VERIFY_SAMPLE" --models mimo-v2.6-flash \
+            --output "results/verification/$STAMP" || true
+
+      - name: Scope status
+        run: |
+          python -m sansad_pipeline scope-status \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            | tee /tmp/scope-status.json
+
+      - name: Build and upload publication
+        if: env.PUBLISH == 'true' && env.HF_REPO != ''
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          if [ -n "$TRANCHE_INPUT" ]; then
+            TRANCHE="$TRANCHE_INPUT"
+          else
+            TRANCHE="$STAMP-run${GITHUB_RUN_ID}"
+          fi
+          BUNDLE="data/publications/$HOUSE-p$PARLIAMENT-s$SESSION-$TRANCHE"
+          PATH_IN_REPO="data/$HOUSE/parliament-$PARLIAMENT/session-$SESSION/tranche-$TRANCHE"
+          python -m sansad_pipeline prepare-publication \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --output "$BUNDLE"
+          python -m sansad_pipeline verify-publication "$BUNDLE"
+          python -m sansad_pipeline publish-hf "$BUNDLE" \
+            --repo "$HF_REPO" --path-in-repo "$PATH_IN_REPO"
+          echo "PATH_IN_REPO=$PATH_IN_REPO" >> "$GITHUB_ENV"
+          echo "TRANCHE=$TRANCHE" >> "$GITHUB_ENV"
+
+      - name: Upload run state and logs
+        if: always() && env.HF_REPO != ''
+        run: |
+          set -uo pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          python scripts/run_summary.py
+          python scripts/cloud_state.py upload --repo "$HF_REPO" \
+            --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" \
+            --file /tmp/run-summary.json
+          for f in data/logs/*.jsonl; do
+            [ -f "$f" ] || continue
+            python scripts/cloud_state.py upload --repo "$HF_REPO" \
+              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" --file "$f" || true
+          done
+          for f in results/verification/*/report.md results/verification/*/report.json; do
+            [ -f "$f" ] || continue
+            python scripts/cloud_state.py upload --repo "$HF_REPO" \
+              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION/verification" --file "$f" || true
+          done
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Digitize $HOUSE parliament $PARLIAMENT session $SESSION"
+            echo ""
+            echo "- Documents requested: $LIMIT"
+            echo "- Model pages per chunk: $MAX_PAGES"
+            echo "- Cross-model verification pages: $VERIFY_SAMPLE"
+            echo "- Tranche: ${PATH_IN_REPO:-not published}"
+            echo ""
+            echo '```json'
+            cat /tmp/scope-status.json 2>/dev/null || echo "scope status unavailable"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

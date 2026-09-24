@@ -1,0 +1,62 @@
+[storage]
+root = "data"
+
+[liteparse]
+version = "2.10.1"
+language = "eng"
+dpi = 150
+full_page_image_dpi = 250
+workers = 4
+max_pages = 10000
+ocr_server_url = ""
+keep_headers_footers = false
+preserve_small_text = false
+
+[routing]
+minimum_native_characters = 40
+minimum_alphanumeric_ratio = 0.35
+force_ocr_full_page_images = true
+ocr_reasons = ["scanned", "no-text", "garbled", "vector-text", "annotation-text"]
+ignore_reasons = ["sparse-text", "embedded-images"]
+
+[validation]
+minimum_ocr_confidence = 0.70
+maximum_replacement_characters = 0
+flag_numeric_disagreement = true
+flag_inconsistent_table_width = true
+
+[openrouter]
+enabled = true
+endpoint = "https://openrouter.ai/api/v1/chat/completions"
+models_endpoint = "https://openrouter.ai/api/v1/models"
+model = "stealth/space-bunny-alpha"
+models = ["stealth/space-bunny-alpha"]
+max_tokens = 8192
+timeout_seconds = 300
+image_dpi = 150
+max_pages_per_command = 200
+max_cumulative_cost_usd = 10.0
+# Space Bunny Alpha is a reasoning model; reasoning is mandatory and cannot be
+# disabled. "low" keeps latency and token burn per page reasonable. The hidden
+# reasoning text is excluded from the stored adjudication by default.
+reasoning_effort = "low"
+reasoning_exclude = true
+store_reasoning = false
+minimum_interval_seconds = 2.0
+max_retries = 6
+maximum_backoff_seconds = 60.0
+max_concurrency = 3
+
+[nvidia]
+enabled = true
+endpoint = "https://integrate.api.nvidia.com/v1/chat/completions"
+model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+max_tokens = 8192
+reasoning_budget = 1024
+timeout_seconds = 240
+image_dpi = 150
+max_pages_per_command = 25
+minimum_interval_seconds = 3.0
+max_retries = 6
+maximum_backoff_seconds = 45.0
+max_concurrency = 5

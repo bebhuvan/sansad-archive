@@ -1,0 +1,81 @@
+{
+  "case": {
+    "case_id": "india1985_ocr100",
+    "pdf": "india1985_scan_proxy.pdf",
+    "ocr": true,
+    "dpi": 100,
+    "pages": "3",
+    "preserve_small": false,
+    "workers": 4,
+    "reference": null,
+    "reference_kind": "manual_transcription",
+    "gold": "india1985_p3.txt"
+  },
+  "liteparse_version": "2.10.1",
+  "elapsed_seconds": 3.4140783570474014,
+  "pages_returned": 1,
+  "text_chars": 1773,
+  "markdown_chars": 1375,
+  "word_tokens": 217,
+  "numeric_tokens": 11,
+  "markdown_table_rows": 0,
+  "pages": [
+    {
+      "page": 3,
+      "width": 990.47998046875,
+      "height": 641.760009765625,
+      "text_chars": 1773,
+      "markdown_chars": 1375,
+      "text_items": 213,
+      "mean_confidence": 0.9490938967382404,
+      "complexity": {
+        "page_number": 3,
+        "text_length": 0,
+        "text_coverage": -0.0,
+        "has_substantial_images": false,
+        "image_block_count": 0,
+        "image_coverage": 0.0,
+        "largest_image_coverage": 0.0,
+        "full_page_image": true,
+        "uncovered_vector_area": null,
+        "is_garbled": false,
+        "page_area": 635650.4375,
+        "needs_ocr": true,
+        "reasons": [
+          "scanned"
+        ],
+        "layout": {
+          "column_count": 1,
+          "ruled_table_count": 0,
+          "ruled_table_coverage": 0.0,
+          "text_table_run_count": 1,
+          "figure_count": 0,
+          "figure_coverage": 0.0,
+          "is_complex": true,
+          "reasons": [
+            "table-likely"
+          ]
+        }
+      },
+      "content_bounds": [
+        0.0,
+        0.0,
+        1192.3199462890625,
+        841.9199829101562
+      ],
+      "vector_line_count": 0,
+      "vector_shape_count": 0
+    }
+  ],
+  "comparison": {
+    "reference": "gold/india1985_p3.txt",
+    "reference_kind": "manual_transcription",
+    "character_sequence_similarity": 0.9868035190615836,
+    "word_precision": 0.9815668202764977,
+    "word_recall": 0.9638009049773756,
+    "word_f1": 0.9726027397260274,
+    "numeric_precision": 1.0,
+    "numeric_recall": 1.0,
+    "numeric_f1": 1.0
+  }
+}

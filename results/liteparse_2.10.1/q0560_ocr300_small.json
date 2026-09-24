@@ -1,0 +1,166 @@
+{
+  "case": {
+    "case_id": "q0560_ocr300_small",
+    "pdf": "ls2026_q0560.pdf",
+    "ocr": true,
+    "dpi": 300,
+    "pages": null,
+    "preserve_small": true,
+    "workers": 4,
+    "reference": "q0560_native",
+    "reference_kind": "native_text"
+  },
+  "liteparse_version": "2.10.1",
+  "elapsed_seconds": 4.002157634997275,
+  "pages_returned": 3,
+  "text_chars": 4187,
+  "markdown_chars": 3456,
+  "word_tokens": 504,
+  "numeric_tokens": 81,
+  "markdown_table_rows": 17,
+  "pages": [
+    {
+      "page": 1,
+      "width": 595.3200073242188,
+      "height": 841.9199829101562,
+      "text_chars": 2017,
+      "markdown_chars": 1732,
+      "text_items": 46,
+      "mean_confidence": null,
+      "complexity": {
+        "page_number": 1,
+        "text_length": 1637,
+        "text_coverage": 0.26619285345077515,
+        "has_substantial_images": false,
+        "image_block_count": 0,
+        "image_coverage": 0.0,
+        "largest_image_coverage": 0.0,
+        "full_page_image": false,
+        "uncovered_vector_area": 0.0,
+        "is_garbled": false,
+        "page_area": 501211.8125,
+        "needs_ocr": false,
+        "reasons": [],
+        "layout": {
+          "column_count": 1,
+          "ruled_table_count": 0,
+          "ruled_table_coverage": 0.0,
+          "text_table_run_count": 0,
+          "figure_count": 0,
+          "figure_coverage": 0.0,
+          "is_complex": false,
+          "reasons": []
+        }
+      },
+      "content_bounds": [
+        72.02400207519531,
+        47.06399917602539,
+        453.56201171875,
+        791.85595703125
+      ],
+      "vector_line_count": 0,
+      "vector_shape_count": 0
+    },
+    {
+      "page": 2,
+      "width": 595.3200073242188,
+      "height": 841.9199829101562,
+      "text_chars": 727,
+      "markdown_chars": 667,
+      "text_items": 19,
+      "mean_confidence": null,
+      "complexity": {
+        "page_number": 2,
+        "text_length": 650,
+        "text_coverage": 0.09995193034410477,
+        "has_substantial_images": false,
+        "image_block_count": 0,
+        "image_coverage": 0.0,
+        "largest_image_coverage": 0.0,
+        "full_page_image": false,
+        "uncovered_vector_area": null,
+        "is_garbled": false,
+        "page_area": 501211.8125,
+        "needs_ocr": true,
+        "reasons": [
+          "sparse-text"
+        ],
+        "layout": {
+          "column_count": 1,
+          "ruled_table_count": 0,
+          "ruled_table_coverage": 0.0,
+          "text_table_run_count": 0,
+          "figure_count": 0,
+          "figure_coverage": 0.0,
+          "is_complex": false,
+          "reasons": []
+        }
+      },
+      "content_bounds": [
+        72.02400207519531,
+        47.06399917602539,
+        451.85198974609375,
+        791.85595703125
+      ],
+      "vector_line_count": 0,
+      "vector_shape_count": 0
+    },
+    {
+      "page": 3,
+      "width": 595.3200073242188,
+      "height": 841.9199829101562,
+      "text_chars": 1437,
+      "markdown_chars": 1011,
+      "text_items": 98,
+      "mean_confidence": null,
+      "complexity": {
+        "page_number": 3,
+        "text_length": 703,
+        "text_coverage": 0.11940338462591171,
+        "has_substantial_images": false,
+        "image_block_count": 0,
+        "image_coverage": 0.0,
+        "largest_image_coverage": 0.0,
+        "full_page_image": false,
+        "uncovered_vector_area": null,
+        "is_garbled": false,
+        "page_area": 501211.8125,
+        "needs_ocr": true,
+        "reasons": [
+          "sparse-text"
+        ],
+        "layout": {
+          "column_count": 1,
+          "ruled_table_count": 1,
+          "ruled_table_coverage": 0.2826184928417206,
+          "text_table_run_count": 1,
+          "figure_count": 0,
+          "figure_coverage": 0.0,
+          "is_complex": true,
+          "reasons": [
+            "table-likely"
+          ]
+        }
+      },
+      "content_bounds": [
+        70.8239974975586,
+        47.20800018310547,
+        453.7959899902344,
+        791.7119750976562
+      ],
+      "vector_line_count": 321,
+      "vector_shape_count": 283
+    }
+  ],
+  "comparison": {
+    "reference": "q0560_native",
+    "reference_kind": "native_text",
+    "character_sequence_similarity": 1.0,
+    "word_precision": 1.0,
+    "word_recall": 1.0,
+    "word_f1": 1.0,
+    "numeric_precision": 1.0,
+    "numeric_recall": 1.0,
+    "numeric_f1": 1.0
+  }
+}

@@ -1,0 +1,396 @@
+{
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "method": "one simultaneous wave per concurrency level; real pages with 200-6000 local characters",
+  "levels": [
+    {
+      "concurrency": 1,
+      "requests": 1,
+      "successes": 1,
+      "failures": 0,
+      "wall_seconds": 18.171,
+      "throughput_pages_per_minute": 3.302,
+      "median_latency_seconds": 18.16,
+      "max_latency_seconds": 18.16,
+      "http_status_counts": {
+        "200": 1
+      },
+      "results": [
+        {
+          "document_sha256": "2fdb38653a60671fca36b745ae40a3a3011981d03b2f40550a9ccc989265ac28",
+          "run_id": 2018,
+          "page_number": 2,
+          "text_chars": 225,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 18.16,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 2,
+      "requests": 2,
+      "successes": 2,
+      "failures": 0,
+      "wall_seconds": 265.059,
+      "throughput_pages_per_minute": 0.453,
+      "median_latency_seconds": 144.718,
+      "max_latency_seconds": 265.049,
+      "http_status_counts": {
+        "200": 2
+      },
+      "results": [
+        {
+          "document_sha256": "0c01e6f7d9d06669d44e3da2716d9cd72d565c5e269a1ba60816672e8f1419bb",
+          "run_id": 1150,
+          "page_number": 2,
+          "text_chars": 438,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 265.049,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        },
+        {
+          "document_sha256": "38b4979a8f649ed35dae95f586d1db2bced334cfb10c193d9514c3c95b8565f6",
+          "run_id": 2190,
+          "page_number": 5,
+          "text_chars": 344,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 24.386,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 4,
+      "requests": 4,
+      "successes": 4,
+      "failures": 0,
+      "wall_seconds": 27.177,
+      "throughput_pages_per_minute": 8.831,
+      "median_latency_seconds": 20.637,
+      "max_latency_seconds": 27.162,
+      "http_status_counts": {
+        "200": 4
+      },
+      "results": [
+        {
+          "document_sha256": "133fa52fd34559267159afc69ee8a73b2efc3f9196dcbab5918edd64d0e5e5c1",
+          "run_id": 77,
+          "page_number": 4,
+          "text_chars": 592,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 17.64,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "03d7aba071a805d31e457933c24dae50edd98b9e41889a346a26e4a089ce1498",
+          "run_id": 1024,
+          "page_number": 4,
+          "text_chars": 502,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 9.727,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "096003ac6a4eacc2b8c27867315142007336538684322bb64052a40005f08f58",
+          "run_id": 1184,
+          "page_number": 2,
+          "text_chars": 559,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 27.162,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "1fb0907c9be4be871b3b7e17c2d0cb29b8bbdfbd39e99eb580a723aee8496f55",
+          "run_id": 1716,
+          "page_number": 5,
+          "text_chars": 453,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 23.634,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 6,
+      "requests": 6,
+      "successes": 6,
+      "failures": 0,
+      "wall_seconds": 31.81,
+      "throughput_pages_per_minute": 11.317,
+      "median_latency_seconds": 27.544,
+      "max_latency_seconds": 31.774,
+      "http_status_counts": {
+        "200": 6
+      },
+      "results": [
+        {
+          "document_sha256": "841d1778a57cf6f9737c812bfe369e56f20946dcb0c34451a2e4a90f76f0d050",
+          "run_id": 503,
+          "page_number": 2,
+          "text_chars": 720,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 25.279,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "e1c3cab2d8be2f1b15b6dfe62ac4fae896bd55085ee1799cda2b530e46717d6a",
+          "run_id": 839,
+          "page_number": 6,
+          "text_chars": 834,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 31.774,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "ee54edaab365aa085ae9ce8ea3570ba4e0bf94d0ecf82131a4e4a2de20cdd224",
+          "run_id": 891,
+          "page_number": 5,
+          "text_chars": 602,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 30.15,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "05f0581f415027f77c30860a917bbd4a10cf593ab352afc5c7a47bfd98424eb0",
+          "run_id": 1067,
+          "page_number": 3,
+          "text_chars": 739,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 25.661,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "0c70559d15bd4f85c5574edbdbf2c0e0368f6224d673241ce1a84563f7e44149",
+          "run_id": 1183,
+          "page_number": 38,
+          "text_chars": 654,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 25.889,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "1550233b7b9ce80e39c82df989b9bbefec6cff5b49ac29913cb7e6554c626cdf",
+          "run_id": 1505,
+          "page_number": 7,
+          "text_chars": 700,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 29.199,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "concurrency": 8,
+      "requests": 8,
+      "successes": 8,
+      "failures": 0,
+      "wall_seconds": 274.953,
+      "throughput_pages_per_minute": 1.746,
+      "median_latency_seconds": 21.721,
+      "max_latency_seconds": 274.937,
+      "http_status_counts": {
+        "200": 8
+      },
+      "results": [
+        {
+          "document_sha256": "16f516f14128f6d8dc8958923346a8fd49ef3306a5addb649a94abda7ea0830f",
+          "run_id": 91,
+          "page_number": 2,
+          "text_chars": 866,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 11.937,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "24f6478bb7f5f9f9fd921830628ab0504df0d045e63687120283659565216423",
+          "run_id": 152,
+          "page_number": 4,
+          "text_chars": 906,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 26.314,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "d5cdcaebd7f77b80b87767fbea724f19e687be04db885a741131e4e2628e374a",
+          "run_id": 786,
+          "page_number": 2,
+          "text_chars": 850,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 20.331,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "0b968b632c1abf1bf8e0b40e661e13577b24904c86d36c78565910e4fcaccf17",
+          "run_id": 1147,
+          "page_number": 7,
+          "text_chars": 847,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 23.11,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "0c70559d15bd4f85c5574edbdbf2c0e0368f6224d673241ce1a84563f7e44149",
+          "run_id": 1183,
+          "page_number": 4,
+          "text_chars": 901,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 16.167,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "16a47c406daa6a92ca6f051dd5a28b12895350dd5bdd7970e1fb708a69ad655a",
+          "run_id": 1557,
+          "page_number": 2,
+          "text_chars": 862,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 23.546,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "2a85be7cc88e7f4e6545d70bd692ad5d8c0316ed0593aba463ac4c7b7d9e19c1",
+          "run_id": 1982,
+          "page_number": 4,
+          "text_chars": 835,
+          "route": "native",
+          "validation_status": "review",
+          "elapsed_seconds": 19.558,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 1
+        },
+        {
+          "document_sha256": "2fb89fc39d9a770d39614fd2676329a035871991195daf57b57d44407afbb1b8",
+          "run_id": 2139,
+          "page_number": 10,
+          "text_chars": 894,
+          "route": "ocr",
+          "validation_status": "review",
+          "elapsed_seconds": 274.937,
+          "success": true,
+          "failed": [],
+          "http_statuses": [
+            200
+          ],
+          "attempts": 2
+        }
+      ]
+    }
+  ]
+}
