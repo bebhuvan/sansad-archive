@@ -329,6 +329,11 @@ substitute for validating original PDF hashes on restore or in a publication.
   found matching Hub LFS SHA-256 and size, without a local shard download.
   Only the ten pilot PDFs had completed extraction at that checkpoint; this
   is acquisition progress, not a complete text corpus or session publication.
+- By 21:36 UTC, the same run had finished acquisition: all 1,499 official
+  records were `downloaded`, all 1,499 distinct originals were in the V3 HF
+  checkpoint, and the job moved to extraction. The final 64,081,820-byte
+  immutable raw shard's remote LFS SHA-256 and size matched its manifest.
+  Extraction/model coverage and a complete publication remained pending.
 - LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
