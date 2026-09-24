@@ -5,7 +5,7 @@ GitHub is compute only; Hugging Face is the system of record.
 
 ```text
 GitHub Actions runner (ephemeral, 14 GB guaranteed SSD, 6 h/job)
-  restore checkpoint from HF
+  restore checkpoint from HF (immutable raw-PDF archive + mutable processing state)
   census session -> acquire originals -> extract -> Space Bunny adjudication
   optional MiMo cross-model verification
   checkpoint to HF after every stage
@@ -131,9 +131,13 @@ truncated or malformed response is a failed page, not a completed census.
 
 ## Resume semantics
 
-- The workflow restores `state/checkpoints/<scope>/checkpoint.tar.zst` before
+- The workflow restores `state/checkpoints/<scope>/checkpoint.json` before
   any work and saves after acquisition, extraction, and every second
-  adjudication chunk. An archive and its checksum manifest use one Hub commit.
+  adjudication chunk. V2 checkpoints keep raw PDFs in a content-addressed
+  archive and SQLite, extraction artifacts, and logs in a separate state
+  archive. Unchanged originals are not re-uploaded for model-only checkpoints.
+  The manifest and any new archives use one Hub commit; V1 single-archive
+  checkpoints remain restorable.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
   regenerable.

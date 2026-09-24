@@ -24,7 +24,9 @@ DATA = PROJECT_ROOT / "data"
 
 EXCLUDE_NAMES = ("data/tmp", "data/exports", "data/publications")
 EXCLUDE_SUFFIXES = (".png", ".jpg", ".jpeg")
-CHECKPOINT_NAME = "checkpoint.tar.zst"
+CHECKPOINT_NAME = "checkpoint.tar.zst"  # legacy v1 archive
+STATE_NAME = "state.tar.zst"
+RAW_NAME = "raw.tar.zst"
 
 
 def utcnow() -> str:
@@ -71,6 +73,42 @@ def _iter_state_files() -> list[tuple[Path, str]]:
     return items
 
 
+def _raw_inventory(files: list[tuple[Path, str]]) -> str:
+    """Stable digest of immutable original files, independent of tar metadata."""
+    digest = hashlib.sha256()
+    for path, relative in files:
+        digest.update(f"{relative}\0{path.stat().st_size}\0{sha256_file(path)}\n".encode())
+    return digest.hexdigest()
+
+
+def _write_archive(path: Path, files: list[tuple[Path, str]]) -> dict:
+    import zstandard
+
+    compressor = zstandard.ZstdCompressor(level=3)
+    with path.open("wb") as target:
+        with compressor.stream_writer(target) as stream:
+            with tarfile.open(fileobj=stream, mode="w|") as archive:
+                for source, relative in files:
+                    archive.add(source, arcname=relative)
+    return {"bytes": path.stat().st_size, "sha256": sha256_file(path),
+            "files": len(files)}
+
+
+def _existing_manifest(repo: str, path_in_repo: str, token: str | None) -> dict | None:
+    from huggingface_hub import hf_hub_download
+
+    try:
+        path = hf_hub_download(
+            repo_id=repo, filename=f"{path_in_repo}/checkpoint.json",
+            repo_type="dataset", token=token,
+        )
+    except Exception as error:
+        if getattr(getattr(error, "response", None), "status_code", None) == 404:
+            return None
+        raise
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
 def _commit_with_retry(api, *, repo: str, operations: list, message: str):
     """Keep an ephemeral runner alive through a temporary Hub commit limit."""
     for attempt in range(11):
@@ -93,7 +131,6 @@ def _commit_with_retry(api, *, repo: str, operations: list, message: str):
 
 
 def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
-    import zstandard
     from huggingface_hub import CommitOperationAdd, HfApi
 
     DATA.mkdir(parents=True, exist_ok=True)
@@ -102,31 +139,48 @@ def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     if not files:
         raise SystemExit("no pipeline state to checkpoint; run the pipeline first")
     path_in_repo = path_in_repo.strip("/")
+    raw_files = [(path, relative) for path, relative in files if relative.startswith("data/raw/")]
+    state_files = [(path, relative) for path, relative in files if not relative.startswith("data/raw/")]
+    api = HfApi(token=token)
+    api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
+    prior = _existing_manifest(repo, path_in_repo, token)
+    inventory = _raw_inventory(raw_files)
     with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / "data") as temp_dir:
-        archive_path = Path(temp_dir) / CHECKPOINT_NAME
-        compressor = zstandard.ZstdCompressor(level=3)
-        with archive_path.open("wb") as target:
-            with compressor.stream_writer(target) as stream:
-                with tarfile.open(fileobj=stream, mode="w|") as archive:
-                    for path, relative in files:
-                        archive.add(path, arcname=relative)
-        size = archive_path.stat().st_size
-        api = HfApi(token=token)
-        api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
+        temp = Path(temp_dir)
+        state_path = temp / STATE_NAME
+        state_info = _write_archive(state_path, state_files)
+        state_info["path"] = f"{path_in_repo}/{STATE_NAME}"
+        operations = [CommitOperationAdd(
+            path_in_repo=state_info["path"], path_or_fileobj=str(state_path)
+        )]
+        raw_info = None
+        if raw_files:
+            previous_raw = (prior or {}).get("raw") or {}
+            if (prior or {}).get("version") == 2 and previous_raw.get("inventory_sha256") == inventory:
+                raw_info = previous_raw
+            else:
+                raw_path = temp / RAW_NAME
+                raw_info = _write_archive(raw_path, raw_files)
+                raw_info["path"] = f"{path_in_repo}/raw/{raw_info['sha256']}.tar.zst"
+                raw_info["inventory_sha256"] = inventory
+                operations.append(CommitOperationAdd(
+                    path_in_repo=raw_info["path"], path_or_fileobj=str(raw_path)
+                ))
         manifest = {
+            "version": 2,
             "created_at": utcnow(),
             "files": len(files),
-            "archive_bytes": size,
-            "archive_sha256": sha256_file(archive_path),
-            "path_in_repo": f"{path_in_repo}/{CHECKPOINT_NAME}",
+            "archive_bytes": state_info["bytes"] + (raw_info["bytes"] if raw_info else 0),
+            "state": state_info,
+            "raw": raw_info,
         }
+        operations.append(CommitOperationAdd(
+            path_in_repo=f"{path_in_repo}/checkpoint.json",
+            path_or_fileobj=json.dumps(manifest, indent=2).encode("utf-8"),
+        ))
         commit = _commit_with_retry(
             api, repo=repo,
-            operations=[
-                CommitOperationAdd(path_in_repo=manifest["path_in_repo"], path_or_fileobj=str(archive_path)),
-                CommitOperationAdd(path_in_repo=f"{path_in_repo}/checkpoint.json",
-                                   path_or_fileobj=json.dumps(manifest, indent=2).encode("utf-8")),
-            ],
+            operations=operations,
             message=f"Checkpoint {path_in_repo} ({len(files)} files)",
         )
     return {**manifest, "commit_url": str(commit.commit_url)}
@@ -138,39 +192,43 @@ def restore(repo: str, path_in_repo: str, *, token: str | None) -> dict:
 
     DATA.mkdir(parents=True, exist_ok=True)
     path_in_repo = path_in_repo.strip("/")
-    try:
-        downloaded = hf_hub_download(
-            repo_id=repo,
-            filename=f"{path_in_repo}/{CHECKPOINT_NAME}",
-            repo_type="dataset",
-            token=token,
-        )
-    except Exception as error:
-        if getattr(getattr(error, "response", None), "status_code", None) == 404:
-            print(json.dumps({"restored": False, "reason": "checkpoint does not exist"}))
-            return {"restored": False}
-        raise
-    try:
-        manifest_path = hf_hub_download(
-            repo_id=repo, filename=f"{path_in_repo}/checkpoint.json",
-            repo_type="dataset", token=token,
-        )
-    except Exception as error:
-        if getattr(getattr(error, "response", None), "status_code", None) == 404:
-            raise RuntimeError("checkpoint archive exists without its manifest") from error
-        raise
-    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
-    expected_sha = manifest.get("archive_sha256")
-    if (manifest.get("archive_bytes") != Path(downloaded).stat().st_size
-            or (expected_sha is not None and expected_sha != sha256_file(Path(downloaded)))):
-        raise RuntimeError("checkpoint archive failed size or SHA-256 verification")
-    with Path(downloaded).open("rb") as source:
-        decompressor = zstandard.ZstdDecompressor()
-        with decompressor.stream_reader(source) as stream:
-            with tarfile.open(fileobj=stream, mode="r|") as archive:
-                archive.extractall(PROJECT_ROOT, filter="data")
-    print(json.dumps({"restored": True, "archive": str(downloaded)}))
-    return {"restored": True}
+    manifest = _existing_manifest(repo, path_in_repo, token)
+    if manifest is None:
+        try:
+            hf_hub_download(repo_id=repo, filename=f"{path_in_repo}/{CHECKPOINT_NAME}",
+                            repo_type="dataset", token=token)
+        except Exception as error:
+            if getattr(getattr(error, "response", None), "status_code", None) == 404:
+                print(json.dumps({"restored": False, "reason": "checkpoint does not exist"}))
+                return {"restored": False}
+            raise
+        raise RuntimeError("checkpoint archive exists without its manifest")
+
+    if manifest.get("version") == 2:
+        archive_infos = [item for item in (manifest.get("raw"), manifest.get("state")) if item]
+        if not manifest.get("state"):
+            raise RuntimeError("v2 checkpoint has no state archive")
+    else:
+        archive_infos = [{
+            "path": manifest.get("path_in_repo") or f"{path_in_repo}/{CHECKPOINT_NAME}",
+            "bytes": manifest.get("archive_bytes"),
+            "sha256": manifest.get("archive_sha256"),
+        }]
+    downloaded = []
+    for info in archive_infos:
+        path = Path(hf_hub_download(
+            repo_id=repo, filename=info["path"], repo_type="dataset", token=token,
+        ))
+        if info.get("bytes") != path.stat().st_size or info.get("sha256") != sha256_file(path):
+            raise RuntimeError(f"checkpoint archive failed size or SHA-256 verification: {info['path']}")
+        downloaded.append(path)
+    for path in downloaded:
+        with path.open("rb") as source:
+            with zstandard.ZstdDecompressor().stream_reader(source) as stream:
+                with tarfile.open(fileobj=stream, mode="r|") as archive:
+                    archive.extractall(PROJECT_ROOT, filter="data")
+    print(json.dumps({"restored": True, "archives": [str(path) for path in downloaded]}))
+    return {"restored": True, "version": manifest.get("version", 1)}
 
 
 def upload_dir(repo: str, path_in_repo: str, directory: Path, *, token: str | None) -> dict:
