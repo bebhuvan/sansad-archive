@@ -172,6 +172,20 @@ class Database:
                     ON census_records(source_type, house, parliament_number, session, acquisition_status);
                     """
                     )
+                connection.executescript(
+                    """CREATE TABLE IF NOT EXISTS elibrary_pdf_attachments (
+                           record_id TEXT NOT NULL REFERENCES census_records(record_id),
+                           bitstream_id TEXT NOT NULL,
+                           position INTEGER NOT NULL,
+                           name TEXT NOT NULL,
+                           source_url TEXT NOT NULL,
+                           document_sha256 TEXT NOT NULL REFERENCES documents(sha256),
+                           acquired_at TEXT NOT NULL,
+                           PRIMARY KEY(record_id, bitstream_id)
+                       );
+                       CREATE INDEX IF NOT EXISTS idx_elibrary_pdf_attachments_record
+                       ON elibrary_pdf_attachments(record_id, position);"""
+                )
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

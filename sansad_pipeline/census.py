@@ -545,7 +545,7 @@ class Census:
         elif source != "all":
             raise ValueError("source must be all, current, or elibrary")
 
-        downloaded = failed = selected = bytes_added = 0
+        downloaded = failed = selected = bytes_added = original_pdfs_downloaded = 0
         stopped_low_disk = False
         minimum_free = round(min_free_gib * 1024**3)
         last_retry_id = ""
@@ -555,11 +555,13 @@ class Census:
                 source_url = row["source_url"]
                 raw = json.loads(row["raw_json"])
                 extra_metadata = {}
+                pdfs = []
                 if raw.get("_source_system") == "sansad_elibrary_dspace":
                     item_id = str(raw.get("uuid") or raw.get("id") or "")
                     pdfs = list_original_pdfs(item_id)
                     source_url, bitstream = pdfs[0]
                     extra_metadata["elibrary_bitstream"] = bitstream
+                    extra_metadata["elibrary_primary_pdf"] = True
                     extra_metadata["elibrary_original_pdf_inventory"] = [
                         {
                             "uuid": str(pdf.get("uuid") or pdf.get("id")),
@@ -569,14 +571,30 @@ class Census:
                         }
                         for url, pdf in pdfs
                     ]
+                source_metadata = {
+                    key: row[key] for key in row.keys() if key not in {"raw_json"}
+                }
                 document = self.store.download(
                     source_url,
                     metadata={
-                        **{key: row[key] for key in row.keys() if key not in {"raw_json"}},
+                        **source_metadata,
                         **extra_metadata,
                     },
                 )
-                return "downloaded", document
+                documents = [document]
+                for attachment_url, attachment in pdfs[1:]:
+                    documents.append(self.store.download(
+                        attachment_url,
+                        metadata={
+                            **source_metadata,
+                            "elibrary_bitstream": attachment,
+                            "elibrary_original_pdf_inventory": extra_metadata[
+                                "elibrary_original_pdf_inventory"
+                            ],
+                            "elibrary_primary_pdf": False,
+                        },
+                    ))
+                return "downloaded", (document, documents, pdfs)
             except Exception as error:
                 return "failed", error
 
@@ -607,18 +625,44 @@ class Census:
                     row = futures[future]
                     status, value = future.result()
                     if status == "downloaded":
-                        document = value
-                        self.store.db.execute(
-                            """UPDATE census_records SET acquisition_status='downloaded',
-                               document_sha256=?,last_error=NULL WHERE record_id=?""",
-                            (document.sha256, row["record_id"]),
-                        )
+                        document, documents, pdfs = value
+                        if pdfs and len(pdfs) != len(documents):
+                            raise RuntimeError("eLibrary PDF inventory/download count mismatch")
+                        with self.store.db.connect() as connection:
+                            for position, ((url, bitstream), item) in enumerate(zip(pdfs, documents)):
+                                bitstream_id = str(bitstream.get("uuid") or bitstream.get("id"))
+                                existing = connection.execute(
+                                    """SELECT document_sha256 FROM elibrary_pdf_attachments
+                                       WHERE record_id=? AND bitstream_id=?""",
+                                    (row["record_id"], bitstream_id),
+                                ).fetchone()
+                                if existing and existing["document_sha256"] != item.sha256:
+                                    raise RuntimeError(
+                                        f"eLibrary bitstream changed for {row['record_id']} "
+                                        f"{bitstream_id}; refusing to replace archived bytes"
+                                    )
+                                connection.execute(
+                                    """INSERT OR IGNORE INTO elibrary_pdf_attachments
+                                       (record_id,bitstream_id,position,name,source_url,
+                                        document_sha256,acquired_at)
+                                       VALUES (?,?,?,?,?,?,?)""",
+                                    (row["record_id"], bitstream_id, position,
+                                     str(bitstream.get("name") or ""), url, item.sha256, utcnow()),
+                                )
+                            connection.execute(
+                                """UPDATE census_records SET acquisition_status='downloaded',
+                                   document_sha256=?,last_error=NULL WHERE record_id=?""",
+                                (document.sha256, row["record_id"]),
+                            )
                         downloaded += 1
-                        if not document.already_present:
-                            bytes_added += document.size_bytes
+                        original_pdfs_downloaded += len(documents)
+                        bytes_added += sum(
+                            item.size_bytes for item in documents if not item.already_present
+                        )
                         print(
                             f"[{downloaded + failed}/{selected}] downloaded "
-                            f"{row['record_id']} {document.sha256[:12]}",
+                            f"{row['record_id']} {document.sha256[:12]} "
+                            f"original_pdfs={len(documents)}",
                             flush=True,
                         )
                     else:
@@ -636,6 +680,7 @@ class Census:
         return {
             "selected": selected,
             "downloaded": downloaded,
+            "original_pdfs_downloaded": original_pdfs_downloaded,
             "failed": failed,
             "bytes_added": bytes_added,
             "stopped_low_disk": stopped_low_disk,

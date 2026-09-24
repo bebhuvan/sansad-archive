@@ -27,16 +27,19 @@ The HF checkpoint also retains immutable raw-PDF shards for resumability.
 **eLibrary attachment completeness is a separate question from item coverage.**
 At 22:52 UTC on 2026-09-24, live item
 `49d60eef-b8d0-4c19-83bf-2804f0a8c3d0` (LS 17/IX) exposed two ORIGINAL
-bitstreams, `AU3055.pdf` and `AU3055_hindi.pdf`. The current English-first
-item-level pipeline selects and archives the first PDF; it does not yet archive
-or extract the second. It now retains the full PDF bitstream inventory in the
-acquired source's checkpoint metadata and rejects truncated listings instead
-of silently treating the first page as complete. Existing complete markers
-certify selected-PDF coverage, **not all attachments**. A separate variant
-backfill and variant-level completion check are required before claiming that
-every eLibrary PDF is archived, including Hindi. Do not delete or replace
-existing markers based on this discovery; preserve the current selected-PDF
-archive while the variant backfill is designed and run.
+bitstreams, `AU3055.pdf` and `AU3055_hindi.pdf`. The acquisition path from
+commit `ea3186f` onward was English-first and selected only one PDF. The
+subsequent acquisition change downloads every PDF in the ORIGINAL bundle into
+the immutable raw checkpoint, records each bitstream-to-SHA mapping in SQLite,
+and leaves the item retryable if an attachment fails. Only the first PDF enters
+the present text pipeline; Hindi extraction remains a later phase. The listing
+rejects truncation rather than silently treating the first page as complete.
+Already-downloaded items in older checkpoints have **not** been backfilled,
+and the publication tranche still embeds only the selected PDF. Existing
+complete markers certify selected-PDF coverage, **not all attachments**. A
+variant backfill, publication mapping, and variant-level completion check are
+required before claiming that every eLibrary PDF is archived. Do not delete
+or replace existing markers based on this discovery.
 
 The read-only HF inspector reports `checkpoint_status: not_found` while a
 scope is still in its first acquisition chunk. It propagates other Hub errors;

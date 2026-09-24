@@ -37,7 +37,7 @@ def main() -> int:
         else "AND record_id NOT LIKE 'elibrary_%'"
     )
     started = time.monotonic()
-    selected = downloaded = failed = 0
+    selected = downloaded = failed = original_pdfs_downloaded = 0
     stopped_low_disk = False
     already_acquired = census.store.db.one(
         f"""SELECT COUNT(*) n FROM census_records
@@ -57,6 +57,7 @@ def main() -> int:
         )
         selected += result["selected"]
         downloaded += result["downloaded"]
+        original_pdfs_downloaded += result["original_pdfs_downloaded"]
         failed += result["failed"]
         stopped_low_disk = result["stopped_low_disk"]
         if result["downloaded"]:
@@ -77,6 +78,7 @@ def main() -> int:
             retry_failed=True, workers=4, min_free_gib=2,
         )
         downloaded += retry["downloaded"]
+        original_pdfs_downloaded += retry["original_pdfs_downloaded"]
         stopped_low_disk = retry["stopped_low_disk"]
         if retry["downloaded"]:
             save(args.repo, args.checkpoint_path, token=os.environ.get("HF_TOKEN"))
@@ -91,6 +93,7 @@ def main() -> int:
     )
     print(json.dumps({
         "selected": selected, "downloaded": downloaded,
+        "original_pdfs_downloaded": original_pdfs_downloaded,
         "failed": int(remaining["failed"] or 0),
         "discovered": int(remaining["discovered"] or 0),
         "stopped_low_disk": stopped_low_disk,
