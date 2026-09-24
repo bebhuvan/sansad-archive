@@ -592,17 +592,36 @@ class PublicationBuilder:
         for shard, records in shards.items():
             with tarfile.open(output / shard) as archive:
                 members = {item.name: item for item in archive.getmembers() if item.isfile()}
-            for record in records:
-                digest = record["document_sha256"]
-                required = ("original.pdf", "md", "local.md", "txt", "json")
-                if record["adjudicated_page_count"]:
-                    required += ("adjudicated.md",)
-                for suffix in required:
-                    name = f"{digest}.{suffix}"
-                    if name not in members:
-                        failures.append({"path": f"{shard}:{name}", "error": "missing"})
-                    elif suffix == "original.pdf" and members[name].size == 0:
-                        failures.append({"path": f"{shard}:{name}", "error": "empty"})
+                for record in records:
+                    digest = record["document_sha256"]
+                    required = ("original.pdf", "md", "local.md", "txt", "json")
+                    if record["adjudicated_page_count"]:
+                        required += ("adjudicated.md",)
+                    for suffix in required:
+                        name = f"{digest}.{suffix}"
+                        member = members.get(name)
+                        if member is None:
+                            failures.append({"path": f"{shard}:{name}", "error": "missing"})
+                        elif suffix == "original.pdf":
+                            if member.size == 0:
+                                failures.append({"path": f"{shard}:{name}", "error": "empty"})
+                                continue
+                            actual = hashlib.sha256()
+                            with archive.extractfile(member) as source:
+                                for block in iter(lambda: source.read(1024 * 1024), b""):
+                                    actual.update(block)
+                            if actual.hexdigest() != digest:
+                                failures.append({
+                                    "path": f"{shard}:{name}", "error": "SHA-256 mismatch",
+                                    "expected": digest, "actual": actual.hexdigest(),
+                                })
+                            if not metadata.get("compact"):
+                                readable_path = output / record["path"] / "original.pdf"
+                                if readable_path.is_file() and sha256_file(readable_path) != digest:
+                                    failures.append({
+                                        "path": f"{record['path']}/original.pdf",
+                                        "error": "SHA-256 mismatch",
+                                    })
         return {"checked": checked, "failures": failures, "valid": not failures}
 
     @staticmethod

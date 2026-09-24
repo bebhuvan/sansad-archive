@@ -241,7 +241,10 @@ for comparison and require language-aware review before a canonical claim.
   manifest key has its original PDF and text layers inside the WebDataset
   shard (and the readable files in small, non-compact tranches), in addition
   to the outer SHA256SUMS. A bundle missing an original is rejected even if
-  its checksum file has been regenerated. The original and derived text share
+  its checksum file has been regenerated. It also hashes each embedded and
+  readable original against the full document SHA-256 in the manifest, so a
+  substituted PDF is rejected even when the tar and outer checksum agree.
+  The original and derived text share
   the source PDF's SHA-256 key, so readers can retrieve and compare both.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
@@ -293,6 +296,9 @@ for comparison and require language-aware review before a canonical claim.
   nonempty (4,562/3,936 and 8,889/7,936 bytes respectively). The JSON members
   contain one and two pages. This checks the retrievable archive artifact, not
   only the publication code or its success log.
+  The strengthened local verifier also passed on a fresh download of all 18
+  files in this published tranche: 17 SHA256SUMS entries and both embedded
+  and readable original PDF hashes passed with zero failures.
 - In the continuing LS 01/I run, an HF checkpoint at 18:18 UTC contained
   1,002 acquired question records mapped to 685 distinct PDF SHA-256s, with
   zero failed acquisitions and 1,948 records still discovered. This is source

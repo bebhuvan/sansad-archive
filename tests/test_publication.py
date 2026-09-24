@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import tarfile
 import tempfile
 import unittest
@@ -155,6 +156,23 @@ class PublicationTests(unittest.TestCase):
                     source.read_bytes(),
                 )
             self.assertTrue(PublicationBuilder.verify(compact_output)["valid"])
+            readable_pdf = readable / "original.pdf"
+            readable_pdf.write_bytes(bytes([source.read_bytes()[0] ^ 1]) + source.read_bytes()[1:])
+            readable_relative = readable_pdf.relative_to(output).as_posix()
+            readable_checksums = output / "SHA256SUMS"
+            readable_checksums.write_text(
+                "\n".join(
+                    f"{sha256_file(readable_pdf)}  {readable_relative}"
+                    if line.endswith(f"  {readable_relative}") else line
+                    for line in readable_checksums.read_text(encoding="utf-8").splitlines()
+                ) + "\n", encoding="utf-8",
+            )
+            readable_verification = PublicationBuilder.verify(output)
+            self.assertFalse(readable_verification["valid"])
+            self.assertIn(
+                f"{manifest[0]['path']}/original.pdf",
+                [failure["path"] for failure in readable_verification["failures"]],
+            )
             with self.assertRaisesRegex(ValueError, "retain the original PDFs"):
                 PublicationBuilder(config).build(
                     Scope("lok_sabha", "18", "8"), root / "without-originals",
@@ -163,6 +181,31 @@ class PublicationTests(unittest.TestCase):
 
             shard = compact_output / "webdataset" / "shard-00000.tar"
             altered = shard.with_name("altered.tar")
+            with tarfile.open(shard) as original, tarfile.open(altered, "w") as target:
+                for member in original:
+                    payload = original.extractfile(member).read()
+                    if member.name == f"{item.sha256}.original.pdf":
+                        payload = bytes([payload[0] ^ 1]) + payload[1:]
+                    target.addfile(member, io.BytesIO(payload))
+            altered.replace(shard)
+            checksum_file = compact_output / "SHA256SUMS"
+            lines = checksum_file.read_text(encoding="utf-8").splitlines()
+            checksum_file.write_text(
+                "\n".join(
+                    f"{sha256_file(shard)}  webdataset/shard-00000.tar"
+                    if line.endswith("  webdataset/shard-00000.tar") else line
+                    for line in lines
+                ) + "\n", encoding="utf-8",
+            )
+            mismatch = PublicationBuilder.verify(compact_output)
+            self.assertFalse(mismatch["valid"])
+            pdf_failures = [failure for failure in mismatch["failures"]
+                            if failure["path"] ==
+                            f"webdataset/shard-00000.tar:{item.sha256}.original.pdf"]
+            self.assertEqual(len(pdf_failures), 1)
+            self.assertEqual(pdf_failures[0]["error"], "SHA-256 mismatch")
+            self.assertEqual(pdf_failures[0]["expected"], item.sha256)
+            self.assertNotEqual(pdf_failures[0]["actual"], item.sha256)
             with tarfile.open(shard) as original, tarfile.open(altered, "w") as target:
                 for member in original:
                     if member.name != f"{item.sha256}.original.pdf":
