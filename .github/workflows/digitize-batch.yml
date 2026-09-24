@@ -68,7 +68,7 @@ jobs:
       - id: plan
         env:
           HOUSE: ${{ inputs.house || 'all' }}
-          EXCLUDE: ${{ inputs.exclude || '' }}
+          EXCLUDE: ${{ inputs.exclude || vars.BATCH_EXCLUDE || '' }}
           SKIP_EXISTING: ${{ inputs.skip_existing || 'true' }}
           HF_REPO: ${{ vars.HF_DATASET_REPO }}
         run: |

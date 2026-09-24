@@ -34,11 +34,15 @@ def completed_scopes(repo: str | None) -> set[str]:
     except Exception as error:  # a missing repo just means nothing is complete
         print(f"skip-existing disabled: {type(error).__name__}: {error}", file=sys.stderr)
         return set()
-    prefix, suffix = "state/complete/session-complete-", ".json"
+    markers = (
+        ("state/complete/session-complete-", ".json"),
+        ("state/skipped/session-skipped-", ".json"),
+    )
     done = set()
     for path in files:
-        if path.startswith(prefix) and path.endswith(suffix):
-            done.add(path[len(prefix):-len(suffix)])
+        for prefix, suffix in markers:
+            if path.startswith(prefix) and path.endswith(suffix):
+                done.add(path[len(prefix):-len(suffix)])
     return done
 
 

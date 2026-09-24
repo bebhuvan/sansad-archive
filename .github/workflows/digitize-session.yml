@@ -201,8 +201,13 @@ jobs:
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
             | tee /tmp/scope-status.json
 
+      - name: Classify session state
+        id: classify
+        if: always()
+        run: python scripts/classify_session.py >> "$GITHUB_OUTPUT"
+
       - name: Build and upload publication
-        if: env.PUBLISH == 'true' && env.HF_REPO != ''
+        if: env.PUBLISH == 'true' && env.HF_REPO != '' && steps.classify.outputs.empty != 'true'
         run: |
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -232,6 +237,11 @@ jobs:
             [ -f "$f" ] || continue
             python scripts/cloud_state.py upload --repo "$HF_REPO" \
               --path-in-repo "state/complete" --file "$f" || true
+          done
+          for f in /tmp/session-skipped-*.json; do
+            [ -f "$f" ] || continue
+            python scripts/cloud_state.py upload --repo "$HF_REPO" \
+              --path-in-repo "state/skipped" --file "$f" || true
           done
           python scripts/cloud_state.py upload --repo "$HF_REPO" \
             --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" \
