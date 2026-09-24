@@ -248,8 +248,11 @@ class OpenRouterAdjudicator:
         return summary
 
     def _model_snapshot(self, model: str) -> dict:
-        if model in self._snapshot_cache:
-            return self._snapshot_cache[model]
+        cached = self._snapshot_cache.get(model)
+        if cached and (
+            datetime.now(timezone.utc) - datetime.fromisoformat(cached["checked_at"])
+        ).total_seconds() < 60:
+            return cached
         request = urllib.request.Request(
             self.config.openrouter.models_endpoint,
             headers={"User-Agent": "SansadArchive/0.1"},
