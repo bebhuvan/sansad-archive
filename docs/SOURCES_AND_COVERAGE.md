@@ -50,6 +50,8 @@ dates, but this does not make the current API complete.
 Snapshot artifact:
 
 - `data/exports/census-2026-08-01.jsonl.gz`
+- HF mirror: `bebhuvan1/sansad-corpus/state/census/snapshot-2026-08-01.jsonl.gz`
+  with `snapshot-2026-08-01.json` manifest (remote SHA-256 verified 2026-09-24)
 - 1,593,344 lines; 310 MB
 - SHA-256 `f0cec93b7f078af545a4b6a1647b50fdae4e90d769172b6bfd922481dbeb2b0e`
 
@@ -76,4 +78,3 @@ Not currently inventoried or downloaded:
 - other parliamentary paper collections;
 - Hindi-only PDFs;
 - third-party mirrors or digitizations.
-

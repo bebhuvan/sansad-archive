@@ -125,6 +125,13 @@ needs a census slice imported into the runner (an `import-census` command) and
 an explicit storage decision: the raw Lok Sabha Q&A originals alone are
 projected at roughly 279 GiB. Ask datasets@huggingface.co for a storage grant
 before starting, and expect weeks of wall-clock at batch parallelism.
+The verified 2026-08-01 census export (1,593,344 records, SHA-256
+`f0cec93b7f078af545a4b6a1647b50fdae4e90d769172b6bfd922481dbeb2b0e`)
+is now durably stored on HF at
+`state/census/snapshot-2026-08-01.jsonl.gz`, with a sibling JSON manifest.
+The remote LFS SHA-256 and byte size match the local artifact. This is a dated
+inventory, not a claim that its PDFs have been downloaded or that it includes
+items added after 2026-08-01.
 The eLibrary total changes as items are added. Its crawler validates the
 returned page number, size, count, and item identifiers for each page; a
 truncated or malformed response is a failed page, not a completed census.
