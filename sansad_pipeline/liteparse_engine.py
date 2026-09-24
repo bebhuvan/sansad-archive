@@ -138,4 +138,14 @@ class LiteParseEngine:
                     vector_shapes=len(vectors.shapes) if vectors else 0,
                 )
             )
+        expected = (
+            sorted(set(target_pages)) if target_pages is not None
+            else list(range(1, int(result.total_pages) + 1))
+        )
+        actual = sorted(page.page_number for page in pages)
+        if actual != expected:
+            raise RuntimeError(
+                f"LiteParse returned pages {actual[:12]} ({len(actual)} total), "
+                f"expected {expected[:12]} ({len(expected)} total)"
+            )
         return pages

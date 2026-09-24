@@ -334,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as error:
                 return identifier, None, error
 
-        workers = args.workers if args.command == "batch" else 1
+        workers = args.workers if args.command in {"batch", "process-scope"} else 1
         if workers < 1:
             raise SystemExit("--workers must be positive")
         from concurrent.futures import ThreadPoolExecutor, as_completed

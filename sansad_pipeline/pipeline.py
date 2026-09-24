@@ -65,16 +65,17 @@ class Pipeline:
                     if "full-page-image" in decisions[number].reasons
                 ]
                 standard_numbers = [number for number in ocr_numbers if number not in fresh_numbers]
-                if standard_numbers:
+                for offset in range(0, len(standard_numbers), 16):
                     ocr_pages = self.engine.extract(
-                        Path(document["raw_path"]), ocr=True, target_pages=standard_numbers
+                        Path(document["raw_path"]), ocr=True,
+                        target_pages=standard_numbers[offset : offset + 16],
                     )
                     ocr_by_number.update({page.page_number: page for page in ocr_pages})
-                if fresh_numbers:
+                for offset in range(0, len(fresh_numbers), 16):
                     fresh_pages = self.engine.extract(
                         Path(document["raw_path"]),
                         ocr=True,
-                        target_pages=fresh_numbers,
+                        target_pages=fresh_numbers[offset : offset + 16],
                         rasterize=True,
                     )
                     ocr_by_number.update({page.page_number: page for page in fresh_pages})
