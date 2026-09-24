@@ -324,7 +324,9 @@ for comparison and require language-aware review before a canonical claim.
   Its LS 01/II HF checkpoint at 19:44 UTC likewise had all 2,198 source
   records downloaded with zero acquisition errors, mapping to 1,365 distinct
   original PDFs. Its 20:02 UTC checkpoint had 1,200 complete LiteParse runs
-  covering 1,890 pages; extraction was still in progress.
+  covering 1,890 pages. By 20:08 UTC all 1,365 distinct PDFs had complete
+  LiteParse runs covering 2,151 pages, and the GitHub job moved to the
+  Space Bunny stage. No full-session tranche existed at that point.
 - The older full current-API batch `36032423348` was cancelled after its
   acquisition checkpoints were verified: it had entered a single large,
   uncheckpointed extraction step under commit `8f994b9`. Replacement batch
