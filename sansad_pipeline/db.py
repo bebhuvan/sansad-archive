@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS adjudications (
     reported_cost REAL,
     created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_adjudications_page_provider
+ON adjudications(run_id, page_number, provider, id);
 CREATE TABLE IF NOT EXISTS census_runs (
     id INTEGER PRIMARY KEY,
     source_type TEXT NOT NULL,

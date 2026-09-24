@@ -386,9 +386,13 @@ for comparison and require language-aware review before a canonical claim.
   replacement. Preserve the originals and both existing text layers while
   evaluating that signal on more layouts, including genuine tables.
 - Each future cloud pass now samples up to twelve OCR-routed pages for a
-  separate, free Tesseract `--psm 3` layout audit. It prioritizes pages where
-  LiteParse has introduced several Markdown table separators, includes other
-  OCR pages for comparison, and uploads the independent transcript plus
+  separate, free Tesseract `--psm 3` layout audit. Its bounded sample reserves
+  roughly one-third each for LiteParse layout suspects (three or more Markdown
+  table separators), LiteParse/Space Bunny visible-number disagreements, and
+  a random baseline; overlap and small strata are filled from remaining pages.
+  The report records each page's selection stratum, so this deliberately
+  enriched sample is not mistaken for a representative error-rate estimate.
+  It uploads the independent transcript plus
   similarity/numeric-agreement diagnostics and both sides of each numeric
   disagreement under the run's `verification/`
   path. This is non-mutating evidence, not an automatic canonical-text switch;

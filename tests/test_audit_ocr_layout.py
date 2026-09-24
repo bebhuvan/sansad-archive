@@ -35,6 +35,23 @@ class LayoutAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             sample_rows(rows, 0, 17)
 
+    def test_sample_includes_numeric_disagreements_and_random_baseline(self):
+        rows = [
+            {"document_sha256": f"{number:064x}", "page_number": 1,
+             "separator_rows": 4 if number < 4 else 0,
+             "model_numeric_disagreement": 4 <= number < 8}
+            for number in range(12)
+        ]
+        selected = sample_rows(rows, 9, 17)
+        self.assertEqual(len(selected), 9)
+        self.assertEqual(len({row["document_sha256"] for row in selected}), 9)
+        self.assertEqual(
+            {reason: sum(row["selection_stratum"] == reason for row in selected)
+             for reason in ("layout", "numeric", "random")},
+            {"layout": 3, "numeric": 3, "random": 3},
+        )
+        self.assertEqual(len(sample_rows(rows, 1, 17)), 1)
+
     def test_similarity_is_format_tolerant_but_not_a_truth_claim(self):
         self.assertEqual(similarity("# Question", "Question"), 1.0)
         self.assertLess(similarity("Government are not doing it", "Government are doing it"), 1.0)
@@ -52,6 +69,10 @@ class LayoutAuditTests(unittest.TestCase):
             Image.new("RGB", (50, 50), "white").save(source, "PDF")
             store = Store(Config(project_root=root, storage=StorageConfig(root=Path("data"))))
             item = store.ingest(source)
+            self.assertIsNotNone(store.db.one(
+                "SELECT name FROM sqlite_master WHERE type='index' "
+                "AND name='idx_adjudications_page_provider'"
+            ))
             artifact = root / "page.json"
             artifact.write_text(json.dumps({"markdown": "| A | B |\n|---|---|"}), encoding="utf-8")
             run = store.db.execute(
@@ -76,8 +97,29 @@ class LayoutAuditTests(unittest.TestCase):
             rows = page_rows(store, "lok_sabha", "01", "I")
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["separator_rows"], 1)
+            self.assertFalse(rows[0]["model_numeric_disagreement"])
             self.assertEqual(rows[0]["document_sha256"], item.sha256)
             self.assertEqual(page_rows(store, "lok_sabha", "01", "II"), [])
+            model_dir = root / "model"
+            model_dir.mkdir()
+            (model_dir / "adjudicated.md").write_text("Question 42", encoding="utf-8")
+            store.db.execute(
+                """INSERT INTO adjudications
+                   (run_id,page_number,provider,model,request_sha256,response_path,created_at)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (run, 1, "openrouter", "stealth/test", "abc",
+                 str(model_dir / "response.json"), now()),
+            )
+            plan = store.db.all(
+                """EXPLAIN QUERY PLAN SELECT response_path FROM adjudications
+                   WHERE run_id=? AND page_number=? AND provider='openrouter'
+                   ORDER BY id DESC LIMIT 1""", (run, 1),
+            )
+            self.assertTrue(any("idx_adjudications_page_provider" in row["detail"]
+                                for row in plan))
+            rows = page_rows(store, "lok_sabha", "01", "I")
+            self.assertTrue(rows[0]["model_numeric_disagreement"])
+            self.assertEqual(rows[0]["model_markdown"], "Question 42")
 
 
 if __name__ == "__main__":

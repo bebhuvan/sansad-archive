@@ -59,18 +59,23 @@ def numeric_difference(candidate: str, tesseract: str) -> dict[str, list[str]]:
 def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     if count <= 0:
         raise ValueError("sample size must be positive")
-    suspect = [row for row in rows if row["separator_rows"] >= 3]
-    ordinary = [row for row in rows if row["separator_rows"] < 3]
     rng = random.Random(seed)
-    suspect_take = min(len(suspect), max(1, (count * 2) // 3))
-    selected = rng.sample(suspect, suspect_take)
-    remaining = count - len(selected)
-    if remaining > 0:
-        selected.extend(rng.sample(ordinary, min(len(ordinary), remaining)))
-    remaining = count - len(selected)
-    if remaining > 0:
-        leftovers = [row for row in suspect if row not in selected]
-        selected.extend(rng.sample(leftovers, min(len(leftovers), remaining)))
+    selected: list[dict] = []
+    chosen: set[tuple[str, int]] = set()
+    quota = max(1, count // 3)
+    for reason, candidates in (
+        ("layout", [row for row in rows if row["separator_rows"] >= 3]),
+        ("numeric", [row for row in rows if row.get("model_numeric_disagreement")]),
+    ):
+        remaining = [row for row in candidates
+                     if (row["document_sha256"], row["page_number"]) not in chosen]
+        for row in rng.sample(remaining, min(len(remaining), quota, count - len(selected))):
+            selected.append({**row, "selection_stratum": reason})
+            chosen.add((row["document_sha256"], row["page_number"]))
+    remaining = [row for row in rows
+                 if (row["document_sha256"], row["page_number"]) not in chosen]
+    selected.extend({**row, "selection_stratum": "random"}
+                    for row in rng.sample(remaining, min(len(remaining), count - len(selected))))
     return sorted(selected, key=lambda row: (row["document_sha256"], row["page_number"]))
 
 
@@ -82,7 +87,11 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
                AND c.parliament_number=? AND c.session=?
                AND c.document_sha256 IS NOT NULL
            )
-           SELECT r.document_sha256,p.page_number,p.artifact_json,d.raw_path,r.id AS run_id
+           SELECT r.document_sha256,p.page_number,p.artifact_json,d.raw_path,r.id AS run_id,
+                  (SELECT a.response_path FROM adjudications a
+                    WHERE a.run_id=r.id AND a.page_number=p.page_number
+                      AND a.provider='openrouter'
+                    ORDER BY a.id DESC LIMIT 1) model_response_path
            FROM scope_docs s JOIN runs r ON r.document_sha256=s.document_sha256
            JOIN pages p ON p.run_id=r.id
            JOIN documents d ON d.sha256=r.document_sha256
@@ -96,8 +105,13 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
     candidates = []
     for row in rows:
         page = json.loads(Path(row["artifact_json"]).read_text(encoding="utf-8"))
+        response = row["model_response_path"]
+        model = (Path(response).with_name("adjudicated.md").read_text(encoding="utf-8")
+                 if response else None)
         candidates.append({**dict(row), "separator_rows": separator_rows(page["markdown"]),
-                           "local_markdown": page["markdown"]})
+                           "local_markdown": page["markdown"], "model_markdown": model,
+                           "model_numeric_disagreement": model is not None and
+                           numbers(page["markdown"]) != numbers(model)})
     return candidates
 
 
@@ -129,20 +143,14 @@ def main() -> int:
     model_pages = 0
     with report.open("w", encoding="utf-8") as handle:
         for row in selected:
-            adjudication = store.db.one(
-                """SELECT response_path FROM adjudications
-                   WHERE run_id=? AND page_number=? AND provider='openrouter'
-                   ORDER BY id DESC LIMIT 1""",
-                (row["run_id"], row["page_number"]),
-            )
-            model_path = (Path(adjudication["response_path"]).with_name("adjudicated.md")
-                          if adjudication else None)
-            model = model_path.read_text(encoding="utf-8") if model_path and model_path.is_file() else None
+            model = row["model_markdown"]
             model_pages += model is not None
             record = {
                 "document_sha256": row["document_sha256"],
                 "page_number": row["page_number"],
                 "liteparse_separator_rows": row["separator_rows"],
+                "selection_stratum": row["selection_stratum"],
+                "model_local_numeric_disagreement": row["model_numeric_disagreement"],
                 "tesseract_version": version,
                 "psm": 3,
                 "language": "eng",
@@ -179,6 +187,8 @@ def main() -> int:
         "scope": {"house": args.house, "parliament": args.parliament, "session": args.session},
         "ocr_candidates": len(candidates), "sampled": len(selected),
         "model_pages": model_pages, "failures": failures,
+        "selection_strata": {reason: sum(row["selection_stratum"] == reason for row in selected)
+                             for reason in ("layout", "numeric", "random")},
         "report": report.name, "tesseract_version": version,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
