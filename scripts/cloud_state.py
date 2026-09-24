@@ -73,12 +73,44 @@ def _iter_state_files() -> list[tuple[Path, str]]:
     return items
 
 
-def _raw_inventory(files: list[tuple[Path, str]]) -> str:
-    """Stable digest of immutable original files, independent of tar metadata."""
+def _raw_index(files: list[tuple[Path, str]]) -> dict[str, dict]:
+    """Manifest of immutable originals, independently verifiable on restore."""
+    return {
+        relative: {"bytes": path.stat().st_size, "sha256": sha256_file(path)}
+        for path, relative in files
+    }
+
+
+def _raw_inventory(index: dict[str, dict]) -> str:
     digest = hashlib.sha256()
-    for path, relative in files:
-        digest.update(f"{relative}\0{path.stat().st_size}\0{sha256_file(path)}\n".encode())
+    for relative, info in sorted(index.items()):
+        digest.update(f"{relative}\0{info['bytes']}\0{info['sha256']}\n".encode())
     return digest.hexdigest()
+
+
+def _legacy_v2_index(repo: str, info: dict, token: str | None) -> dict[str, dict]:
+    """Verify V2 originals once so migration cannot mask changed PDF bytes."""
+    import zstandard
+    from huggingface_hub import hf_hub_download
+
+    archive_path = Path(hf_hub_download(
+        repo_id=repo, filename=info["path"], repo_type="dataset", token=token,
+    ))
+    if archive_path.stat().st_size != info["bytes"] or sha256_file(archive_path) != info["sha256"]:
+        raise RuntimeError("legacy raw archive failed size or SHA-256 verification")
+    with archive_path.open("rb") as source:
+        with zstandard.ZstdDecompressor().stream_reader(source) as stream:
+            with tarfile.open(fileobj=stream, mode="r|") as archive:
+                index = {}
+                for member in archive:
+                    if not member.isfile():
+                        continue
+                    digest = hashlib.sha256()
+                    with archive.extractfile(member) as raw:
+                        for block in iter(lambda: raw.read(1024 * 1024), b""):
+                            digest.update(block)
+                    index[member.name] = {"bytes": member.size, "sha256": digest.hexdigest()}
+                return index
 
 
 def _write_archive(path: Path, files: list[tuple[Path, str]]) -> dict:
@@ -144,7 +176,34 @@ def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     api = HfApi(token=token)
     api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
     prior = _existing_manifest(repo, path_in_repo, token)
-    inventory = _raw_inventory(raw_files)
+    index = _raw_index(raw_files)
+    prior_version = (prior or {}).get("version")
+    shards: list[dict] = []
+    if prior_version == 3:
+        previous_index = prior.get("raw_index") or {}
+        shards = list(prior.get("raw_shards") or [])
+        if previous_index and not shards:
+            raise RuntimeError("v3 checkpoint has a raw index but no shards")
+        for relative, info in previous_index.items():
+            if index.get(relative) != info:
+                raise RuntimeError(f"previously checkpointed original changed or disappeared: {relative}")
+        known = set(previous_index)
+    elif prior_version == 2 and prior.get("raw"):
+        old = prior["raw"]
+        shards = [old]
+        if old.get("inventory_sha256") == _raw_inventory(index):
+            known = set(index)
+        else:
+            old_index = _legacy_v2_index(repo, old, token)
+            for relative, info in old_index.items():
+                if index.get(relative) != info:
+                    raise RuntimeError(
+                        f"previously checkpointed original changed or disappeared during v2 migration: {relative}"
+                    )
+            known = set(old_index)
+    else:
+        known = set()
+    additions = [(path, relative) for path, relative in raw_files if relative not in known]
     with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / "data") as temp_dir:
         temp = Path(temp_dir)
         state_path = temp / STATE_NAME
@@ -153,26 +212,23 @@ def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
         operations = [CommitOperationAdd(
             path_in_repo=state_info["path"], path_or_fileobj=str(state_path)
         )]
-        raw_info = None
-        if raw_files:
-            previous_raw = (prior or {}).get("raw") or {}
-            if (prior or {}).get("version") == 2 and previous_raw.get("inventory_sha256") == inventory:
-                raw_info = previous_raw
-            else:
-                raw_path = temp / RAW_NAME
-                raw_info = _write_archive(raw_path, raw_files)
-                raw_info["path"] = f"{path_in_repo}/raw/{raw_info['sha256']}.tar.zst"
-                raw_info["inventory_sha256"] = inventory
-                operations.append(CommitOperationAdd(
-                    path_in_repo=raw_info["path"], path_or_fileobj=str(raw_path)
-                ))
+        if additions:
+            raw_path = temp / RAW_NAME
+            raw_info = _write_archive(raw_path, additions)
+            raw_info["path"] = f"{path_in_repo}/raw/{raw_info['sha256']}.tar.zst"
+            shards.append(raw_info)
+            operations.append(CommitOperationAdd(
+                path_in_repo=raw_info["path"], path_or_fileobj=str(raw_path)
+            ))
         manifest = {
-            "version": 2,
+            "version": 3,
             "created_at": utcnow(),
             "files": len(files),
-            "archive_bytes": state_info["bytes"] + (raw_info["bytes"] if raw_info else 0),
+            "archive_bytes": state_info["bytes"] + sum(item["bytes"] for item in shards),
             "state": state_info,
-            "raw": raw_info,
+            "raw_shards": shards,
+            "raw_index": index,
+            "raw_inventory_sha256": _raw_inventory(index),
         }
         operations.append(CommitOperationAdd(
             path_in_repo=f"{path_in_repo}/checkpoint.json",
@@ -204,7 +260,13 @@ def restore(repo: str, path_in_repo: str, *, token: str | None) -> dict:
             raise
         raise RuntimeError("checkpoint archive exists without its manifest")
 
-    if manifest.get("version") == 2:
+    if manifest.get("version") == 3:
+        archive_infos = list(manifest.get("raw_shards") or []) + [manifest.get("state")]
+        if not manifest.get("state"):
+            raise RuntimeError("v3 checkpoint has no state archive")
+        if manifest.get("raw_index") and not manifest.get("raw_shards"):
+            raise RuntimeError("v3 checkpoint has a raw index but no shards")
+    elif manifest.get("version") == 2:
         archive_infos = [item for item in (manifest.get("raw"), manifest.get("state")) if item]
         if not manifest.get("state"):
             raise RuntimeError("v2 checkpoint has no state archive")
@@ -227,6 +289,13 @@ def restore(repo: str, path_in_repo: str, *, token: str | None) -> dict:
             with zstandard.ZstdDecompressor().stream_reader(source) as stream:
                 with tarfile.open(fileobj=stream, mode="r|") as archive:
                     archive.extractall(PROJECT_ROOT, filter="data")
+    if manifest.get("version") == 3:
+        actual = _raw_index([
+            (path, path.relative_to(PROJECT_ROOT).as_posix())
+            for path in sorted((DATA / "raw").rglob("*")) if path.is_file()
+        ]) if (DATA / "raw").is_dir() else {}
+        if actual != manifest.get("raw_index"):
+            raise RuntimeError("restored original-PDF inventory differs from v3 manifest")
     print(json.dumps({"restored": True, "archives": [str(path) for path in downloaded]}))
     return {"restored": True, "version": manifest.get("version", 1)}
 

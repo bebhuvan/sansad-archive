@@ -5,7 +5,7 @@ GitHub is compute only; Hugging Face is the system of record.
 
 ```text
 GitHub Actions runner (ephemeral, 14 GB guaranteed SSD, 6 h/job)
-  restore checkpoint from HF (immutable raw-PDF archive + mutable processing state)
+  restore checkpoint from HF (immutable raw-PDF shards + mutable processing state)
   census session -> acquire originals -> extract -> Space Bunny adjudication
   optional MiMo cross-model verification
   checkpoint to HF after acquisition, every 100 extracted PDFs, and model batches
@@ -172,10 +172,11 @@ for comparison and require language-aware review before a canonical claim.
 
 - The workflow restores `state/checkpoints/<scope>/checkpoint.json` before
   any work and saves after acquisition, every 100 extracted PDFs, and every second
-  adjudication chunk. V2 checkpoints keep raw PDFs in a content-addressed
-  archive and SQLite, extraction artifacts, and logs in a separate state
-  archive. Unchanged originals are not re-uploaded for model-only checkpoints.
-  The manifest and any new archives use one Hub commit; V1 single-archive
+  adjudication chunk. V3 checkpoints append only newly acquired originals to
+  immutable, content-addressed raw-PDF shards. SQLite, extraction artifacts,
+  and logs live in a separate mutable state archive. Unchanged originals are
+  never re-uploaded; the manifest and any new shard use one Hub commit. V2
+  cumulative archives migrate as a verified base shard, and V1 single-archive
   checkpoints remain restorable.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
