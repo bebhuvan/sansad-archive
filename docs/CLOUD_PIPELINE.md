@@ -310,6 +310,18 @@ for comparison and require language-aware review before a canonical claim.
   pixel-identical first page but slightly different local candidates and
   model responses; the system therefore does not silently reuse one model
   response for merely identical page images.
+- A source-image check of two distinct 1952 two-column scans (printed pages
+  25 and 27) exposed a local-layout failure: LiteParse Markdown introduced
+  34 and 27 table-separator rows into ordinary prose and mixed words within
+  some questions. Tesseract `--psm 3` on the same rendered pages preserved the
+  left-column-then-right-column reading order substantially better. Changing
+  LiteParse's output format from Markdown to text did not fix its two-column
+  ordering, so this is a layout-reconstruction issue, not merely Markdown
+  syntax. The stored model layer was generally closer to the visible scan in
+  these samples, but it is candidate-assisted; a separate Tesseract transcript
+  is a promising independent QA signal, not yet a validated corpus-wide
+  replacement. Preserve the originals and both existing text layers while
+  evaluating that signal on more layouts, including genuine tables.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
