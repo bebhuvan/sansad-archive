@@ -102,6 +102,12 @@ After the native-page audit cloud canary, pending-only runs `36060344843`
 (current API) and `36060358281` (historical) replaced those older fallbacks
 at commit `557a4eb`. GitHub again left the active jobs untouched; the pending
 runs include the verified mixed-route audit code.
+At 22:40 UTC, pending-only successors `36068733982` (current API, four scopes,
+two parallel) and `36068688868` (historical, two scopes, two parallel) were
+queued at commit `6c1a17f`. GitHub cancelled only the older pending runs and
+left the active modern and historical model jobs running. The successors
+include the transcript-publication guard and missing-tranche marker recovery;
+their pending state is not evidence that model work has begun.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
