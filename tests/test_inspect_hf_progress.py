@@ -21,6 +21,46 @@ from scripts.inspect_hf_progress import (
 
 
 class CheckpointMonitorTests(unittest.TestCase):
+    def test_historical_attachment_coverage_is_distinct_from_selected_pdfs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.sqlite3"
+            db = Database(path)
+            db.initialize()
+            selected = "a" * 64
+            extra = "b" * 64
+            for digest in (selected, extra):
+                db.execute("INSERT INTO documents VALUES (?,?,?,?,?)",
+                           (digest, 12, "application/pdf", f"/{digest}.pdf", "now"))
+            for record_id in ("elibrary_one", "elibrary_two"):
+                db.execute(
+                    """INSERT INTO census_records
+                       (record_id,source_type,house,parliament_number,session,title,
+                        language,source_url,official_page_url,api_url,api_params_json,
+                        raw_json,discovered_at,acquisition_status,document_sha256)
+                       VALUES (?,'questions_answers','lok_sabha','01','II','Question',
+                               'und','','','','{}','{}','now','downloaded',?)""",
+                    (record_id, selected),
+                )
+            for position, (bitstream, digest) in enumerate((("selected", selected),
+                                                             ("extra", extra))):
+                db.execute(
+                    """INSERT INTO elibrary_pdf_attachments
+                       (record_id,bitstream_id,position,name,source_url,
+                        document_sha256,acquired_at) VALUES (?,?,?,?,?,?,?)""",
+                    ("elibrary_one", bitstream, position, f"{bitstream}.pdf",
+                     f"https://example.test/{bitstream}", digest, "now"),
+                )
+            result = summarize_database(path, "elibrary-lok_sabha-p01-sII")
+            self.assertEqual(result["attachment_inventory_status"], "present")
+            self.assertEqual(result["attachment_items_total"], 2)
+            self.assertEqual(result["attachment_items_inventoried"], 1)
+            self.assertEqual(result["attachment_items_missing_inventory"], 1)
+            self.assertEqual(result["attachment_pdf_bitstreams"], 2)
+            self.assertEqual(result["attachment_additional_pdf_bitstreams"], 1)
+            db.execute("DROP TABLE elibrary_pdf_attachments")
+            legacy = summarize_database(path, "elibrary-lok_sabha-p01-sII")
+            self.assertEqual(legacy["attachment_inventory_status"], "not_recorded")
+
     def test_missing_checkpoint_is_reported_without_hiding_other_hub_errors(self):
         with patch("huggingface_hub.hf_hub_download",
                    side_effect=RemoteEntryNotFoundError(

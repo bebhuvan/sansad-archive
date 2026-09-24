@@ -52,6 +52,9 @@ backfill and remote publication proof are still pending.
 The read-only HF inspector reports `checkpoint_status: not_found` while a
 scope is still in its first acquisition chunk. It propagates other Hub errors;
 checkpoint absence alone is not evidence that its GitHub job stopped.
+For historical checkpoints it also distinguishes an old database without an
+attachment ledger (`not_recorded`) from a new ledger with missing item
+inventories, and counts source PDF bitstreams separately from distinct bytes.
 
 ## Why this split
 

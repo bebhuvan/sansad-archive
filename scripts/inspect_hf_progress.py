@@ -203,6 +203,39 @@ def summarize_database(path: Path, scope: str) -> dict:
                                AND COALESCE(c.parliament_number,'')=?
                                AND c.session=?)""", params,
         ).fetchone()
+        attachment_summary = {"attachment_inventory_status": "not_applicable"}
+        if scope.startswith("elibrary-"):
+            table_present = connection.execute(
+                """SELECT 1 FROM sqlite_master WHERE type='table'
+                   AND name='elibrary_pdf_attachments'"""
+            ).fetchone() is not None
+            attachment_summary = {"attachment_inventory_status":
+                                  "present" if table_present else "not_recorded"}
+            if table_present:
+                total = connection.execute(
+                    """SELECT COUNT(*) FROM census_records
+                       WHERE house=? AND COALESCE(parliament_number,'')=?
+                         AND session=? AND record_id LIKE 'elibrary_%'
+                         AND acquisition_status='downloaded'""", params,
+                ).fetchone()[0]
+                covered, pdfs, additional, distinct = connection.execute(
+                    """SELECT COUNT(DISTINCT a.record_id),COUNT(*),
+                              SUM(a.document_sha256<>c.document_sha256),
+                              COUNT(DISTINCT a.document_sha256)
+                       FROM elibrary_pdf_attachments a
+                       JOIN census_records c ON c.record_id=a.record_id
+                       WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                         AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                         AND c.acquisition_status='downloaded'""", params,
+                ).fetchone()
+                attachment_summary.update({
+                    "attachment_items_total": int(total),
+                    "attachment_items_inventoried": int(covered or 0),
+                    "attachment_items_missing_inventory": int(total - (covered or 0)),
+                    "attachment_pdf_bitstreams": int(pdfs or 0),
+                    "attachment_additional_pdf_bitstreams": int(additional or 0),
+                    "attachment_distinct_pdf_bytes": int(distinct or 0),
+                })
         return {
             "source_records_by_acquisition_status": statuses,
             "distinct_acquired_pdfs": int(coverage[0] or 0),
@@ -216,6 +249,7 @@ def summarize_database(path: Path, scope: str) -> dict:
             "cost_unknown_calls": int(cost[1] or 0),
             "cost_zero_calls": int(cost[2] or 0),
             "cost_nonzero_calls": int(cost[3] or 0),
+            **attachment_summary,
         }
     finally:
         connection.close()
