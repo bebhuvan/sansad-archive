@@ -429,6 +429,12 @@ substitute for validating original PDF hashes on restore or in a publication.
   UTC read. Their checkpoint model-call costs remained explicitly zero, with
   no unknown or nonzero reported costs. All four GitHub jobs were still in
   adjudication, so no complete-session marker was inferred from page gains.
+- The 22:02 UTC read found 3,399, 3,000, 1,403 and 1,200 model pages in those
+  four scopes, plus 434 in full-session LS 17/15. That is 2,200 new
+  model-covered pages since the 21:32 check. All checkpointed OpenRouter calls
+  still had explicit zero cost; no unknown or nonzero calls were recorded.
+  The five jobs remained active, with both batch continuations and the safe
+  17/15 same-scope continuation pending.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.
