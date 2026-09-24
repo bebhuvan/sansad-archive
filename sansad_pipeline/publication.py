@@ -749,6 +749,7 @@ JSON/Parquet page records, and a DuckDB snapshot. {coverage}
 - Session: `{scope['session']}`
 - Documents: {metadata['document_count']}
 - Pages: {metadata['page_count']}
+- Additional official PDF attachments: {metadata.get('additional_original_pdf_count', 0)}
 - Losslessly optimized PDF derivatives: {metadata['optimized_pdf_count']}
 - Model-reviewed pages: {metadata['adjudicated_page_count']}
 - Pipeline commit: `{commit}`
@@ -770,6 +771,9 @@ the parser/OCR text canonical with the model layer beside it for comparison,
 PDFs retain their source copyright. Reproduction is for attributed,
 non-commercial research. Extracted text is machine-generated and may contain
 errors; validation status and provenance are included for every page.
+Additional official PDF attachments are preserved with their bitstream IDs and
+SHA-256 hashes in the manifest. They are not separately text-extracted in this
+tranche unless they also appear as selected documents.
 """
 
 
@@ -778,6 +782,7 @@ def dataset_card() -> str:
 license: other
 language:
 - en
+- hi
 task_categories:
 - document-question-answering
 - text-retrieval
@@ -795,18 +800,40 @@ A provenance-preserving corpus of Lok Sabha and Rajya Sabha documents for
 non-commercial research. Publications are uploaded in bounded tranches and do
 not imply completeness unless a release explicitly says so.
 
-Each tranche provides original official PDFs, per-document Markdown, JSON and
-plain text in WebDataset TAR shards, Zstandard-compressed JSONL, Parquet tables,
-a DuckDB snapshot, and SHA-256 checksums.
+The sources are the [Digital Sansad](https://sansad.in/) question APIs and the
+[Parliament eLibrary](https://elibrary.sansad.in/). Each document is mapped to
+an official source record and its original PDF bytes by SHA-256. The archive
+retains additional eLibrary ORIGINAL-bundle PDFs, including Hindi variants
+when offered; those attachments are linked in the manifest but are not yet
+separately text-extracted.
+
+Each tranche provides selected official PDFs, page-level Markdown, plain text
+and JSON in WebDataset TAR shards, Zstandard-compressed JSONL, Parquet tables,
+a DuckDB snapshot, and SHA-256 checksums. `manifest.jsonl` identifies the
+source records, bitstreams and files. The bundle verifier checks every included
+original PDF against its recorded SHA-256; publication also verifies the
+uploaded file set and content IDs.
+
+## Text layers and coverage
+
+The canonical layer currently defaults to LiteParse native/OCR text. A separate
+free vision-model transcription is retained per page when available; it does
+not silently replace the local layer. Page JSON records route, engine,
+validation flags and model provenance. Machine-generated text can contain
+errors, especially in scans and tables, and should be checked against the PDF
+for consequential use.
+
+A tranche may be a pilot, partial session, or complete snapshot. Historical
+eLibrary completion refers to a dated census snapshot, not a guarantee that
+the live source cannot change. Older tranches may predate attachment archiving;
+use each tranche's metadata and manifest rather than assuming uniform coverage.
 
 ## Provenance and limitations
 
-Every document retains its official source URL and SHA-256. Original Parliament
-material retains its source copyright and must be appropriately attributed.
-errors. Each tranche states its canonical-text policy; the default is the local
-parser/OCR text, with the model transcription retained separately for comparison.
-Treat validation flags and review provenance as part of the data, not as
-optional metadata.
+Original Parliament material retains its source rights and must be
+appropriately attributed. This dataset does not assert that all original
+material is public domain. The texts are research derivatives, not official
+transcripts; treat validation flags and review provenance as part of the data.
 """
 
 

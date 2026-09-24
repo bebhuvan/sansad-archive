@@ -14,7 +14,7 @@ from sansad_pipeline.config import Config, StorageConfig
 from sansad_pipeline.db import json_text
 from sansad_pipeline.publication import (
     PublicationBuilder, Scope, _git_blob_id, compare_remote_bundle,
-    document_slug, sha256_file, slugify,
+    dataset_card, document_slug, sha256_file, slugify,
 )
 from sansad_pipeline.storage import Store, now
 from sansad_pipeline.validation import content_numbers, numbers, text_flags
@@ -22,6 +22,13 @@ from sansad_pipeline.config import ValidationConfig
 
 
 class PublicationTests(unittest.TestCase):
+    def test_dataset_card_explains_source_rights_and_attachment_limits(self):
+        card = dataset_card()
+        self.assertIn("- hi", card)
+        self.assertIn("not yet\nseparately text-extracted", card)
+        self.assertIn("not assert that all original\nmaterial is public domain", card)
+        self.assertNotIn("\nerrors. Each tranche", card)
+
     def test_elibrary_bundle_requires_and_verifies_every_original_pdf(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
