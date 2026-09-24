@@ -98,6 +98,10 @@ at commit `9f6b419`; GitHub cancelled the older pending runs under the declared
 concurrency groups. The three active jobs remained in Space Bunny adjudication.
 The fallback inputs preserve full-session acquisition, all-pages model coverage,
 OCR inclusion, local canonical text, and no paid cross-model verification.
+After the native-page audit cloud canary, pending-only runs `36060344843`
+(current API) and `36060358281` (historical) replaced those older fallbacks
+at commit `557a4eb`. GitHub again left the active jobs untouched; the pending
+runs include the verified mixed-route audit code.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
