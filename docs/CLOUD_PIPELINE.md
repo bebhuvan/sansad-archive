@@ -286,7 +286,19 @@ for comparison and require language-aware review before a canonical claim.
   `text`/`markdown`. The canonical policy defaults to `local`, so the model
   layer can be compared against the parser/OCR layer across the whole corpus
   before anyone promotes it; set `canonical_policy=model` to make the stored
-  adjudication canonical.
+  adjudication canonical. Space Bunny sees the local candidate as a prompt
+  hint, so these are separate outputs but **not independent witnesses**.
+  Independence requires source-image review or the optional separate-model
+  audit; disagreement flags alone cannot decide which is correct.
+- A bounded image-only Space Bunny test on the visible 1952 LS 01/I page 25
+  cost `0.0` but changed the printed “Government are, however, doing
+  everything possible” to “Government are not doing everything possible.”
+  The candidate-assisted stored transcription matched the scan on this
+  consequential phrase. This single counterexample rules out a blind
+  corpus-wide switch to image-only prompting. Two source PDFs had an exact
+  pixel-identical first page but slightly different local candidates and
+  model responses; the system therefore does not silently reuse one model
+  response for merely identical page images.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
