@@ -200,6 +200,8 @@ class PublicationBuilder:
         include_raw: bool = True,
         minimum_pdf_saving_percent: float = 5.0,
         canonical_policy: str = "local",
+        compact: bool = False,
+        complete_session: bool = False,
     ) -> dict:
         if canonical_policy not in {"local", "model"}:
             raise ValueError("canonical_policy must be 'local' or 'model'")
@@ -369,21 +371,26 @@ class PublicationBuilder:
                             optimization_rows.append({"document_sha256": digest, **optimized})
 
                     slug = document_slug(primary, digest)
-                    readable_dir = output / "documents" / slug
-                    readable_dir.mkdir(parents=True, exist_ok=True)
-                    (readable_dir / "document.md").write_text(markdown, encoding="utf-8")
-                    (readable_dir / "document.txt").write_text(plain_text, encoding="utf-8")
-                    (readable_dir / "document.json").write_text(
-                        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-                    )
-                    readable_files = ["document.md", "document.txt", "document.json"]
-                    if include_raw:
-                        shutil.copyfile(raw_path, readable_dir / "original.pdf")
-                        readable_files.insert(0, "original.pdf")
+                    readable_path = f"documents/{slug}" if not compact else None
+                    readable_files = []
+                    if not compact:
+                        readable_dir = output / readable_path
+                        readable_dir.mkdir(parents=True, exist_ok=True)
+                        (readable_dir / "document.md").write_text(markdown, encoding="utf-8")
+                        (readable_dir / "document.txt").write_text(plain_text, encoding="utf-8")
+                        (readable_dir / "document.json").write_text(
+                            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+                        readable_files = ["document.md", "document.txt", "document.json"]
+                        if include_raw:
+                            shutil.copyfile(raw_path, readable_dir / "original.pdf")
+                            readable_files.insert(0, "original.pdf")
                     source_urls = sorted({item["source_url"] for item in public_sources})
                     manifest_rows.append(
                         {
-                            "path": f"documents/{slug}",
+                            "path": readable_path,
+                            "webdataset_shard": "webdataset/shard-00000.tar",
+                            "webdataset_key": digest,
                             "document_sha256": digest,
                             "house": primary["house"],
                             "parliament_number": primary["parliament_number"],
@@ -412,7 +419,7 @@ class PublicationBuilder:
                     document_rows.append(
                         {
                             "document_sha256": digest,
-                            "readable_path": f"documents/{slug}",
+                            "readable_path": readable_path,
                             "size_bytes": primary["size_bytes"],
                             "media_type": primary["media_type"],
                             "record_ids": [item["record_id"] for item in public_sources],
@@ -513,12 +520,14 @@ class PublicationBuilder:
             "adjudicated_page_count": sum(
                 1 for page in page_rows if page["adjudication_provider"] is not None
             ),
-            "readable_document_count": len(manifest_rows),
+            "readable_document_count": 0 if compact else len(manifest_rows),
+            "webdataset_document_count": len(manifest_rows),
+            "compact": compact,
             "manifest": "manifest.jsonl",
             "canonical_policy": canonical_policy,
             "code_commit": code_commit(self.config.project_root),
             "pdf_optimizations": optimization_rows,
-            "complete_session_claimed": False,
+            "complete_session_claimed": complete_session,
         }
         (output / "metadata.json").write_text(
             json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -556,12 +565,30 @@ class PublicationBuilder:
     def scope_readme(metadata: dict) -> str:
         scope = metadata["scope"]
         commit = metadata.get("code_commit") or "unknown"
+        coverage = (
+            "The workflow verified full census, acquisition, extraction and model-page "
+            "coverage before publishing this session."
+            if metadata.get("complete_session_claimed") else
+            "This is a bounded tranche and does not claim the named session is complete."
+        )
+        browse = (
+            "- `webdataset/shard-00000.tar` holds each original PDF together with its "
+            "Markdown, plain text and JSON under the full SHA-256 key.\n"
+            "- `manifest.jsonl` maps each key and shard to official source URLs and "
+            "question metadata.\n"
+            if metadata.get("compact") else
+            "- `documents/<readable-name>/` contains `original.pdf`, `document.md`, "
+            "`document.txt` and `document.json` for each question.\n"
+            "- `manifest.jsonl` maps each readable path and WebDataset key to its "
+            "official source URLs and question metadata.\n"
+            "- `webdataset/shard-00000.tar` also keeps each original and text layer "
+            "under the full SHA-256 key.\n"
+        )
         return f"""# Sansad corpus publication tranche
 
 This is a provenance-preserving research tranche from the Sansad PDF corpus.
 It contains original official PDFs, extracted Markdown and plain text, structured
-JSON/Parquet page records, and a DuckDB snapshot. It is a pilot and does not
-claim that the named parliamentary session is complete.
+JSON/Parquet page records, and a DuckDB snapshot. {coverage}
 
 - House: `{scope['house']}`
 - Parliament: `{scope['parliament_number']}`
@@ -574,18 +601,10 @@ claim that the named parliamentary session is complete.
 
 ## How to browse this tranche
 
-- `documents/<readable-name>/` contains one folder per document:
-  `original.pdf`, `document.md`, `document.txt`, `document.json`. The folder
-  name carries the document date, question number, a title slug and the first
-  eight characters of the SHA-256.
-- `manifest.jsonl` maps every readable path to its full SHA-256, official
-  source URLs, record IDs, house/parliament/session, date, question number,
-  title, ministry and page count. Use it instead of guessing from filenames.
+{browse}
 - `pages.parquet`, `pages.jsonl.zst` and `sansad.duckdb` carry per-page
   canonical text, the local parser candidate, validation flags and model
   provenance.
-- `webdataset/shard-00000.tar` is the machine-friendly shard keyed by SHA-256
-  for streaming and training.
 - `SHA256SUMS` verifies every file in the tranche.
 
 Every page keeps its layers side by side: `local_text`/`local_markdown` from

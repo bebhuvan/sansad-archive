@@ -255,9 +255,13 @@ jobs:
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           BUNDLE="data/publications/$HOUSE-p$PARLIAMENT-s$SESSION-run${GITHUB_RUN_ID}"
+          FORMAT_ARGS=()
+          if [ "$LIMIT" = "0" ]; then
+            FORMAT_ARGS+=(--compact --complete-session)
+          fi
           python -m sansad_pipeline prepare-publication \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-            --output "$BUNDLE" --canonical-policy "$CANONICAL_POLICY"
+            --output "$BUNDLE" --canonical-policy "$CANONICAL_POLICY" "${FORMAT_ARGS[@]}"
           python -m sansad_pipeline verify-publication "$BUNDLE"
           if [ -n "$TRANCHE_INPUT" ]; then
             TRANCHE="$TRANCHE_INPUT"

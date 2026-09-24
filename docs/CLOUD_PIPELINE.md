@@ -173,9 +173,12 @@ before starting, and expect weeks of wall-clock at batch parallelism.
 
 Each publication tranche contains:
 
-- `documents/<date>_<question>_<title>__<sha8>/` with `original.pdf`,
-  `document.md`, `document.txt`, `document.json`;
-- `manifest.jsonl` mapping every readable path to its full SHA-256, official
+- pilot tranches have `documents/<date>_<question>_<title>__<sha8>/` with
+  `original.pdf`, `document.md`, `document.txt`, `document.json`;
+- complete cloud sessions use compact WebDataset storage, keeping each
+  original PDF and its text layers together under the full SHA-256 key. This
+  avoids hundreds of thousands of small files in one HF repository;
+- `manifest.jsonl` mapping every readable path or WebDataset key to its full SHA-256, official
   source URLs, record IDs, house/parliament/session, date, question number,
   title, ministry and page count;
 - `pages.parquet`, `documents.parquet`, `pages.jsonl.zst`,

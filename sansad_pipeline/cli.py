@@ -205,6 +205,10 @@ def parser() -> argparse.ArgumentParser:
     prepare_publication.add_argument("--output", required=True, type=Path)
     prepare_publication.add_argument("--limit", type=int)
     prepare_publication.add_argument("--no-raw", action="store_true")
+    prepare_publication.add_argument("--compact", action="store_true",
+                                     help="Keep originals and text together in the WebDataset archive without per-document files")
+    prepare_publication.add_argument("--complete-session", action="store_true",
+                                     help="Claim completeness after the workflow has verified the full scope")
     prepare_publication.add_argument("--minimum-pdf-saving-percent", type=float, default=5.0)
     prepare_publication.add_argument(
         "--canonical-policy",
@@ -782,6 +786,8 @@ def main(argv: list[str] | None = None) -> int:
             include_raw=not args.no_raw,
             minimum_pdf_saving_percent=args.minimum_pdf_saving_percent,
             canonical_policy=args.canonical_policy,
+            compact=args.compact,
+            complete_session=args.complete_session,
         )
         verification = PublicationBuilder.verify(args.output)
         print(json.dumps({"publication": result, "verification": verification}, indent=2))

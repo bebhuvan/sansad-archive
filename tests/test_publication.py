@@ -132,6 +132,24 @@ class PublicationTests(unittest.TestCase):
                 canonical = archive.extractfile(f"{item.sha256}.md").read().decode("utf-8")
             self.assertEqual(canonical, "# Reviewed text")
 
+            compact_output = root / "bundle-compact"
+            PublicationBuilder(config).build(
+                Scope("lok_sabha", "18", "8"), compact_output,
+                minimum_pdf_saving_percent=100, compact=True, complete_session=True,
+            )
+            compact_manifest = json.loads(
+                (compact_output / "manifest.jsonl").read_text(encoding="utf-8").splitlines()[0]
+            )
+            self.assertIsNone(compact_manifest["path"])
+            self.assertEqual(compact_manifest["webdataset_key"], item.sha256)
+            self.assertFalse((compact_output / "documents").exists())
+            with tarfile.open(compact_output / "webdataset" / "shard-00000.tar") as archive:
+                self.assertEqual(
+                    archive.extractfile(f"{item.sha256}.original.pdf").read(),
+                    source.read_bytes(),
+                )
+            self.assertTrue(PublicationBuilder.verify(compact_output)["valid"])
+
 
 class NamingAndValidationTests(unittest.TestCase):
     def test_document_slug_is_human_readable_and_hash_suffixed(self):
