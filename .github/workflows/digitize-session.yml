@@ -119,11 +119,11 @@ jobs:
       SESSION: ${{ inputs.session || vars.PILOT_SESSION || '8' }}
       LIMIT: ${{ inputs.limit || vars.PILOT_LIMIT || '200' }}
       MAX_PAGES: ${{ inputs.max_pages || vars.PILOT_MAX_PAGES || '500' }}
-      ALL_PAGES: ${{ inputs.all_pages || 'true' }}
+      ALL_PAGES: ${{ (inputs.all_pages == true || inputs.all_pages == 'true') && 'true' || 'false' }}
       CANONICAL_POLICY: ${{ inputs.canonical_policy || 'local' }}
-      INCLUDE_OCR: ${{ inputs.include_ocr || 'true' }}
+      INCLUDE_OCR: ${{ (inputs.include_ocr == true || inputs.include_ocr == 'true') && 'true' || 'false' }}
       VERIFY_SAMPLE: ${{ inputs.verify_sample || '0' }}
-      PUBLISH: ${{ inputs.publish || 'true' }}
+      PUBLISH: ${{ (inputs.publish == true || inputs.publish == 'true') && 'true' || 'false' }}
       TRANCHE_INPUT: ${{ inputs.tranche || '' }}
       HF_REPO: ${{ vars.HF_DATASET_REPO }}
       CHECKPOINT_PATH: state/checkpoints/${{ inputs.source == 'elibrary' && 'elibrary-' || '' }}${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
@@ -270,8 +270,13 @@ jobs:
             --sample "$VERIFY_SAMPLE" --models mimo-v2.6-flash \
             --output "results/verification/$STAMP" || true
 
+      - name: Install free Tesseract layout-audit OCR
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+          tesseract --version
+
       - name: Free Tesseract layout audit
-        continue-on-error: true
         run: |
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           python scripts/audit_ocr_layout.py \

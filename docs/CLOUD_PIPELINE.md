@@ -336,6 +336,17 @@ for comparison and require language-aware review before a canonical claim.
   and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
   the stored model transcription. Both numeric comparisons disagreed with
   Tesseract, so similarity alone cannot adjudicate that page.
+- A two-document cloud canary (`36045023595`) exposed two workflow-boundary
+  failures before this audit could be trusted: the runner lacked the system
+  `tesseract` executable, and `inputs.publish || 'true'` treated an explicit
+  `publish=false` as the default `true`. That canary therefore published a
+  bounded, remotely verified two-PDF tranche at
+  `data/lok_sabha/parliament-02/session-IX/tranche-snapshot-local-1a185ab8b95638656abd`
+  despite the no-publication request; it is not a complete-session claim.
+  The workflow now installs the free Tesseract binary before auditing,
+  makes audit failure fail the pass instead of appearing green, and converts
+  Boolean inputs explicitly so `false` remains `false`. A follow-up cloud
+  canary must verify these fixes before treating audit upload as proven.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the

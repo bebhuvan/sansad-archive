@@ -38,7 +38,7 @@ def main() -> int:
         "inputs": {
             key.lower(): os.environ.get(key)
             for key in ("SOURCE", "HOUSE", "PARLIAMENT", "SESSION", "LIMIT", "MAX_PAGES",
-                        "ALL_PAGES", "INCLUDE_OCR", "VERIFY_SAMPLE")
+                        "ALL_PAGES", "INCLUDE_OCR", "VERIFY_SAMPLE", "PUBLISH")
         },
         "tranche": os.environ.get("TRANCHE", ""),
         "tranche_path": os.environ.get("PATH_IN_REPO", ""),
