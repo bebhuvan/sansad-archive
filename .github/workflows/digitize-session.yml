@@ -171,13 +171,10 @@ jobs:
           python -m sansad_pipeline acquire-census "${ARGS[@]}" | tee /tmp/acquire.json
           RC=${PIPESTATUS[0]}
           set -e
-          if [ "$RC" != "0" ] && [ ! -s /tmp/acquire.json ]; then
-            echo "acquire failed without a result summary" >&2
-            exit "$RC"
+          python scripts/acquire_summary.py /tmp/acquire.json >> "$GITHUB_OUTPUT"
+          if [ "$RC" != "0" ]; then
+            echo "acquire exited $RC; failures are classified after the retry pass"
           fi
-          read -r DOWNLOADED FAILED < <(python -c "import json;d=json.load(open('/tmp/acquire.json'));print(d.get('downloaded',0),d.get('failed',0))")
-          echo "downloaded=$DOWNLOADED failed=$FAILED"
-          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
 
       - name: Retry failed downloads once
         if: steps.acquire.outputs.failed != '0'
