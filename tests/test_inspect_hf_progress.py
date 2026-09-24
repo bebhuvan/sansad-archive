@@ -10,6 +10,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import zstandard
+import httpx
+from huggingface_hub.errors import RemoteEntryNotFoundError
 
 from sansad_pipeline.db import Database
 from scripts.inspect_hf_progress import (
@@ -19,6 +21,21 @@ from scripts.inspect_hf_progress import (
 
 
 class CheckpointMonitorTests(unittest.TestCase):
+    def test_missing_checkpoint_is_reported_without_hiding_other_hub_errors(self):
+        with patch("huggingface_hub.hf_hub_download",
+                   side_effect=RemoteEntryNotFoundError(
+                       "missing", response=httpx.Response(
+                           404, request=httpx.Request("GET", "https://example.test/missing")))):
+            result = inspect("test/corpus", "elibrary-lok_sabha-p01-sIII",
+                             max_db_bytes=1024 * 1024)
+        self.assertEqual(result["checkpoint_status"], "not_found")
+        self.assertIsNone(result["checkpoint_at"])
+        with patch("huggingface_hub.hf_hub_download",
+                   side_effect=RuntimeError("hub unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "hub unavailable"):
+                inspect("test/corpus", "elibrary-lok_sabha-p01-sIII",
+                        max_db_bytes=1024 * 1024)
+
     def test_monitor_uses_temporary_state_and_keeps_original_shards_remote(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

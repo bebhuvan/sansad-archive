@@ -225,16 +225,21 @@ def inspect(repo: str, scope: str, *, max_db_bytes: int,
             max_state_bytes: int = 512 * 1024 * 1024,
             audit_transcripts: bool = False) -> dict:
     from huggingface_hub import hf_hub_download
+    from huggingface_hub.errors import RemoteEntryNotFoundError
 
     if not SCOPE.fullmatch(scope):
         raise ValueError(f"invalid checkpoint scope: {scope}")
     root = f"state/checkpoints/{scope}"
     with tempfile.TemporaryDirectory(prefix="sansad-hf-monitor-") as directory:
         temporary = Path(directory)
-        manifest_path = Path(hf_hub_download(
-            repo, f"{root}/checkpoint.json", repo_type="dataset",
-            local_dir=temporary, force_download=True,
-        ))
+        try:
+            manifest_path = Path(hf_hub_download(
+                repo, f"{root}/checkpoint.json", repo_type="dataset",
+                local_dir=temporary, force_download=True,
+            ))
+        except RemoteEntryNotFoundError:
+            return {"repo": repo, "scope": scope,
+                    "checkpoint_status": "not_found", "checkpoint_at": None}
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         state = manifest.get("state") or {}
         state_name = state.get("path")
@@ -259,6 +264,7 @@ def inspect(repo: str, scope: str, *, max_db_bytes: int,
         return {
             "repo": repo,
             "scope": scope,
+            "checkpoint_status": "present",
             "checkpoint_at": manifest.get("created_at"),
             "checkpoint_version": manifest.get("version"),
             "retained_original_pdfs": raw_pdf_count(manifest),

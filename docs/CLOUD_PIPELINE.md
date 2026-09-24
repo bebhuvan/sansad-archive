@@ -38,6 +38,10 @@ every eLibrary PDF is archived, including Hindi. Do not delete or replace
 existing markers based on this discovery; preserve the current selected-PDF
 archive while the variant backfill is designed and run.
 
+The read-only HF inspector reports `checkpoint_status: not_found` while a
+scope is still in its first acquisition chunk. It propagates other Hub errors;
+checkpoint absence alone is not evidence that its GitHub job stopped.
+
 ## Why this split
 
 - GitHub repositories are not storage: 100 MB per-file rejections, roughly
