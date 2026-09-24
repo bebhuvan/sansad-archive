@@ -42,7 +42,7 @@ without repeating model calls.
    - `HF_TOKEN` with write access to the dataset repository (required);
    - `OPENCODE_API_KEY` for MiMo cross-model verification (optional).
 3. Repository variable `HF_DATASET_REPO`, for example `your-user/sansad-corpus`.
-4. Optional repository variables for the nightly schedule:
+4. Optional repository variables for directly dispatched pilot sessions:
    `PILOT_HOUSE`, `PILOT_PARLIAMENT`, `PILOT_SESSION`, `PILOT_LIMIT`,
    `PILOT_MAX_PAGES`.
 
@@ -66,8 +66,13 @@ Use **Actions -> Digitize session -> Run workflow**:
 | `publish` | Build and upload the publication tranche |
 | `tranche` | Tranche label; blank uses a content-derived snapshot label |
 
-The nightly `schedule` runs the batch workflow; `PILOT_*` variables apply only
-to a directly dispatched session workflow. GitHub disables scheduled
+The four-hour `schedule` queues each batch workflow at minutes 17 (current API)
+and 47 (historical) of 00, 04, 08, 12, 16 and 20 UTC. Each workflow's
+concurrency group allows one active batch and one pending batch, so a long
+two-wave batch cannot overlap itself. The per-scope lock separately prevents
+two runs for one session. GitHub schedules are best-effort and may start late.
+`PILOT_*` variables apply only to a directly dispatched session workflow.
+GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
 the repository active.
 
@@ -92,13 +97,13 @@ being mistaken for a successful empty session.
 Phase 1 is the bounded LS 18/8 pilot. Phase 2 is the **Digitize batch**
 workflow: it lists every current-API session, skips scopes already marked
 complete, and runs a bounded matrix of four scopes with at most two concurrent
-sessions by default. Each nightly batch resumes the earliest unfinished scopes.
+sessions by default. Each queued batch resumes the earliest unfinished scopes.
 A scope is marked complete only when its census, acquisition, extraction,
 all-page Space Bunny coverage, and publication are proven. A source record
 whose official link is demonstrably HTML rather than a PDF is counted
 separately and remains visible in the run summary; it cannot hide a transient
 download failure. Markers live at
-`state/complete/session-complete-<house>-p<parl>-s<session>.json`. The nightly
+`state/complete/session-complete-<house>-p<parl>-s<session>.json`. The four-hour
 schedule re-runs the batch incrementally, so new sessions are picked up
 automatically. The planner validates each existing HF completion or skip
 marker against its recorded census, acquisition, extraction, model coverage,
@@ -109,7 +114,7 @@ Scopes whose census returns zero records (typically pre-2000 sessions that the
 current API lists but does not serve) are classified as empty: the workflow
 skips publication, exits successfully, and uploads a skip marker to
 `state/skipped/session-skipped-<key>.json`. The planner skips both complete and
-skipped scopes, so empty sessions are attempted once, not nightly. The same
+skipped scopes, so empty sessions are attempted once, not at every pass. The same
 path covers legacy sessions whose records only link to `.htm` annexure pages
 instead of PDFs, for example Lok Sabha 13/4, where all 31 records resolve to
 `sansad.in/getFile/Annexture_New/...htm` with no PDF field. Those belong to the

@@ -2,6 +2,7 @@ name: Digitize historical Lok Sabha batch
 
 # The dated eLibrary snapshot is the scheduler's finite inventory. A separate
 # snapshot-complete marker prevents treating it as live eLibrary completeness.
+# Queue every four hours; the concurrency group prevents overlapping batches.
 on:
   workflow_dispatch:
     inputs:
@@ -18,7 +19,7 @@ on:
         type: string
         default: ""
   schedule:
-    - cron: "15 17 * * *"  # 22:45 IST daily; incremental dated-snapshot scheduler
+    - cron: "47 0,4,8,12,16,20 * * *"  # UTC; staggered from current-API batch
 
 concurrency:
   group: digitize-historical-batch

@@ -2,8 +2,9 @@ name: Digitize batch
 
 # Queues every current-API House/Parliament/session scope as a matrix of
 # resumable session runs. Complete scopes are skipped using markers under
-# state/complete/ on Hugging Face, so the nightly schedule is an incremental
-# scheduler for new sessions and anything left incomplete.
+# state/complete/ on Hugging Face, so the four-hour schedule is an incremental
+# scheduler for new sessions and anything left incomplete. Concurrency keeps
+# one batch active and at most one pending while six-hour jobs resume on HF.
 #
 # The historical eLibrary collection is not session-scoped and is not part of
 # this batch yet; see docs/CLOUD_PIPELINE.md.
@@ -57,7 +58,7 @@ on:
         type: boolean
         default: true
   schedule:
-    - cron: "30 16 * * *"  # 22:00 IST incremental batch
+    - cron: "17 0,4,8,12,16,20 * * *"  # UTC; staggered from historical batch
 
 concurrency:
   group: digitize-batch
