@@ -168,6 +168,15 @@ was in progress at 23:19 UTC; no attachment backfill or replacement publication
 is yet proven. Pending historical successor `36072076317` now carries the same
 code; GitHub cancelled the older pending `36071290681` without touching active
 batch `36039411879`.
+At 23:22 UTC, MIME-format inspection was added for extensionless PDF
+bitstreams. The direct replay `36072053119` was still at census import, so a
+cancel request was sent before it reached attachment acquisition. Replacement
+run `36072353217` was queued on commit `43ac90c` for the same scope and full
+inputs. Historical pending successor `36072372995` carries that commit;
+GitHub cancelled the older pending `36072076317` and kept the active
+historical batch running. At 23:23 UTC, `36072053119` was terminal/cancelled
+and replacement `36072353217` had started runner preparation; attachment
+backfill had not yet begun.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
