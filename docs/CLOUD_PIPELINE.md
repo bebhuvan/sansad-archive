@@ -187,6 +187,12 @@ GitHub cancelled the older pending `36072076317` and kept the active
 historical batch running. At 23:23 UTC, `36072053119` was terminal/cancelled
 and replacement `36072353217` had started runner preparation; attachment
 backfill had not yet begun.
+At 23:28 UTC, pending historical batch `36072908147` was queued on commit
+`5e56235`, which requires attachment-aware snapshot completion markers. GitHub
+cancelled only the older pending `36072372995`; active batch `36039411879`
+remained in LS 01/III acquisition. The direct LS 01/II replay remained active
+in acquisition. A later batch may revisit II once to replace its pre-marker-
+upgrade run summary, even if that replay finishes its PDF backfill first.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
