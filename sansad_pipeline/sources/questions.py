@@ -81,11 +81,16 @@ class QuestionRecord:
 
 def available_lok_sabha_sessions() -> list[tuple[str, str]]:
     rows = request_json(f"{LS_API}/business/getAllLoksabhaAndSession", params={"locale": "en"})
-    return [
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError("official Lok Sabha session inventory is empty or malformed")
+    sessions = {
         (str(house["loksabha"]), str(session["sessionNo"]))
         for house in rows
         for session in house.get("sessions", [])
-    ]
+    }
+    if not sessions:
+        raise RuntimeError("official Lok Sabha session inventory has no sessions")
+    return sorted(sessions, key=lambda item: (int(item[0]), int(item[1])))
 
 
 def latest_lok_sabha_session() -> tuple[str, str]:
@@ -165,6 +170,9 @@ def discover_lok_sabha_questions(
     api_url = f"{LS_API}/question/qetFilteredQuestionsAns"
     page_number = 1
     yielded = 0
+    rows_seen = 0
+    expected_total: int | None = None
+    record_ids: set[str] = set()
     while True:
         params = {
             "loksabhaNo": lok_sabha,
@@ -174,18 +182,30 @@ def discover_lok_sabha_questions(
             "pageSize": page_size,
         }
         response = request_json(api_url, params=params)
-        payload = response[0] if response else {}
-        rows = payload.get("listOfQuestions") or []
-        total = int(payload.get("totalRecordSize") or 0)
+        if not isinstance(response, list) or not response or not isinstance(response[0], dict):
+            raise RuntimeError(f"Lok Sabha questions page {page_number} has an invalid response")
+        payload = response[0]
+        if "totalRecordSize" not in payload or not isinstance(payload.get("listOfQuestions"), list):
+            raise RuntimeError(f"Lok Sabha questions page {page_number} lacks pagination fields")
+        rows = payload["listOfQuestions"]
+        total = int(payload["totalRecordSize"])
+        if total < 0 or (expected_total is not None and total != expected_total):
+            raise RuntimeError("Lok Sabha question count changed during pagination")
+        expected_total = total
         if not rows:
+            if rows_seen < total:
+                raise RuntimeError(f"Lok Sabha questions ended after {rows_seen} of {total} rows")
             break
         for row in rows:
             source_url = str(row.get("questionsFilePath") or "").strip()
-            if not source_url:
-                continue
             number = str(row.get("quesNo") or "").strip()
+            if not number:
+                raise RuntimeError(f"Lok Sabha questions page {page_number} has a record without quesNo")
             subtype = str(row.get("type") or "unknown").strip().upper()
             record_id = f"ls_l{lok_sabha}_s{session}_q{number}_{subtype.casefold()}_en"
+            if record_id in record_ids:
+                raise RuntimeError(f"duplicate Lok Sabha question in paginated census: {record_id}")
+            record_ids.add(record_id)
             yield QuestionRecord(
                 record_id=record_id,
                 source_type="questions_answers",
@@ -208,7 +228,8 @@ def discover_lok_sabha_questions(
             yielded += 1
             if limit and yielded >= limit:
                 return
-        if page_number * page_size >= total:
+        rows_seen += len(rows)
+        if rows_seen >= total:
             break
         page_number += 1
         if sleep_seconds:

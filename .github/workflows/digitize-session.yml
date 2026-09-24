@@ -142,6 +142,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set job work deadline
+        run: echo "JOB_DEADLINE=$(( $(date +%s) + 19500 ))" >> "$GITHUB_ENV"
+
       - name: Restore checkpoint
         if: env.HF_REPO != ''
         run: python scripts/cloud_state.py restore --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
@@ -159,37 +162,10 @@ jobs:
           fi
 
       - name: Acquire originals
-        id: acquire
         run: |
-          set -x
-          ARGS=(--house "$HOUSE" --session "$SESSION" --source current \
-                --limit "$LIMIT" --workers 4 --min-free-gib 2)
-          if [ "$HOUSE" = "lok_sabha" ]; then
-            ARGS+=(--lok-sabha "$PARLIAMENT")
-          fi
-          set +e
-          python -m sansad_pipeline acquire-census "${ARGS[@]}" | tee /tmp/acquire.json
-          RC=${PIPESTATUS[0]}
-          set -e
-          python scripts/acquire_summary.py /tmp/acquire.json >> "$GITHUB_OUTPUT"
-          if [ "$RC" != "0" ]; then
-            echo "acquire exited $RC; failures are classified after the retry pass"
-          fi
-
-      - name: Retry failed downloads once
-        if: steps.acquire.outputs.failed != '0'
-        run: |
-          set -x
-          ARGS=(--house "$HOUSE" --session "$SESSION" --source current \
-                --retry-failed --limit 0 --workers 4 --min-free-gib 2)
-          if [ "$HOUSE" = "lok_sabha" ]; then
-            ARGS+=(--lok-sabha "$PARLIAMENT")
-          fi
-          python -m sansad_pipeline acquire-census "${ARGS[@]}" || true
-
-      - name: Checkpoint after acquisition
-        if: env.HF_REPO != ''
-        run: python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+          python scripts/acquire_cloud_scope.py \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --limit "$LIMIT" --repo "$HF_REPO" --checkpoint-path "$CHECKPOINT_PATH"
 
       - name: Extract pages
         run: |
@@ -198,7 +174,10 @@ jobs:
 
       - name: Checkpoint after extraction
         if: env.HF_REPO != ''
-        run: python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+        run: |
+          if [ -d data/raw ] && [ -n "$(find data/raw -type f -print -quit)" ]; then
+            python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+          fi
 
       - name: Adjudicate with Space Bunny in resumable chunks
         if: env.MAX_PAGES != '0'
@@ -208,12 +187,18 @@ jobs:
           if [ "$ALL_PAGES" = "true" ]; then ALL_FLAG="--all-pages"; fi
           OCR_FLAG=""
           if [ "$INCLUDE_OCR" = "true" ]; then OCR_FLAG="--include-ocr"; fi
-          DEADLINE=$(( $(date +%s) + 18000 ))
+          CHUNK_PAGES="$MAX_PAGES"
+          if [ "$CHUNK_PAGES" -gt 100 ]; then CHUNK_PAGES=100; fi
+          DEADLINE=$(( JOB_DEADLINE - 3600 ))
           ADJ_COMPLETE=false
-          for i in $(seq 1 24); do
+          for i in $(seq 1 100); do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "work deadline reached before chunk $i"
+              break
+            fi
             python -m sansad_pipeline adjudicate-scope-openrouter \
               --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-              --workers 3 --limit-pages "$MAX_PAGES" $ALL_FLAG $OCR_FLAG \
+              --workers 3 --limit-pages "$CHUNK_PAGES" $ALL_FLAG $OCR_FLAG \
               --summary-out "/tmp/adjudication-$i.json" \
               --log "data/logs/adjudication-$i.jsonl" || true
             SUMMARY="/tmp/adjudication-$i.json"
@@ -221,12 +206,16 @@ jobs:
             read -r CONSIDERED FAILED RATE < <(python -c "import json;d=json.load(open('$SUMMARY'));print(d['pages_considered'],d['failed'],'true' if d['rate_limited'] else 'false')")
             echo "chunk $i considered=$CONSIDERED failed=$FAILED rate_limited=$RATE"
             if [ "$RATE" = "true" ]; then break; fi
-            if [ "$CONSIDERED" -lt "$MAX_PAGES" ] && [ "$FAILED" = "0" ]; then
+            if [ "$FAILED" != "0" ]; then
+              echo "model page failures remain; checkpointing for a later retry"
+              break
+            fi
+            if [ "$CONSIDERED" -lt "$CHUNK_PAGES" ] && [ "$FAILED" = "0" ]; then
               ADJ_COMPLETE=true
               break
             fi
             if [ $((i % 2)) -eq 0 ] && [ -n "$HF_REPO" ]; then
-              python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH" || true
+              python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
             fi
             if [ "$(date +%s)" -ge "$DEADLINE" ]; then
               echo "time budget reached after chunk $i"
@@ -234,7 +223,7 @@ jobs:
             fi
           done
           if [ -n "$HF_REPO" ]; then
-            python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH" || true
+            python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
           fi
           if [ "$ADJ_COMPLETE" = "true" ]; then touch /tmp/adjudication-complete; fi
           echo "adjudication_complete=$ADJ_COMPLETE"
@@ -261,21 +250,21 @@ jobs:
         run: python scripts/classify_session.py >> "$GITHUB_OUTPUT"
 
       - name: Build and upload publication
-        if: env.PUBLISH == 'true' && env.HF_REPO != '' && steps.classify.outputs.empty != 'true'
+        if: env.PUBLISH == 'true' && env.HF_REPO != '' && steps.classify.outputs.publish_ready == 'true'
         run: |
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-          if [ -n "$TRANCHE_INPUT" ]; then
-            TRANCHE="$TRANCHE_INPUT"
-          else
-            TRANCHE="$STAMP-run${GITHUB_RUN_ID}"
-          fi
-          BUNDLE="data/publications/$HOUSE-p$PARLIAMENT-s$SESSION-$TRANCHE"
-          PATH_IN_REPO="data/$HOUSE/parliament-$PARLIAMENT/session-$SESSION/tranche-$TRANCHE"
+          BUNDLE="data/publications/$HOUSE-p$PARLIAMENT-s$SESSION-run${GITHUB_RUN_ID}"
           python -m sansad_pipeline prepare-publication \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
             --output "$BUNDLE" --canonical-policy "$CANONICAL_POLICY"
           python -m sansad_pipeline verify-publication "$BUNDLE"
+          if [ -n "$TRANCHE_INPUT" ]; then
+            TRANCHE="$TRANCHE_INPUT"
+          else
+            TRANCHE="snapshot-$CANONICAL_POLICY-$(sha256sum "$BUNDLE/pages.jsonl.zst" | cut -c1-20)"
+          fi
+          PATH_IN_REPO="data/$HOUSE/parliament-$PARLIAMENT/session-$SESSION/tranche-$TRANCHE"
           python -m sansad_pipeline publish-hf "$BUNDLE" \
             --repo "$HF_REPO" --path-in-repo "$PATH_IN_REPO"
           echo "PATH_IN_REPO=$PATH_IN_REPO" >> "$GITHUB_ENV"
@@ -287,29 +276,8 @@ jobs:
           set -uo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           python scripts/run_summary.py
-          for f in /tmp/session-complete-*.json; do
-            [ -f "$f" ] || continue
-            python scripts/cloud_state.py upload --repo "$HF_REPO" \
-              --path-in-repo "state/complete" --file "$f" || true
-          done
-          for f in /tmp/session-skipped-*.json; do
-            [ -f "$f" ] || continue
-            python scripts/cloud_state.py upload --repo "$HF_REPO" \
-              --path-in-repo "state/skipped" --file "$f" || true
-          done
-          python scripts/cloud_state.py upload --repo "$HF_REPO" \
-            --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" \
-            --file /tmp/run-summary.json
-          for f in data/logs/*.jsonl; do
-            [ -f "$f" ] || continue
-            python scripts/cloud_state.py upload --repo "$HF_REPO" \
-              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" --file "$f" || true
-          done
-          if [ -d results/verification ]; then
-            python scripts/cloud_state.py upload-dir --repo "$HF_REPO" \
-              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION/verification" \
-              --dir results/verification || true
-          fi
+          python scripts/cloud_state.py upload-run --repo "$HF_REPO" \
+            --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION"
 
       - name: Job summary
         if: always()

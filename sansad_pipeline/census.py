@@ -451,6 +451,7 @@ class Census:
         downloaded = failed = selected = bytes_added = 0
         stopped_low_disk = False
         minimum_free = round(min_free_gib * 1024**3)
+        last_retry_id = ""
 
         def acquire(row) -> tuple[str, object]:
             try:
@@ -478,13 +479,20 @@ class Census:
                 stopped_low_disk = True
                 break
             count = min(batch_size, limit - selected) if limit else batch_size
+            query_where = list(where)
+            query_params = list(base_params)
+            if retry_failed:
+                query_where.append("record_id>?")
+                query_params.append(last_retry_id)
             rows = self.store.db.all(
-                f"""SELECT * FROM census_records WHERE {' AND '.join(where)}
-                    ORDER BY document_date,record_id LIMIT ?""",
-                tuple([*base_params, count]),
+                f"""SELECT * FROM census_records WHERE {' AND '.join(query_where)}
+                    ORDER BY {'record_id' if retry_failed else 'document_date,record_id'} LIMIT ?""",
+                tuple([*query_params, count]),
             )
             if not rows:
                 break
+            if retry_failed:
+                last_retry_id = rows[-1]["record_id"]
             selected += len(rows)
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(acquire, row): row for row in rows}
@@ -518,8 +526,6 @@ class Census:
                             f"[{downloaded + failed}/{selected}] failed {row['record_id']}: {error}",
                             flush=True,
                         )
-            if retry_failed:
-                break
         return {
             "selected": selected,
             "downloaded": downloaded,

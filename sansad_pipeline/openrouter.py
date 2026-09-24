@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import os
@@ -265,6 +266,19 @@ class OpenRouterAdjudicator:
             raise RuntimeError(
                 f"OpenRouter model {model} is text-only and cannot adjudicate page images"
             )
+        pricing = snapshot.get("pricing") or {}
+        for field in ("prompt", "completion", "image"):
+            value = pricing.get(field)
+            if field == "image" and value is None:
+                continue
+            try:
+                if value is None or Decimal(str(value)) != 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                raise RuntimeError(
+                    f"OpenRouter model {model} has nonzero or unknown {field} pricing; "
+                    "paid calls are disabled"
+                )
         result = {
             "id": snapshot.get("id"),
             "canonical_slug": snapshot.get("canonical_slug"),
@@ -477,6 +491,11 @@ class OpenRouterAdjudicator:
                     f"OpenRouter model {selected_model} returned an empty transcription "
                     f"for page {number}"
                 )
+            finish_reason = response_payload.get("choices", [{}])[0].get("finish_reason")
+            if finish_reason in {"length", "content_filter", "error"}:
+                raise RuntimeError(
+                    f"OpenRouter model {selected_model} ended page {number} with {finish_reason}"
+                )
             (page_dir / "adjudicated.md").write_text(message, encoding="utf-8")
             if cfg.store_reasoning and message_object.get("reasoning"):
                 (page_dir / "reasoning.md").write_text(
@@ -518,5 +537,6 @@ class OpenRouterAdjudicator:
                     usage.get("total_tokens"), usage.get("cost"), utcnow(),
                 ),
             )
+            image.unlink(missing_ok=True)
             completed.append(number)
         return completed

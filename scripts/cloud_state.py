@@ -9,11 +9,13 @@ page images are excluded because they are large and regenerable.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import sys
 import tarfile
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,6 +29,14 @@ CHECKPOINT_NAME = "checkpoint.tar.zst"
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _checkpoint_sqlite(path: Path) -> None:
@@ -61,9 +71,30 @@ def _iter_state_files() -> list[tuple[Path, str]]:
     return items
 
 
+def _commit_with_retry(api, *, repo: str, operations: list, message: str):
+    """Keep an ephemeral runner alive through a temporary Hub commit limit."""
+    for attempt in range(11):
+        try:
+            return api.create_commit(
+                repo_id=repo, repo_type="dataset", operations=operations,
+                commit_message=message,
+            )
+        except Exception as error:
+            response = getattr(error, "response", None)
+            status = getattr(response, "status_code", None)
+            if status not in {429, 500, 502, 503, 504} or attempt >= (10 if status == 429 else 4):
+                raise
+            wait = min(600, 30 * 2**attempt)
+            retry_after = response.headers.get("Retry-After") if response else None
+            if retry_after and retry_after.isdecimal():
+                wait = min(600, max(wait, int(retry_after)))
+            print(f"Hub commit HTTP {status}; retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+
+
 def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     import zstandard
-    from huggingface_hub import HfApi
+    from huggingface_hub import CommitOperationAdd, HfApi
 
     DATA.mkdir(parents=True, exist_ok=True)
     _checkpoint_sqlite(DATA / "pipeline.sqlite3")
@@ -82,25 +113,21 @@ def save(repo: str, path_in_repo: str, *, token: str | None) -> dict:
         size = archive_path.stat().st_size
         api = HfApi(token=token)
         api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
-        commit = api.upload_file(
-            path_or_fileobj=str(archive_path),
-            path_in_repo=f"{path_in_repo}/{CHECKPOINT_NAME}",
-            repo_id=repo,
-            repo_type="dataset",
-            commit_message=f"Checkpoint {path_in_repo} ({len(files)} files)",
-        )
         manifest = {
             "created_at": utcnow(),
             "files": len(files),
             "archive_bytes": size,
+            "archive_sha256": sha256_file(archive_path),
             "path_in_repo": f"{path_in_repo}/{CHECKPOINT_NAME}",
         }
-        api.upload_file(
-            path_or_fileobj=json.dumps(manifest, indent=2).encode("utf-8"),
-            path_in_repo=f"{path_in_repo}/checkpoint.json",
-            repo_id=repo,
-            repo_type="dataset",
-            commit_message=f"Checkpoint manifest {path_in_repo}",
+        commit = _commit_with_retry(
+            api, repo=repo,
+            operations=[
+                CommitOperationAdd(path_in_repo=manifest["path_in_repo"], path_or_fileobj=str(archive_path)),
+                CommitOperationAdd(path_in_repo=f"{path_in_repo}/checkpoint.json",
+                                   path_or_fileobj=json.dumps(manifest, indent=2).encode("utf-8")),
+            ],
+            message=f"Checkpoint {path_in_repo} ({len(files)} files)",
         )
     return {**manifest, "commit_url": str(commit.commit_url)}
 
@@ -119,18 +146,29 @@ def restore(repo: str, path_in_repo: str, *, token: str | None) -> dict:
             token=token,
         )
     except Exception as error:
-        print(json.dumps({"restored": False, "reason": str(error)[:300]}))
-        return {"restored": False}
-    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / "data") as temp_dir:
-        archive_path = Path(temp_dir) / CHECKPOINT_NAME
-        with Path(downloaded).open("rb") as source:
-            with archive_path.open("wb") as target:
-                target.write(source.read())
-        with archive_path.open("rb") as source:
-            decompressor = zstandard.ZstdDecompressor()
-            with decompressor.stream_reader(source) as stream:
-                with tarfile.open(fileobj=stream, mode="r|") as archive:
-                    archive.extractall(PROJECT_ROOT, filter="data")
+        if getattr(getattr(error, "response", None), "status_code", None) == 404:
+            print(json.dumps({"restored": False, "reason": "checkpoint does not exist"}))
+            return {"restored": False}
+        raise
+    try:
+        manifest_path = hf_hub_download(
+            repo_id=repo, filename=f"{path_in_repo}/checkpoint.json",
+            repo_type="dataset", token=token,
+        )
+    except Exception as error:
+        if getattr(getattr(error, "response", None), "status_code", None) == 404:
+            raise RuntimeError("checkpoint archive exists without its manifest") from error
+        raise
+    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    expected_sha = manifest.get("archive_sha256")
+    if (manifest.get("archive_bytes") != Path(downloaded).stat().st_size
+            or (expected_sha is not None and expected_sha != sha256_file(Path(downloaded)))):
+        raise RuntimeError("checkpoint archive failed size or SHA-256 verification")
+    with Path(downloaded).open("rb") as source:
+        decompressor = zstandard.ZstdDecompressor()
+        with decompressor.stream_reader(source) as stream:
+            with tarfile.open(fileobj=stream, mode="r|") as archive:
+                archive.extractall(PROJECT_ROOT, filter="data")
     print(json.dumps({"restored": True, "archive": str(downloaded)}))
     return {"restored": True}
 
@@ -154,24 +192,40 @@ def upload_dir(repo: str, path_in_repo: str, directory: Path, *, token: str | No
 
 
 def upload(repo: str, path_in_repo: str, files: list[Path], *, token: str | None) -> dict:
-    from huggingface_hub import HfApi
+    from huggingface_hub import CommitOperationAdd, HfApi
 
     api = HfApi(token=token)
     api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
     path_in_repo = path_in_repo.strip("/")
-    uploaded = []
-    for path in files:
-        if not path.is_file():
-            continue
-        commit = api.upload_file(
-            path_or_fileobj=str(path),
-            path_in_repo=f"{path_in_repo}/{path.name}",
-            repo_id=repo,
-            repo_type="dataset",
-            commit_message=f"Add {path.name}",
-        )
-        uploaded.append({"file": str(path), "commit_url": str(commit.commit_url)})
-    return {"uploaded": uploaded}
+    operations = [CommitOperationAdd(path_in_repo=f"{path_in_repo}/{path.name}",
+                                     path_or_fileobj=str(path)) for path in files if path.is_file()]
+    if not operations:
+        return {"uploaded": []}
+    commit = _commit_with_retry(api, repo=repo, operations=operations,
+                                message=f"Add {len(operations)} run files to {path_in_repo}")
+    return {"uploaded": [operation.path_in_repo for operation in operations],
+            "commit_url": str(commit.commit_url)}
+
+
+def upload_run(repo: str, path_in_repo: str, *, token: str | None) -> dict:
+    from huggingface_hub import CommitOperationAdd, HfApi
+
+    path_in_repo = path_in_repo.strip("/")
+    files: list[tuple[Path, str]] = [(Path("/tmp/run-summary.json"), f"{path_in_repo}/run-summary.json")]
+    for kind in ("complete", "skipped"):
+        for path in Path("/tmp").glob(f"session-{kind}-*.json"):
+            files.append((path, f"state/{kind}/{path.name}"))
+    for path in Path("data/logs").glob("*.jsonl"):
+        files.append((path, f"{path_in_repo}/{path.name}"))
+    for path in Path("results/verification").rglob("*"):
+        if path.is_file():
+            files.append((path, f"{path_in_repo}/verification/{path.relative_to('results/verification').as_posix()}"))
+    operations = [CommitOperationAdd(path_in_repo=remote, path_or_fileobj=str(local))
+                  for local, remote in files if local.is_file()]
+    api = HfApi(token=token)
+    commit = _commit_with_retry(api, repo=repo, operations=operations,
+                                message=f"Run state {path_in_repo}")
+    return {"files": len(operations), "commit_url": str(commit.commit_url)}
 
 
 def main() -> int:
@@ -198,6 +252,10 @@ def main() -> int:
     dir_parser.add_argument("--path-in-repo", required=True)
     dir_parser.add_argument("--dir", type=Path, required=True)
 
+    run_parser = sub.add_parser("upload-run", help="Upload summary, markers and logs in one commit")
+    run_parser.add_argument("--repo", required=True)
+    run_parser.add_argument("--path-in-repo", required=True)
+
     args = parser.parse_args()
     import os
 
@@ -208,6 +266,8 @@ def main() -> int:
         print(json.dumps(restore(args.repo, args.path_in_repo, token=token), indent=2))
     elif args.command == "upload-dir":
         print(json.dumps(upload_dir(args.repo, args.path_in_repo, args.dir, token=token), indent=2))
+    elif args.command == "upload-run":
+        print(json.dumps(upload_run(args.repo, args.path_in_repo, token=token), indent=2))
     else:
         if not args.file:
             raise SystemExit("--file is required at least once")

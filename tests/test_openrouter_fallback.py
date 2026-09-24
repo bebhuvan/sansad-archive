@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import unittest
+import io
+import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from sansad_pipeline.openrouter import (
     OpenRouterAdjudicator,
@@ -37,6 +41,20 @@ class RateLimitedAdjudicator(FakeAdjudicator):
 
 
 class OpenRouterFallbackTests(unittest.TestCase):
+    def test_paid_model_is_rejected_before_any_page_call(self):
+        worker = FakeAdjudicator()
+        worker.config = SimpleNamespace(openrouter=SimpleNamespace(
+            models_endpoint="https://example.test/models", timeout_seconds=5
+        ))
+        worker._snapshot_cache = {}
+        payload = {"data": [{"id": "primary", "architecture": {
+            "input_modalities": ["text", "image"]},
+            "pricing": {"prompt": "0.0001", "completion": "0"}}]}
+        response = io.BytesIO(json.dumps(payload).encode())
+        with patch("urllib.request.urlopen", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "paid calls are disabled"):
+                worker._model_snapshot("primary")
+
     def test_retryable_failure_uses_second_model(self):
         worker = FakeAdjudicator()
         result = worker.adjudicate_with_fallback("document", pages=[7], force=True)
@@ -53,4 +71,3 @@ class OpenRouterFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

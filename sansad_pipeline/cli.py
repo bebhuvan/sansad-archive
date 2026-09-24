@@ -13,7 +13,7 @@ from .config import load_config
 from .events import EventLog
 from .pipeline import Pipeline
 from .publication import PublicationBuilder, Scope, upload_bundle
-from .openrouter import OpenRouterAdjudicator, OpenRouterRateLimitError
+from .openrouter import OpenRouterAdjudicator, OpenRouterHTTPError, OpenRouterRateLimitError
 from .nvidia import NvidiaAdjudicator
 from .secondary import compare_pdf_inspector
 from .storage import Store
@@ -363,6 +363,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "scope-status":
         params = (args.house, args.parliament, args.session)
+        census_row = store.db.one(
+            """SELECT status FROM census_scopes
+               WHERE house=? AND parliament_number=? AND session=?
+               ORDER BY run_id DESC LIMIT 1""",
+            params,
+        )
         acquisition = {
             row["acquisition_status"]: int(row["n"])
             for row in store.db.all(
@@ -372,6 +378,14 @@ def main(argv: list[str] | None = None) -> int:
                 params,
             )
         }
+        unsupported_html = store.db.one(
+            """SELECT COUNT(*) n FROM census_records
+               WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
+                 AND acquisition_status='failed'
+                 AND LOWER(source_url) LIKE '%.htm%'
+                 AND last_error LIKE '%not a PDF:%'""",
+            params,
+        )
         metrics = store.db.one(
             """WITH scoped AS (
                    SELECT DISTINCT document_sha256 FROM census_records
@@ -392,6 +406,10 @@ def main(argv: list[str] | None = None) -> int:
                         WHERE p.route='ocr') ocr_pages,
                       (SELECT COUNT(*) FROM pages p JOIN latest x ON x.run_id=p.run_id
                         WHERE p.validation_status='review') review_pages,
+                      (SELECT COUNT(*) FROM pages p JOIN latest x ON x.run_id=p.run_id
+                        WHERE EXISTS (SELECT 1 FROM adjudications a
+                                      WHERE a.run_id=p.run_id AND a.page_number=p.page_number
+                                        AND a.provider='openrouter')) openrouter_adjudicated_pages,
                       (SELECT COUNT(*) FROM adjudications a JOIN latest x ON x.run_id=a.run_id
                         WHERE a.provider='nvidia') nvidia_adjudications
                  FROM latest l JOIN documents d ON d.sha256=l.document_sha256""",
@@ -400,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
         payload = {
             "scope": {"house": args.house, "parliament": args.parliament, "session": args.session},
             "records": sum(acquisition.values()),
+            "census_status": census_row["status"] if census_row else None,
             "acquisition": acquisition,
+            "unsupported_html_records": int(unsupported_html["n"]),
             **{key: int(metrics[key] or 0) for key in metrics.keys()},
         }
         print(json.dumps(payload, indent=2))
@@ -616,7 +636,9 @@ def main(argv: list[str] | None = None) -> int:
                         progress=f"{completed + failed}/{len(tasks)}",
                     )
                     continue
-                if isinstance(error, OpenRouterRateLimitError):
+                if isinstance(error, OpenRouterRateLimitError) or (
+                    isinstance(error, OpenRouterHTTPError) and error.status == 429
+                ):
                     rate_limited = True
                     events.emit("rate_limited", detail=str(error))
                     for pending in futures:

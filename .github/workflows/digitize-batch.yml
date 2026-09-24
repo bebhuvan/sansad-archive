@@ -15,11 +15,15 @@ on:
         description: Houses to queue
         type: choice
         options: [all, lok_sabha, rajya_sabha]
-        default: all
+        default: lok_sabha
       max_parallel:
         description: Sessions processed concurrently
         type: string
-        default: "3"
+        default: "2"
+      max_scopes:
+        description: Maximum scopes this batch schedules; 0 means all
+        type: string
+        default: "4"
       limit:
         description: Documents per session; 0 means the whole session
         type: string
@@ -79,12 +83,13 @@ jobs:
 
       - id: plan
         env:
-          HOUSE: ${{ inputs.house || 'all' }}
-          EXCLUDE: ${{ inputs.exclude || vars.BATCH_EXCLUDE || '' }}
+          HOUSE: ${{ inputs.house || 'lok_sabha' }}
+          EXCLUDE: ${{ inputs.exclude || '' }}
+          MAX_SCOPES: ${{ inputs.max_scopes || '4' }}
           SKIP_EXISTING: ${{ inputs.skip_existing || 'true' }}
           HF_REPO: ${{ vars.HF_DATASET_REPO }}
         run: |
-          ARGS=(--house "$HOUSE")
+          ARGS=(--house "$HOUSE" --max "$MAX_SCOPES")
           if [ -n "$EXCLUDE" ]; then ARGS+=(--exclude "$EXCLUDE"); fi
           if [ "$SKIP_EXISTING" = "true" ]; then ARGS+=(--skip-existing --repo "$HF_REPO"); fi
           python scripts/plan_sessions.py "${ARGS[@]}" >> "$GITHUB_OUTPUT"
@@ -93,7 +98,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.count != '0'
     strategy:
-      max-parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '2') }}
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     uses: ./.github/workflows/digitize-session.yml

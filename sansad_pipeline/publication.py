@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -261,7 +262,7 @@ class PublicationBuilder:
                         adjudication = self.store.db.one(
                             """SELECT * FROM adjudications
                                WHERE run_id=? AND page_number=?
-                               ORDER BY id DESC LIMIT 1""",
+                               ORDER BY (provider='openrouter') DESC,id DESC LIMIT 1""",
                             (run["id"], page["page_number"]),
                         )
                         if adjudication:
@@ -643,18 +644,29 @@ def upload_bundle(repo_id: str, bundle: Path, path_in_repo: str, *, private: boo
         raise RuntimeError("huggingface_hub is not installed") from error
     api = HfApi()
     repo = api.create_repo(repo_id=repo_id, repo_type="dataset", private=private, exist_ok=True)
-    api.upload_file(
-        path_or_fileobj=dataset_card().encode("utf-8"),
-        path_in_repo="README.md",
-        repo_id=repo_id,
-        repo_type="dataset",
-        commit_message="Add Sansad corpus dataset card",
-    )
-    commit = api.upload_folder(
-        folder_path=str(bundle),
-        path_in_repo=path_in_repo,
-        repo_id=repo_id,
-        repo_type="dataset",
-        commit_message=f"Publish {path_in_repo}",
-    )
+    if not api.file_exists(repo_id=repo_id, filename="README.md", repo_type="dataset"):
+        api.upload_file(
+            path_or_fileobj=dataset_card().encode("utf-8"),
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="dataset",
+            commit_message="Add Sansad corpus dataset card",
+        )
+    for attempt in range(11):
+        try:
+            commit = api.upload_folder(
+                folder_path=str(bundle),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type="dataset",
+                commit_message=f"Publish {path_in_repo}",
+            )
+            break
+        except Exception as error:
+            status = getattr(getattr(error, "response", None), "status_code", None)
+            if status not in {429, 500, 502, 503, 504} or attempt >= (10 if status == 429 else 4):
+                raise
+            wait = min(600, 30 * 2**attempt)
+            print(f"Hub publication HTTP {status}; retrying in {wait}s")
+            time.sleep(wait)
     return {"repo_url": str(repo), "commit_url": str(commit.commit_url)}

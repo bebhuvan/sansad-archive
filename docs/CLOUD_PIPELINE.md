@@ -62,7 +62,7 @@ Use **Actions -> Digitize session -> Run workflow**:
 | `all_pages` | Adjudicate every page, not only flagged pages |
 | `verify_sample` | Pages to cross-check with MiMo via OpenCode Go; `0` disables |
 | `publish` | Build and upload the publication tranche |
-| `tranche` | Tranche label; blank uses timestamp plus run id |
+| `tranche` | Tranche label; blank uses a content-derived snapshot label |
 
 The nightly `schedule` uses the `PILOT_*` variables. GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
@@ -71,6 +71,12 @@ the repository active.
 The session census and acquisition use the current Digital Sansad APIs, which
 are session-scoped from 2000 (Lok Sabha) and 2001 (Rajya Sabha). Historical
 eLibrary discovery is not session-scoped and remains a separate phase.
+The Lok Sabha inventory comes from the official session endpoint, is deduplicated
+and sorted numerically, and the batch starts with the newest sessions. Each
+question census checks the API's reported row count across pages, rejects
+missing pages and duplicate record IDs, and retains records with missing PDF
+links as explicit acquisition failures. This prevents an incomplete crawl from
+being mistaken for a successful empty session.
 
 ## Corpus scale and batch runs
 
@@ -82,9 +88,10 @@ eLibrary discovery is not session-scoped and remains a separate phase.
 
 Phase 1 is the bounded LS 18/8 pilot. Phase 2 is the **Digitize batch**
 workflow: it lists every current-API session, skips scopes already marked
-complete, and runs them as a matrix with `max_parallel` concurrent sessions
-(default 3). A scope is marked complete only when every discovered record is
-acquired and none failed; markers live at
+complete, and runs a bounded matrix of four scopes with at most two concurrent
+sessions by default. Each nightly batch resumes the earliest unfinished scopes.
+A scope is marked complete only when its census, acquisition, extraction,
+all-page Space Bunny coverage, and publication are proven; markers live at
 `state/complete/session-complete-<house>-p<parl>-s<session>.json`. The nightly
 schedule re-runs the batch incrementally, so new sessions are picked up
 automatically.
@@ -98,12 +105,12 @@ path covers legacy sessions whose records only link to `.htm` annexure pages
 instead of PDFs, for example Lok Sabha 13/4, where all 31 records resolve to
 `sansad.in/getFile/Annexture_New/...htm` with no PDF field. Those belong to the
 historical eLibrary phase. Acquisition failures get one retry pass in the same
-run; a scope with failures still remaining is marked skipped with the failure
-counts in the marker. To force a
-re-attempt, delete the marker from the dataset repository. A repository
-variable `BATCH_EXCLUDE` (comma-separated `house:parliament:session`) excludes
-scopes known to return persistent server errors, for example the eight Lok
-Sabha scopes documented in `SOURCES_AND_COVERAGE.md`.
+run. Transient failures remain eligible for the next batch; only a successful
+zero-record census or an HTML-only scope receives a skip marker. To force a
+re-attempt of an HTML-only scope, delete its marker from the dataset repository. A repository
+dispatch input `exclude` (comma-separated `house:parliament:session`) can
+temporarily omit a scope during a focused run. The normal batch does not
+permanently exclude known server errors; failed scopes remain visible for retry.
 
 Phase 3 is the historical eLibrary collection. It is not session-scoped, so it
 needs a census slice imported into the runner (an `import-census` command) and
@@ -114,16 +121,18 @@ before starting, and expect weeks of wall-clock at batch parallelism.
 ## Resume semantics
 
 - The workflow restores `state/checkpoints/<scope>/checkpoint.tar.zst` before
-  any work and saves after acquisition and after every adjudication chunk.
+  any work and saves after acquisition, extraction, and every second
+  adjudication chunk. An archive and its checksum manifest use one Hub commit.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
   regenerable.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
   previous one stopped.
-- If the provider rate-limits every configured model, the chunk stops with
-  `rate_limited: true`, the state is checkpointed, and the run still publishes
-  whatever completed. The next run resumes.
+- If the provider returns a sustained 429, the chunk stops with
+  `rate_limited: true` and the state is checkpointed. Publication waits for
+  every acquired page to have a model layer, so incomplete passes do not
+  create duplicate tranches. The next run resumes.
 - Checkpoint artifact paths assume the same workspace path across runs, which
   holds for a repository with an unchanged name.
 
@@ -133,6 +142,10 @@ before starting, and expect weeks of wall-clock at batch parallelism.
   Bunny Alpha transcription (`all_pages=true`, reasoning effort `low`,
   temperature 0). OCR still runs on every OCR-routed page, so scanned pages
   carry both an OCR candidate and a model candidate.
+- LiteParse 2.14.7 supplies native extraction and built-in Tesseract OCR for
+  pages whose native text is missing or suspect. The model adapter rejects
+  nonzero or unknown provider pricing before making an inference call. The
+  optional MiMo verification stays disabled in the free-only overnight run.
 - The layers stay separate in every record: `local_text`/`local_markdown`
   (native or OCR), `adjudicated_markdown` (Space Bunny), and the canonical
   `text`/`markdown`. The canonical policy defaults to `local`, so the model

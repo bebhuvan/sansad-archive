@@ -31,9 +31,10 @@ def completed_scopes(repo: str | None) -> set[str]:
         from huggingface_hub import HfApi
 
         files = HfApi().list_repo_files(repo, repo_type="dataset")
-    except Exception as error:  # a missing repo just means nothing is complete
-        print(f"skip-existing disabled: {type(error).__name__}: {error}", file=sys.stderr)
-        return set()
+    except Exception as error:
+        raise RuntimeError(
+            f"cannot inspect Hub markers; refusing to schedule duplicate scopes: {error}"
+        ) from error
     markers = (
         ("state/complete/session-complete-", ".json"),
         ("state/skipped/session-skipped-", ".json"),
@@ -60,7 +61,7 @@ def main() -> int:
     if args.house in {"all", "lok_sabha"}:
         scopes += [
             {"house": "lok_sabha", "parliament": parliament, "session": session}
-            for parliament, session in available_lok_sabha_sessions()
+            for parliament, session in reversed(available_lok_sabha_sessions())
         ]
     if args.house in {"all", "rajya_sabha"}:
         scopes += [

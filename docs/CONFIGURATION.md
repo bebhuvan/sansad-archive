@@ -8,7 +8,7 @@ from that file's directory. `--config` must precede the subcommand.
 | Section/key | Current value | Meaning |
 |---|---:|---|
 | `storage.root` | `data` | Database, raw store, artifacts, temp, exports |
-| `liteparse.version` | `2.10.1` | Pinned/recorded parser version |
+| `liteparse.version` | `2.14.7` | Pinned/recorded parser version |
 | `liteparse.language` | `eng` | English-only OCR policy |
 | `liteparse.dpi` | `150` | Ordinary OCR resolution |
 | `liteparse.full_page_image_dpi` | `250` | Independent OCR for full-page scans |

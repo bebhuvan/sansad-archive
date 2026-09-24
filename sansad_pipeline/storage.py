@@ -123,8 +123,16 @@ class Store:
                 except (urllib.error.URLError, TimeoutError, OSError) as error:
                     last_error = error
                     downloaded.unlink(missing_ok=True)
+                    if isinstance(error, urllib.error.HTTPError):
+                        if 400 <= error.code < 500 and error.code not in {408, 429}:
+                            break
                     if attempt < 5:
-                        time.sleep(min(2 ** attempt, 30))
+                        delay = min(2 ** attempt, 30)
+                        if isinstance(error, urllib.error.HTTPError) and error.code == 429:
+                            retry_after = error.headers.get("Retry-After")
+                            if retry_after and retry_after.isdecimal():
+                                delay = max(delay, min(int(retry_after), 60))
+                        time.sleep(delay)
             if last_error is not None:
                 raise last_error
             return self.ingest(

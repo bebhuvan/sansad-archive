@@ -43,7 +43,7 @@ new extraction merely because it contains many characters.
 .venv/bin/sansad-pipeline doctor
 ```
 
-The core environment pins LiteParse 2.10.1. `data/`, `.env`, optional engine
+The core environment pins LiteParse 2.14.7. `data/`, `.env`, optional engine
 environments and virtual environments are ignored by Git.
 
 ## Acquire PDFs

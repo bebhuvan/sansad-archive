@@ -12,7 +12,7 @@ class StorageConfig:
 
 @dataclass(frozen=True)
 class LiteParseConfig:
-    version: str = "2.10.1"
+    version: str = "2.14.7"
     language: str = "eng"
     dpi: int = 150
     full_page_image_dpi: int = 250

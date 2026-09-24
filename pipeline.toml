@@ -2,7 +2,7 @@
 root = "data"
 
 [liteparse]
-version = "2.10.1"
+version = "2.14.7"
 language = "eng"
 dpi = 150
 full_page_image_dpi = 250
@@ -31,7 +31,7 @@ endpoint = "https://openrouter.ai/api/v1/chat/completions"
 models_endpoint = "https://openrouter.ai/api/v1/models"
 model = "stealth/space-bunny-alpha"
 models = ["stealth/space-bunny-alpha"]
-max_tokens = 8192
+max_tokens = 16384
 timeout_seconds = 300
 image_dpi = 150
 max_pages_per_command = 200
