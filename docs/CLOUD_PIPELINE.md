@@ -155,6 +155,21 @@ truncated or malformed response is a failed page, not a completed census.
 - Checkpoint artifact paths assume the same workspace path across runs, which
   holds for a repository with an unchanged name.
 
+## Verified cloud canaries (2026-09-24)
+
+- LS 17/15 run `36030891951` published 10 source PDFs and 34 pages. All 34
+  pages had nonempty local and Space Bunny text. A fresh HF download contained
+  exactly 50 files; all `SHA256SUMS` entries, original-PDF SHA-256s, and remote
+  Git/LFS content IDs matched. This is a bounded tranche, not a complete
+  1,499-record session.
+- LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
+  remote verifier. It published one PDF and two fully adjudicated pages. The
+  raw archive SHA-256 was unchanged between extraction and model checkpoints;
+  remote verification reported no missing or changed files.
+- LS 18/1 returned zero records despite appearing in the official session
+  inventory, so its green skip run is not an extraction canary. The planner
+  retains this distinction in the marker evidence.
+
 ## Accuracy policy
 
 - Every page gets a local extraction and, by default in cloud runs, a Space
