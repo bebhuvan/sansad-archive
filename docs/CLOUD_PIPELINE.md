@@ -72,6 +72,29 @@ The session census and acquisition use the current Digital Sansad APIs, which
 are session-scoped from 2000 (Lok Sabha) and 2001 (Rajya Sabha). Historical
 eLibrary discovery is not session-scoped and remains a separate phase.
 
+## Corpus scale and batch runs
+
+| Inventory | House | Records | Dates | Cloud status |
+|---|---:|---:|---|---|
+| eLibrary Q&A | Lok Sabha | 1,155,268 | 1952-2026 | phase 3, not session-scoped |
+| Current API | Lok Sabha | 179,089 | 2000-2026 | phase 2, 76 sessions |
+| Current RS API | Rajya Sabha | 258,987 | 2001-2026 | phase 2, 73 sessions |
+
+Phase 1 is the bounded LS 18/8 pilot. Phase 2 is the **Digitize batch**
+workflow: it lists every current-API session, skips scopes already marked
+complete, and runs them as a matrix with `max_parallel` concurrent sessions
+(default 3). A scope is marked complete only when every discovered record is
+acquired and none failed; markers live at
+`state/complete/session-complete-<house>-p<parl>-s<session>.json`. The nightly
+schedule re-runs the batch incrementally, so new sessions are picked up
+automatically.
+
+Phase 3 is the historical eLibrary collection. It is not session-scoped, so it
+needs a census slice imported into the runner (an `import-census` command) and
+an explicit storage decision: the raw Lok Sabha Q&A originals alone are
+projected at roughly 279 GiB. Ask datasets@huggingface.co for a storage grant
+before starting, and expect weeks of wall-clock at batch parallelism.
+
 ## Resume semantics
 
 - The workflow restores `state/checkpoints/<scope>/checkpoint.tar.zst` before

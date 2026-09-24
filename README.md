@@ -372,9 +372,12 @@ local OpenCode auth file, and run:
 
 For machines without local disk space, `.github/workflows/digitize-session.yml`
 runs census, acquisition, extraction, adjudication, publication and upload on a
-GitHub Actions runner while Hugging Face holds the corpus and checkpoints. See
-[docs/CLOUD_PIPELINE.md](docs/CLOUD_PIPELINE.md) for prerequisites, inputs,
-resume semantics, and limits.
+GitHub Actions runner while Hugging Face holds the corpus and checkpoints.
+`.github/workflows/digitize-batch.yml` queues every current-API session as a
+resumable matrix and skips scopes already marked complete, so its nightly
+schedule works as an incremental scheduler. See
+[docs/CLOUD_PIPELINE.md](docs/CLOUD_PIPELINE.md) for the corpus map,
+prerequisites, resume semantics, and limits.
 
 ## Tests and benchmark
 

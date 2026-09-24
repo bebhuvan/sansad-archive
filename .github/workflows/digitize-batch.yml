@@ -1,0 +1,96 @@
+name: Digitize batch
+
+# Queues every current-API House/Parliament/session scope as a matrix of
+# resumable session runs. Complete scopes are skipped using markers under
+# state/complete/ on Hugging Face, so the nightly schedule is an incremental
+# scheduler for new sessions and anything left incomplete.
+#
+# The historical eLibrary collection is not session-scoped and is not part of
+# this batch yet; see docs/CLOUD_PIPELINE.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      house:
+        description: Houses to queue
+        type: choice
+        options: [all, lok_sabha, rajya_sabha]
+        default: all
+      max_parallel:
+        description: Sessions processed concurrently
+        type: string
+        default: "3"
+      limit:
+        description: Documents per session; 0 means the whole session
+        type: string
+        default: "0"
+      max_pages:
+        description: Model pages per adjudication chunk
+        type: string
+        default: "500"
+      verify_sample:
+        description: Cross-model verification pages per session; 0 disables
+        type: string
+        default: "0"
+      exclude:
+        description: Comma-separated house:parliament:session scopes to skip
+        type: string
+        default: ""
+      skip_existing:
+        description: Skip scopes already marked complete on Hugging Face
+        type: boolean
+        default: true
+  schedule:
+    - cron: "30 16 * * *"  # 22:00 IST incremental batch
+
+concurrency:
+  group: digitize-batch
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - id: plan
+        env:
+          HOUSE: ${{ inputs.house || 'all' }}
+          EXCLUDE: ${{ inputs.exclude || '' }}
+          SKIP_EXISTING: ${{ inputs.skip_existing || 'true' }}
+          HF_REPO: ${{ vars.HF_DATASET_REPO }}
+        run: |
+          ARGS=(--house "$HOUSE")
+          if [ -n "$EXCLUDE" ]; then ARGS+=(--exclude "$EXCLUDE"); fi
+          if [ "$SKIP_EXISTING" = "true" ]; then ARGS+=(--skip-existing --repo "$HF_REPO"); fi
+          python scripts/plan_sessions.py "${ARGS[@]}" >> "$GITHUB_OUTPUT"
+
+  digitize:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    strategy:
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    uses: ./.github/workflows/digitize-session.yml
+    with:
+      house: ${{ matrix.house }}
+      parliament: ${{ matrix.parliament }}
+      session: ${{ matrix.session }}
+      limit: ${{ inputs.limit || '0' }}
+      max_pages: ${{ inputs.max_pages || '500' }}
+      verify_sample: ${{ inputs.verify_sample || '0' }}
+      publish: "true"
+    secrets: inherit

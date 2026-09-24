@@ -51,11 +51,38 @@ on:
         description: Tranche label (blank uses timestamp and run id)
         type: string
         default: ""
-  schedule:
-    - cron: "30 16 * * *"  # 22:00 IST nightly pilot; values come from repo variables
+  workflow_call:
+    inputs:
+      house:
+        type: string
+        default: lok_sabha
+      parliament:
+        type: string
+        default: "18"
+      session:
+        type: string
+        default: "8"
+      limit:
+        type: string
+        default: "200"
+      max_pages:
+        type: string
+        default: "500"
+      all_pages:
+        type: string
+        default: "false"
+      verify_sample:
+        type: string
+        default: "0"
+      publish:
+        type: string
+        default: "true"
+      tranche:
+        type: string
+        default: ""
 
 concurrency:
-  group: digitize-session
+  group: digitize-${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
   cancel-in-progress: false
 
 jobs:
@@ -197,6 +224,11 @@ jobs:
           set -uo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           python scripts/run_summary.py
+          for f in /tmp/session-complete-*.json; do
+            [ -f "$f" ] || continue
+            python scripts/cloud_state.py upload --repo "$HF_REPO" \
+              --path-in-repo "state/complete" --file "$f" || true
+          done
           python scripts/cloud_state.py upload --repo "$HF_REPO" \
             --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" \
             --file /tmp/run-summary.json

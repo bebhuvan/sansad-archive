@@ -29,9 +29,24 @@ def main() -> int:
             summary["scope_status"] = json.loads(status_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             summary["scope_status_error"] = "unreadable scope-status.json"
+    status = summary.get("scope_status") or {}
+    acquisition = status.get("acquisition") or {}
+    summary["session_complete"] = bool(
+        status.get("records")
+        and acquisition.get("discovered", 0) == 0
+        and acquisition.get("failed", 0) == 0
+    )
     Path("/tmp/run-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    if summary["session_complete"]:
+        key = (
+            f"{os.environ.get('HOUSE', '')}-p{os.environ.get('PARLIAMENT', '')}"
+            f"-s{os.environ.get('SESSION', '')}"
+        )
+        Path(f"/tmp/session-complete-{key}.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     print(json.dumps(summary, indent=2))
     return 0
 
