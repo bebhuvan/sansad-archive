@@ -64,7 +64,8 @@ Use **Actions -> Digitize session -> Run workflow**:
 | `publish` | Build and upload the publication tranche |
 | `tranche` | Tranche label; blank uses a content-derived snapshot label |
 
-The nightly `schedule` uses the `PILOT_*` variables. GitHub disables scheduled
+The nightly `schedule` runs the batch workflow; `PILOT_*` variables apply only
+to a directly dispatched session workflow. GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
 the repository active.
 
@@ -83,7 +84,7 @@ being mistaken for a successful empty session.
 | Inventory | House | Records | Dates | Cloud status |
 |---|---:|---:|---|---|
 | eLibrary Q&A | Lok Sabha | 1,155,268 | 1952-2026 | phase 3, not session-scoped |
-| Current API | Lok Sabha | 179,089 | 2000-2026 | phase 2, 76 sessions |
+| Current API | Lok Sabha | 179,089 | 2000-2026 | phase 2, 84 listed sessions (some empty/HTML-only) |
 | Current RS API | Rajya Sabha | 258,987 | 2001-2026 | phase 2, 73 sessions |
 
 Phase 1 is the bounded LS 18/8 pilot. Phase 2 is the **Digitize batch**
@@ -97,7 +98,10 @@ separately and remains visible in the run summary; it cannot hide a transient
 download failure. Markers live at
 `state/complete/session-complete-<house>-p<parl>-s<session>.json`. The nightly
 schedule re-runs the batch incrementally, so new sessions are picked up
-automatically.
+automatically. The planner validates each existing HF completion or skip
+marker against its recorded census, acquisition, extraction, model coverage,
+and publication evidence. Older unproven marker filenames are ignored and
+their scopes are revisited.
 
 Scopes whose census returns zero records (typically pre-2000 sessions that the
 current API lists but does not serve) are classified as empty: the workflow

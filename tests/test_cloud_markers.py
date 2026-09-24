@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from scripts.classify_session import publication_ready, skip_reason
+from scripts.plan_sessions import valid_marker
 from scripts.run_summary import is_session_complete
 
 
@@ -24,6 +25,32 @@ class MarkerSemanticsTests(unittest.TestCase):
 
     def test_successful_zero_record_census_is_skipped(self):
         self.assertIsNotNone(skip_reason({"records": 0, "census_status": "complete"}))
+
+    def test_planner_rejects_historical_unproven_skip_marker(self):
+        path = "state/skipped/session-skipped-lok_sabha-p13-s3.json"
+        marker = {"house": "lok_sabha", "parliament": "13", "session": "3",
+                  "scope_status": {"records": 27, "acquisition": {"failed": 27}}}
+        self.assertFalse(valid_marker(path, marker))
+        marker["scope_status"].update(
+            census_status="complete", unsupported_html_records=27,
+            acquired_documents=0,
+        )
+        self.assertTrue(valid_marker(path, marker))
+        self.assertFalse(valid_marker(path.replace("s3", "s4"), marker))
+
+    def test_planner_requires_complete_marker_evidence(self):
+        path = "state/complete/session-complete-lok_sabha-p18-s8.json"
+        status = {"census_status": "complete", "records": 1,
+                  "acquisition": {"downloaded": 1}, "acquired_documents": 1,
+                  "processed_documents": 1, "pages": 2,
+                  "openrouter_adjudicated_pages": 2}
+        marker = {"inputs": {"house": "lok_sabha", "parliament": "18",
+                             "session": "8", "limit": "0", "max_pages": "500",
+                             "all_pages": "true"}, "scope_status": status,
+                  "tranche_path": "data/tranche", "session_complete": True}
+        self.assertTrue(valid_marker(path, marker))
+        self.assertFalse(valid_marker(path, {**marker, "session_complete": False}))
+        self.assertFalse(valid_marker(path, {**marker, "tranche_path": ""}))
 
     def test_completion_requires_page_coverage_and_published_tranche(self):
         status = {"census_status": "complete", "records": 3,
