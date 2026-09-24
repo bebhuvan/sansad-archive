@@ -269,6 +269,20 @@ for comparison and require language-aware review before a canonical claim.
 - Checkpoint artifact paths assume the same workspace path across runs, which
   holds for a repository with an unchanged name.
 
+## Read-only overnight monitoring
+
+`python scripts/inspect_hf_progress.py --repo bebhuvan1/sansad-corpus
+--scope lok_sabha-p18-s8 --scope elibrary-lok_sabha-p01-sI` reports scoped
+acquisition, distinct retained originals, extraction/model coverage, and
+zero/unknown/nonzero reported-cost counts. It downloads only each checkpoint's
+mutable state archive into a temporary directory, verifies its size and
+SHA-256, reads SQLite without writing to it, and removes the temporary files
+on exit. Immutable original-PDF shards are not downloaded for monitoring;
+the PDF count is read from the checkpoint manifest. Default 512 MiB compressed
+state and 1 GiB SQLite-file caps limit temporary local disk use. This is a
+progress check, not a
+substitute for validating original PDF hashes on restore or in a publication.
+
 ## Verified cloud canaries (2026-09-24)
 
 - LS 17/15 run `36030891951` published 10 source PDFs and 34 pages. All 34
