@@ -64,6 +64,23 @@ class LayoutAuditTests(unittest.TestCase):
                              for row in selected), 2)
         self.assertEqual(len(selected), 12)
 
+    def test_sample_checks_empty_local_text_without_losing_random_baseline(self):
+        rows = [
+            {"document_sha256": f"{number:064x}", "page_number": 1,
+             "route": "ocr" if number % 2 else "native",
+             "separator_rows": 4 if 2 <= number < 6 else 0,
+             "model_numeric_disagreement": 6 <= number < 10,
+             "local_markdown": "" if number < 2 else "Visible words"}
+            for number in range(16)
+        ]
+        selected = sample_rows(rows, 12, 17)
+        self.assertEqual(len(selected), 12)
+        self.assertEqual(sum(row["selection_stratum"] == "empty_local_text"
+                             for row in selected), 2)
+        self.assertGreaterEqual(sum(row["selection_stratum"] == "random"
+                                    for row in selected), 2)
+        self.assertEqual({row["route"] for row in selected}, {"ocr", "native"})
+
     def test_similarity_is_format_tolerant_but_not_a_truth_claim(self):
         self.assertEqual(similarity("# Question", "Question"), 1.0)
         self.assertLess(similarity("Government are not doing it", "Government are doing it"), 1.0)

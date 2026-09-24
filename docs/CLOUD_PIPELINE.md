@@ -718,7 +718,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
   routes for a separate, free Tesseract `--psm 3` image audit. When both routes
   exist, it reserves one page from each before sampling LiteParse layout
   suspects (three or more Markdown table separators), LiteParse/Space Bunny
-  visible-number disagreements, and a random remainder. Overlap and small
+  visible-number disagreements, and a random remainder. Newer passes also
+  reserve up to two pages whose local Markdown is empty, then keep at least two
+  ordinary random pages when the twelve-page budget permits. Overlap and small
   strata are filled from remaining pages.
   The report records each page's selection stratum, so this deliberately
   enriched sample is not mistaken for a representative error-rate estimate.

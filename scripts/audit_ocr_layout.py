@@ -71,7 +71,19 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
             row = rng.choice(candidates)
             selected.append({**row, "selection_stratum": "route_baseline"})
             chosen.add((row["document_sha256"], row["page_number"]))
-    quota = max(1, count // 3)
+    empty_candidates = [
+        row for row in rows
+        if row.get("local_markdown") is not None
+        and not row["local_markdown"].strip()
+        and (row["document_sha256"], row["page_number"]) not in chosen
+    ]
+    for row in rng.sample(
+        empty_candidates, min(len(empty_candidates), max(1, count // 6), count - len(selected))
+    ):
+        selected.append({**row, "selection_stratum": "empty_local_text"})
+        chosen.add((row["document_sha256"], row["page_number"]))
+    # Reserve two ordinary pages for a baseline after selecting error suspects.
+    quota = max(1, (count - len(selected) - 2) // 2)
     for reason, candidates in (
         ("layout", [row for row in rows if row["separator_rows"] >= 3]),
         ("numeric", [row for row in rows if row.get("model_numeric_disagreement")]),
@@ -162,6 +174,7 @@ def main() -> int:
                 "page_number": row["page_number"],
                 "liteparse_route": row["route"],
                 "liteparse_separator_rows": row["separator_rows"],
+                "local_text_empty": not row["local_markdown"].strip(),
                 "selection_stratum": row["selection_stratum"],
                 "model_local_numeric_disagreement": row["model_numeric_disagreement"],
                 "model_local_raw_numeric_disagreement": row["model_raw_numeric_disagreement"],
