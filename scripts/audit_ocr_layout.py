@@ -46,6 +46,16 @@ def similarity(left: str, right: str) -> float:
     return round(difflib.SequenceMatcher(None, normalize(left), normalize(right)).ratio(), 4)
 
 
+def numeric_difference(candidate: str, tesseract: str) -> dict[str, list[str]]:
+    """Expose disagreements without treating either OCR output as ground truth."""
+    candidate_numbers = numbers(candidate)
+    tesseract_numbers = numbers(tesseract)
+    return {
+        "candidate_only": sorted((candidate_numbers - tesseract_numbers).elements()),
+        "tesseract_only": sorted((tesseract_numbers - candidate_numbers).elements()),
+    }
+
+
 def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     if count <= 0:
         raise ValueError("sample size must be positive")
@@ -154,8 +164,11 @@ def main() -> int:
                     "tesseract_sha256": hashlib.sha256(transcript.encode("utf-8")).hexdigest(),
                     "local_similarity": similarity(transcript, row["local_markdown"]),
                     "local_numeric_agreement": numbers(transcript) == numbers(row["local_markdown"]),
+                    "local_numeric_difference": numeric_difference(row["local_markdown"], transcript),
                     "model_similarity": similarity(transcript, model) if model is not None else None,
                     "model_numeric_agreement": numbers(transcript) == numbers(model)
+                    if model is not None else None,
+                    "model_numeric_difference": numeric_difference(model, transcript)
                     if model is not None else None,
                 })
             except (OSError, subprocess.SubprocessError, RuntimeError) as error:

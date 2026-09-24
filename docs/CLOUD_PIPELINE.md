@@ -327,7 +327,8 @@ for comparison and require language-aware review before a canonical claim.
   separate, free Tesseract `--psm 3` layout audit. It prioritizes pages where
   LiteParse has introduced several Markdown table separators, includes other
   OCR pages for comparison, and uploads the independent transcript plus
-  similarity/numeric-agreement diagnostics under the run's `verification/`
+  similarity/numeric-agreement diagnostics and both sides of each numeric
+  disagreement under the run's `verification/`
   path. This is non-mutating evidence, not an automatic canonical-text switch;
   OCR and Space Bunny can both make errors, so disputed pages still require
   source-image review. The first local end-to-end audit on a 1952 scan selected

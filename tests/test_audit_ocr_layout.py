@@ -10,7 +10,9 @@ from PIL import Image
 from sansad_pipeline.config import Config, StorageConfig
 from sansad_pipeline.db import json_text
 from sansad_pipeline.storage import Store, now
-from scripts.audit_ocr_layout import page_rows, sample_rows, separator_rows, similarity
+from scripts.audit_ocr_layout import (
+    numeric_difference, page_rows, sample_rows, separator_rows, similarity,
+)
 
 
 class LayoutAuditTests(unittest.TestCase):
@@ -36,6 +38,12 @@ class LayoutAuditTests(unittest.TestCase):
     def test_similarity_is_format_tolerant_but_not_a_truth_claim(self):
         self.assertEqual(similarity("# Question", "Question"), 1.0)
         self.assertLess(similarity("Government are not doing it", "Government are doing it"), 1.0)
+
+    def test_numeric_difference_keeps_both_directions(self):
+        self.assertEqual(
+            numeric_difference("42 and 42", "42 and 4.2"),
+            {"candidate_only": ["42"], "tesseract_only": ["4.2"]},
+        )
 
     def test_page_rows_selects_scoped_latest_ocr_artifact(self):
         with tempfile.TemporaryDirectory() as directory:
