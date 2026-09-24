@@ -296,7 +296,8 @@ for comparison and require language-aware review before a canonical claim.
 `python scripts/inspect_hf_progress.py --repo bebhuvan1/sansad-corpus
 --scope lok_sabha-p18-s8 --scope elibrary-lok_sabha-p01-sI` reports scoped
 acquisition, distinct retained originals, extraction/model coverage, latest-run
-page counts by extraction route and validation status, and
+page counts by extraction route and validation status, validation-flag counts,
+and
 zero/unknown/nonzero reported-cost counts. The route and status counts each
 sum to `extracted_pages`; `review` means that local validation requested
 comparison or inspection, not that extraction failed. Cost calls are scoped through the
@@ -445,6 +446,14 @@ substitute for validating original PDF hashes on restore or in a publication.
   native and 454 OCR, with 327 flagged `review`. Both route and status totals
   reconcile to the latest-run page count in all three scopes; these are
   checkpointed local-validation flags, not adjudicated accuracy rates.
+- The historical LS 01/II checkpoint's 2,017 review pages have 1,843
+  inconsistent-table-width flags and 1,803 native/OCR numeric-disagreement
+  flags; these can co-occur on a page. Only one page has a low-OCR-confidence
+  flag. The modern LS 17/15 checkpoint has 33 empty-text flags among 4,756
+  locally extracted pages. Flags identify comparison and image-inspection
+  priorities; they do not establish which transcript is correct. The
+  read-only monitor now exposes the individual counts without downloading
+  original-PDF shards.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.

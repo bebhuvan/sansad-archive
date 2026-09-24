@@ -35,7 +35,8 @@ class CheckpointMonitorTests(unittest.TestCase):
             )
             db.execute(
                 "INSERT INTO pages VALUES (?,?,?,?,?,?,?,?,?)",
-                (superseded_run, 1, "native", "liteparse", 10, None, "review", "[]", "old.json"),
+                (superseded_run, 1, "native", "liteparse", 10, None, "review",
+                 '["empty-text"]', "old.json"),
             )
             run_id = db.execute(
                 """INSERT INTO runs(document_sha256,status,config_json,started_at)
@@ -44,6 +45,11 @@ class CheckpointMonitorTests(unittest.TestCase):
             db.execute(
                 "INSERT INTO pages VALUES (?,?,?,?,?,?,?,?,?)",
                 (run_id, 1, "ocr", "liteparse", 25, None, "accepted", "[]", "page.json"),
+            )
+            db.execute(
+                "INSERT INTO pages VALUES (?,?,?,?,?,?,?,?,?)",
+                (run_id, 2, "ocr", "liteparse", 12, 42.0, "review",
+                 '["low-ocr-confidence","native-ocr-numeric-disagreement"]', "page2.json"),
             )
             db.execute(
                 """INSERT INTO adjudications
@@ -121,8 +127,11 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(result["retained_original_pdfs"], 1)
             self.assertEqual(result["source_records_by_acquisition_status"], {"downloaded": 1})
             self.assertEqual(result["processed_pdfs"], 1)
-            self.assertEqual(result["pages_by_route"], {"ocr": 1})
-            self.assertEqual(result["pages_by_validation_status"], {"accepted": 1})
+            self.assertEqual(result["pages_by_route"], {"ocr": 2})
+            self.assertEqual(result["pages_by_validation_status"], {"accepted": 1, "review": 1})
+            self.assertEqual(result["validation_flag_counts"], {
+                "low-ocr-confidence": 1, "native-ocr-numeric-disagreement": 1,
+            })
             self.assertEqual(result["model_pages"], 1)
             self.assertEqual(result["cost_zero_calls"], 1)
             self.assertEqual(result["cost_nonzero_calls"], 0)
