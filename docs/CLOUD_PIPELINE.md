@@ -295,8 +295,11 @@ for comparison and require language-aware review before a canonical claim.
 
 `python scripts/inspect_hf_progress.py --repo bebhuvan1/sansad-corpus
 --scope lok_sabha-p18-s8 --scope elibrary-lok_sabha-p01-sI` reports scoped
-acquisition, distinct retained originals, extraction/model coverage, and
-zero/unknown/nonzero reported-cost counts. Cost calls are scoped through the
+acquisition, distinct retained originals, extraction/model coverage, latest-run
+page counts by extraction route and validation status, and
+zero/unknown/nonzero reported-cost counts. The route and status counts each
+sum to `extracted_pages`; `review` means that local validation requested
+comparison or inspection, not that extraction failed. Cost calls are scoped through the
 session's acquired document digests, even if a checkpoint database contains
 unrelated sessions; all historical calls for those digests are counted, while
 page coverage uses each document's latest complete extraction run. It
@@ -435,6 +438,13 @@ substitute for validating original PDF hashes on restore or in a publication.
   still had explicit zero cost; no unknown or nonzero calls were recorded.
   The five jobs remained active, with both batch continuations and the safe
   17/15 same-scope continuation pending.
+- A read-only quality breakdown from the same checkpoints counted LS 18/8's
+  17,306 pages as 14,534 native and 2,772 OCR, with 1,353 flagged `review`.
+  Historical LS 01/II's 2,151 pages were 333 native and 1,818 OCR, with
+  2,017 flagged `review`. Full-session LS 17/15's 4,756 pages were 4,302
+  native and 454 OCR, with 327 flagged `review`. Both route and status totals
+  reconcile to the latest-run page count in all three scopes; these are
+  checkpointed local-validation flags, not adjudicated accuracy rates.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.

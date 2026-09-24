@@ -90,6 +90,25 @@ def summarize_database(path: Path, scope: str) -> dict:
                                        AND a.provider='openrouter'))
                FROM latest l""", params,
         ).fetchone()
+        page_quality = connection.execute(
+            """WITH scoped AS (
+                 SELECT DISTINCT document_sha256 FROM census_records
+                 WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
+                   AND document_sha256 IS NOT NULL
+               ), latest AS (
+                 SELECT (SELECT MAX(r.id) FROM runs r
+                         WHERE r.document_sha256=s.document_sha256
+                           AND r.status='complete') run_id FROM scoped s
+               )
+               SELECT p.route,p.validation_status,COUNT(*)
+               FROM pages p JOIN latest x ON x.run_id=p.run_id
+               GROUP BY p.route,p.validation_status""", params,
+        ).fetchall()
+        by_route: dict[str, int] = {}
+        by_status: dict[str, int] = {}
+        for route, status, count in page_quality:
+            by_route[route] = by_route.get(route, 0) + count
+            by_status[status] = by_status.get(status, 0) + count
         cost = connection.execute(
             """SELECT COUNT(*),SUM(a.reported_cost IS NULL),SUM(a.reported_cost=0),
                       SUM(a.reported_cost!=0)
@@ -106,6 +125,8 @@ def summarize_database(path: Path, scope: str) -> dict:
             "distinct_acquired_pdfs": int(coverage[0] or 0),
             "processed_pdfs": int(coverage[1] or 0),
             "extracted_pages": int(coverage[2] or 0),
+            "pages_by_route": by_route,
+            "pages_by_validation_status": by_status,
             "model_pages": int(coverage[3] or 0),
             "model_calls": int(cost[0] or 0),
             "cost_unknown_calls": int(cost[1] or 0),

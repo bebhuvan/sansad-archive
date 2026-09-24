@@ -29,6 +29,14 @@ class CheckpointMonitorTests(unittest.TestCase):
                 "INSERT INTO documents VALUES (?,?,?,?,?)",
                 (digest, 12, "application/pdf", "/not-downloaded.pdf", "now"),
             )
+            superseded_run = db.execute(
+                """INSERT INTO runs(document_sha256,status,config_json,started_at)
+                   VALUES (?,'complete','{}','before')""", (digest,),
+            )
+            db.execute(
+                "INSERT INTO pages VALUES (?,?,?,?,?,?,?,?,?)",
+                (superseded_run, 1, "native", "liteparse", 10, None, "review", "[]", "old.json"),
+            )
             run_id = db.execute(
                 """INSERT INTO runs(document_sha256,status,config_json,started_at)
                    VALUES (?,'complete','{}','now')""", (digest,),
@@ -113,6 +121,8 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(result["retained_original_pdfs"], 1)
             self.assertEqual(result["source_records_by_acquisition_status"], {"downloaded": 1})
             self.assertEqual(result["processed_pdfs"], 1)
+            self.assertEqual(result["pages_by_route"], {"ocr": 1})
+            self.assertEqual(result["pages_by_validation_status"], {"accepted": 1})
             self.assertEqual(result["model_pages"], 1)
             self.assertEqual(result["cost_zero_calls"], 1)
             self.assertEqual(result["cost_nonzero_calls"], 0)
