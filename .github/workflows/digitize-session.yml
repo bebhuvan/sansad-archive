@@ -200,6 +200,7 @@ jobs:
           if [ "$CHUNK_PAGES" -gt 100 ]; then CHUNK_PAGES=100; fi
           DEADLINE=$(( JOB_DEADLINE - 3600 ))
           ADJ_COMPLETE=false
+          STALLED_CHUNKS=0
           for i in $(seq 1 100); do
             if [ "$(date +%s)" -ge "$DEADLINE" ]; then
               echo "work deadline reached before chunk $i"
@@ -216,8 +217,17 @@ jobs:
             echo "chunk $i considered=$CONSIDERED failed=$FAILED rate_limited=$RATE"
             if [ "$RATE" = "true" ]; then break; fi
             if [ "$FAILED" != "0" ]; then
-              echo "model page failures remain; checkpointing for a later retry"
-              break
+              COMPLETED=$((CONSIDERED - FAILED))
+              if [ "$COMPLETED" -eq 0 ]; then
+                STALLED_CHUNKS=$((STALLED_CHUNKS + 1))
+              else
+                STALLED_CHUNKS=0
+              fi
+              echo "model page failures remain; retrying pending pages in the next chunk (stalled=$STALLED_CHUNKS)"
+              if [ "$STALLED_CHUNKS" -ge 3 ]; then
+                echo "three consecutive chunks made no progress; stopping for diagnosis"
+                break
+              fi
             fi
             if [ "$CONSIDERED" -lt "$CHUNK_PAGES" ] && [ "$FAILED" = "0" ]; then
               ADJ_COMPLETE=true

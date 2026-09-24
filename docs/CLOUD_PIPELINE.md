@@ -131,7 +131,8 @@ before starting, and expect weeks of wall-clock at batch parallelism.
   regenerable.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
-  previous one stopped.
+  previous one stopped. Isolated page failures are retried in the next chunk;
+  three consecutive chunks with no completed pages stop the run for diagnosis.
 - If the provider returns a sustained 429, the chunk stops with
   `rate_limited: true` and the state is checkpointed. Publication waits for
   every acquired page to have a model layer, so incomplete passes do not
