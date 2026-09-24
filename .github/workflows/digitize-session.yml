@@ -192,15 +192,10 @@ jobs:
 
       - name: Extract pages
         run: |
-          python -m sansad_pipeline process-scope \
-            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" --workers 2
-
-      - name: Checkpoint after extraction
-        if: env.HF_REPO != ''
-        run: |
-          if [ -d data/raw ] && [ -n "$(find data/raw -type f -print -quit)" ]; then
-            python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
-          fi
+          python scripts/extract_cloud_scope.py \
+            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --repo "$HF_REPO" --checkpoint-path "$CHECKPOINT_PATH" \
+            --chunk-documents 100 --workers 2
 
       - name: Adjudicate with Space Bunny in resumable chunks
         if: env.MAX_PAGES != '0'

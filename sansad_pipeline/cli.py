@@ -6,10 +6,12 @@ import json
 import shutil
 import sys
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 from .census import Census
 from .config import load_config
+from .db import json_text
 from .events import EventLog
 from .pipeline import Pipeline
 from .publication import PublicationBuilder, Scope, upload_bundle
@@ -60,6 +62,8 @@ def parser() -> argparse.ArgumentParser:
     process_scope.add_argument("--limit", type=int)
     process_scope.add_argument("--workers", type=int, default=1)
     process_scope.add_argument("--force", action="store_true")
+    process_scope.add_argument("--pending-only", action="store_true")
+    process_scope.add_argument("--summary-out", type=Path)
 
     status = commands.add_parser("status", help="Print corpus/run/page status")
     status.add_argument("--json", action="store_true")
@@ -324,6 +328,18 @@ def main(argv: list[str] | None = None) -> int:
             ][: args.limit]
         else:
             params: list[object] = [args.house, args.parliament, args.session]
+            pending_sql = ""
+            if args.pending_only:
+                current_config = json_text({
+                    "liteparse": asdict(config.liteparse),
+                    "routing": asdict(config.routing),
+                    "validation": asdict(config.validation),
+                })
+                pending_sql = """ AND NOT EXISTS (
+                    SELECT 1 FROM runs r WHERE r.document_sha256=c.document_sha256
+                      AND r.status='complete' AND r.config_json=?
+                )"""
+                params.append(current_config)
             limit_sql = ""
             if args.limit is not None:
                 if args.limit < 1:
@@ -333,10 +349,10 @@ def main(argv: list[str] | None = None) -> int:
             identifiers = [
                 row["document_sha256"]
                 for row in store.db.all(
-                    """SELECT DISTINCT document_sha256 FROM census_records
+                    """SELECT DISTINCT c.document_sha256 FROM census_records c
                        WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
-                         AND document_sha256 IS NOT NULL
-                       ORDER BY document_sha256""" + limit_sql,
+                         AND c.document_sha256 IS NOT NULL""" + pending_sql +
+                    " ORDER BY c.document_sha256" + limit_sql,
                     tuple(params),
                 )
             ]
@@ -371,6 +387,12 @@ def main(argv: list[str] | None = None) -> int:
                         f"[{completed}/{len(identifiers)}] {identifier[:12]} ERROR {error}",
                         file=sys.stderr,
                     )
+        if args.command == "process-scope" and args.summary_out:
+            args.summary_out.parent.mkdir(parents=True, exist_ok=True)
+            args.summary_out.write_text(json.dumps({
+                "selected": len(identifiers), "failures": failures,
+                "completed": len(identifiers) - failures,
+            }) + "\n", encoding="utf-8")
         return 1 if failures else 0
     if args.command == "status":
         payload = status_payload(store)

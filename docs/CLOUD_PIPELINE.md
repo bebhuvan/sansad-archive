@@ -8,7 +8,7 @@ GitHub Actions runner (ephemeral, 14 GB guaranteed SSD, 6 h/job)
   restore checkpoint from HF (immutable raw-PDF archive + mutable processing state)
   census session -> acquire originals -> extract -> Space Bunny adjudication
   optional MiMo cross-model verification
-  checkpoint to HF after every stage
+  checkpoint to HF after acquisition, every 100 extracted PDFs, and model batches
   build publication tranche -> verify SHA256SUMS -> upload to HF dataset repo
   verify remote file set and Git/LFS content hashes before marking published
 ```
@@ -152,7 +152,7 @@ truncated or malformed response is a failed page, not a completed census.
 ## Resume semantics
 
 - The workflow restores `state/checkpoints/<scope>/checkpoint.json` before
-  any work and saves after acquisition, extraction, and every second
+  any work and saves after acquisition, every 100 extracted PDFs, and every second
   adjudication chunk. V2 checkpoints keep raw PDFs in a content-addressed
   archive and SQLite, extraction artifacts, and logs in a separate state
   archive. Unchanged originals are not re-uploaded for model-only checkpoints.
@@ -161,6 +161,11 @@ truncated or malformed response is a failed page, not a completed census.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
   regenerable.
+- Extraction selects PDFs lacking a complete run under the current LiteParse,
+  routing, and validation configuration. Each batch is durably checkpointed
+  before the next; even if one PDF fails, successful work is saved before the
+  job fails. It stops at a deadline that leaves two hours for model work and
+  publication, resuming from the checkpoint on the next run.
 - Publication succeeds only after the remote HF tranche has exactly the local
   file set, matching sizes, and matching Git blob or LFS SHA-256 content IDs.
   A partial or altered upload cannot produce a completion marker.
@@ -191,6 +196,9 @@ truncated or malformed response is a failed page, not a completed census.
   tranche. Remote verification passed; visible-text numeric normalization
   reduced model comparison flags from seven to six without altering either
   source text layer.
+- LS 17/14 continuation `36035410077` made new calls under the zero-cost
+  ceiling. Its six published model pages each report `0.0` cost; the fatal-cost
+  flag was false, and the two-PDF tranche passed remote verification.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.
