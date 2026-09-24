@@ -92,8 +92,12 @@ class PublicationTests(unittest.TestCase):
             with tarfile.open(output / "webdataset" / "shard-00000.tar") as archive:
                 canonical = archive.extractfile(f"{item.sha256}.md").read().decode("utf-8")
                 local = archive.extractfile(f"{item.sha256}.local.md").read().decode("utf-8")
-            self.assertEqual(canonical, "# Reviewed text")
+                adjudicated = archive.extractfile(
+                    f"{item.sha256}.adjudicated.md"
+                ).read().decode("utf-8")
+            self.assertEqual(canonical, "# Research text")
             self.assertEqual(local, "# Research text\n")
+            self.assertEqual(adjudicated, "# Reviewed text")
 
             manifest = [
                 json.loads(line)
@@ -111,10 +115,22 @@ class PublicationTests(unittest.TestCase):
             self.assertTrue((readable / "original.pdf").is_file())
             payload = json.loads((readable / "document.json").read_text(encoding="utf-8"))
             page_payload = payload["pages"][0]
-            self.assertEqual(page_payload["canonical_source"], "nvidia:nvidia/test")
+            self.assertEqual(page_payload["canonical_source"], "local:test@1")
             self.assertEqual(page_payload["local_markdown"], "# Research text")
+            self.assertEqual(page_payload["adjudicated_markdown"], "# Reviewed text")
             self.assertIn("canonical_validation", page_payload)
             self.assertTrue(PublicationBuilder.verify(output)["valid"])
+
+            model_output = root / "bundle-model"
+            PublicationBuilder(config).build(
+                Scope("lok_sabha", "18", "8"),
+                model_output,
+                minimum_pdf_saving_percent=100,
+                canonical_policy="model",
+            )
+            with tarfile.open(model_output / "webdataset" / "shard-00000.tar") as archive:
+                canonical = archive.extractfile(f"{item.sha256}.md").read().decode("utf-8")
+            self.assertEqual(canonical, "# Reviewed text")
 
 
 class NamingAndValidationTests(unittest.TestCase):

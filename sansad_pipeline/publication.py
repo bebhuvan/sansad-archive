@@ -198,7 +198,10 @@ class PublicationBuilder:
         limit: int | None = None,
         include_raw: bool = True,
         minimum_pdf_saving_percent: float = 5.0,
+        canonical_policy: str = "local",
     ) -> dict:
+        if canonical_policy not in {"local", "model"}:
+            raise ValueError("canonical_policy must be 'local' or 'model'")
         try:
             import duckdb
             import pyarrow as pa
@@ -245,6 +248,8 @@ class PublicationBuilder:
                         page = dict(page)
                         page["local_text"] = page["text"]
                         page["local_markdown"] = page["markdown"]
+                        page["adjudicated_text"] = None
+                        page["adjudicated_markdown"] = None
                         page["adjudication"] = None
                         page["canonical_source"] = (
                             f"local:{page['engine']}@{page['engine_version']}"
@@ -263,21 +268,24 @@ class PublicationBuilder:
                             response_path = Path(adjudication["response_path"])
                             adjudicated_path = response_path.with_name("adjudicated.md")
                             if adjudicated_path.is_file():
-                                canonical = adjudicated_path.read_text(encoding="utf-8")
+                                model_markdown = adjudicated_path.read_text(encoding="utf-8")
                                 flags = text_flags(
-                                    canonical,
+                                    model_markdown,
                                     reference=page["local_markdown"],
                                     config=self.config.validation,
                                 )
-                                page["markdown"] = canonical
-                                page["text"] = canonical
-                                page["canonical_source"] = (
-                                    f"{adjudication['provider']}:{adjudication['model']}"
-                                )
-                                page["canonical_validation"] = {
-                                    "status": "review" if flags else "accepted",
-                                    "flags": list(flags),
-                                }
+                                page["adjudicated_text"] = model_markdown
+                                page["adjudicated_markdown"] = model_markdown
+                                if canonical_policy == "model":
+                                    page["markdown"] = model_markdown
+                                    page["text"] = model_markdown
+                                    page["canonical_source"] = (
+                                        f"{adjudication['provider']}:{adjudication['model']}"
+                                    )
+                                    page["canonical_validation"] = {
+                                        "status": "review" if flags else "accepted",
+                                        "flags": list(flags),
+                                    }
                                 page["adjudication"] = {
                                     "provider": adjudication["provider"],
                                     "model": adjudication["model"],
@@ -292,6 +300,9 @@ class PublicationBuilder:
                         publication_pages.append(page)
                     markdown = "\n\n".join(page["markdown"] for page in publication_pages)
                     plain_text = "\n\n".join(page["text"] for page in publication_pages)
+                    adjudicated_markdown = "\n\n".join(
+                        page["adjudicated_markdown"] or "" for page in publication_pages
+                    )
                     raw_path = Path(primary["raw_path"])
                     if sha256_file(raw_path) != digest:
                         raise RuntimeError(f"raw PDF checksum mismatch: {raw_path}")
@@ -334,6 +345,12 @@ class PublicationBuilder:
                     prefix = digest
                     _tar_bytes(archive, f"{prefix}.md", markdown.encode("utf-8"))
                     _tar_bytes(archive, f"{prefix}.local.md", local_markdown.encode("utf-8"))
+                    if adjudicated_markdown.strip():
+                        _tar_bytes(
+                            archive,
+                            f"{prefix}.adjudicated.md",
+                            adjudicated_markdown.encode("utf-8"),
+                        )
                     _tar_bytes(archive, f"{prefix}.txt", plain_text.encode("utf-8"))
                     _tar_bytes(
                         archive,
@@ -424,6 +441,7 @@ class PublicationBuilder:
                                 "markdown": page["markdown"],
                                 "local_text": page["local_text"],
                                 "local_markdown": page["local_markdown"],
+                                "adjudicated_markdown": page["adjudicated_markdown"],
                                 "route": page["route"],
                                 "route_reasons": page["route_reasons"],
                                 "engine": page["engine"],
@@ -496,6 +514,7 @@ class PublicationBuilder:
             ),
             "readable_document_count": len(manifest_rows),
             "manifest": "manifest.jsonl",
+            "canonical_policy": canonical_policy,
             "code_commit": code_commit(self.config.project_root),
             "pdf_optimizations": optimization_rows,
             "complete_session_claimed": False,
@@ -568,12 +587,15 @@ claim that the named parliamentary session is complete.
   for streaming and training.
 - `SHA256SUMS` verifies every file in the tranche.
 
-Canonical text is selected deterministically: the stored model adjudication
-when one exists, otherwise the local extraction. Both candidates remain in the
-record. Original PDFs retain their source copyright. Reproduction is for
-attributed, non-commercial research. Extracted text is machine-generated and
-may contain errors; validation status and provenance are included for every
-page.
+Every page keeps its layers side by side: `local_text`/`local_markdown` from
+the parser or OCR, `adjudicated_markdown` from the vision model when present,
+and the canonical `text`/`markdown` chosen by policy. This tranche used
+canonical policy `{metadata.get('canonical_policy', 'local')}`: `local` keeps
+the parser/OCR text canonical with the model layer beside it for comparison,
+`model` makes the stored model adjudication canonical when one exists. Original
+PDFs retain their source copyright. Reproduction is for attributed,
+non-commercial research. Extracted text is machine-generated and may contain
+errors; validation status and provenance are included for every page.
 """
 
 

@@ -18,7 +18,7 @@ def main() -> int:
         "inputs": {
             key.lower(): os.environ.get(key)
             for key in ("HOUSE", "PARLIAMENT", "SESSION", "LIMIT", "MAX_PAGES",
-                        "ALL_PAGES", "VERIFY_SAMPLE")
+                        "ALL_PAGES", "INCLUDE_OCR", "VERIFY_SAMPLE")
         },
         "tranche": os.environ.get("TRANCHE", ""),
         "tranche_path": os.environ.get("PATH_IN_REPO", ""),
@@ -31,10 +31,15 @@ def main() -> int:
             summary["scope_status_error"] = "unreadable scope-status.json"
     status = summary.get("scope_status") or {}
     acquisition = status.get("acquisition") or {}
+    adjudication_required = os.environ.get("MAX_PAGES", "0") != "0"
+    adjudication_done = Path("/tmp/adjudication-complete").is_file()
+    summary["adjudication_required"] = adjudication_required
+    summary["adjudication_complete"] = adjudication_done
     summary["session_complete"] = bool(
         status.get("records")
         and acquisition.get("discovered", 0) == 0
         and acquisition.get("failed", 0) == 0
+        and (adjudication_done or not adjudication_required)
     )
     Path("/tmp/run-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"

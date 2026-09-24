@@ -89,6 +89,16 @@ acquired and none failed; markers live at
 schedule re-runs the batch incrementally, so new sessions are picked up
 automatically.
 
+Scopes whose census returns zero records (typically pre-2000 sessions that the
+current API lists but does not serve) are classified as empty: the workflow
+skips publication, exits successfully, and uploads a skip marker to
+`state/skipped/session-skipped-<key>.json`. The planner skips both complete and
+skipped scopes, so empty sessions are attempted once, not nightly. To force a
+re-attempt, delete the marker from the dataset repository. A repository
+variable `BATCH_EXCLUDE` (comma-separated `house:parliament:session`) excludes
+scopes known to return persistent server errors, for example the eight Lok
+Sabha scopes documented in `SOURCES_AND_COVERAGE.md`.
+
 Phase 3 is the historical eLibrary collection. It is not session-scoped, so it
 needs a census slice imported into the runner (an `import-census` command) and
 an explicit storage decision: the raw Lok Sabha Q&A originals alone are
@@ -113,17 +123,25 @@ before starting, and expect weeks of wall-clock at batch parallelism.
 
 ## Accuracy policy
 
-- Local LiteParse extraction is the baseline for every page. Space Bunny Alpha
-  (a vision model, reasoning effort `low`, temperature 0) adjudicates flagged
-  pages by default; `all_pages` is for experiments, because a model can only
-  degrade a byte-exact native text layer.
-- Canonical text is selected deterministically: the stored adjudication when
-  one exists, otherwise the local extraction. Both candidates are always
-  retained as `local_markdown` and `markdown`.
+- Every page gets a local extraction and, by default in cloud runs, a Space
+  Bunny Alpha transcription (`all_pages=true`, reasoning effort `low`,
+  temperature 0). OCR still runs on every OCR-routed page, so scanned pages
+  carry both an OCR candidate and a model candidate.
+- The layers stay separate in every record: `local_text`/`local_markdown`
+  (native or OCR), `adjudicated_markdown` (Space Bunny), and the canonical
+  `text`/`markdown`. The canonical policy defaults to `local`, so the model
+  layer can be compared against the parser/OCR layer across the whole corpus
+  before anyone promotes it; set `canonical_policy=model` to make the stored
+  adjudication canonical.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
   page tables. Flags create review evidence, never silent corrections.
+- All-pages adjudication is the throughput bottleneck: a large Lok Sabha
+  session is roughly 15,000 pages, so one 6-hour job adjudicates only part of
+  it. The loop is time-budgeted, checkpoints every second chunk, and a scope is
+  marked complete only when acquisition and adjudication coverage are both
+  finished, so multi-pass sessions resume instead of restarting.
 - Cross-model verification (`scripts/verify_pages.py`) samples pages and
   compares an independent model (MiMo-V2.6-Flash on OpenCode Go) against the
   canonical text, reporting numeric disagreement, table consistency and text

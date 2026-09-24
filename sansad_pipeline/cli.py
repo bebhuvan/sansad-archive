@@ -84,6 +84,11 @@ def parser() -> argparse.ArgumentParser:
     adjudicate.add_argument(
         "--all-pages", action="store_true", help="Transcribe every page, not only review pages"
     )
+    adjudicate.add_argument(
+        "--include-ocr",
+        action="store_true",
+        help="Also transcribe every OCR-routed page, not only flagged pages",
+    )
     adjudicate.add_argument("--force", action="store_true", help="Repeat already completed pages")
 
     openrouter_scope = commands.add_parser(
@@ -97,6 +102,11 @@ def parser() -> argparse.ArgumentParser:
     openrouter_scope.add_argument("--workers", type=int, default=1)
     openrouter_scope.add_argument(
         "--all-pages", action="store_true", help="Transcribe every page, not only review pages"
+    )
+    openrouter_scope.add_argument(
+        "--include-ocr",
+        action="store_true",
+        help="Also transcribe every OCR-routed page, not only flagged pages",
     )
     openrouter_scope.add_argument("--force", action="store_true")
     openrouter_scope.add_argument("--summary-out", type=Path)
@@ -196,6 +206,12 @@ def parser() -> argparse.ArgumentParser:
     prepare_publication.add_argument("--limit", type=int)
     prepare_publication.add_argument("--no-raw", action="store_true")
     prepare_publication.add_argument("--minimum-pdf-saving-percent", type=float, default=5.0)
+    prepare_publication.add_argument(
+        "--canonical-policy",
+        choices=("local", "model"),
+        default="local",
+        help="Which layer becomes canonical text; the other layer is always retained",
+    )
 
     verify_publication = commands.add_parser(
         "verify-publication", help="Verify every file against a publication SHA256SUMS"
@@ -407,6 +423,7 @@ def main(argv: list[str] | None = None) -> int:
                 pages=pages,
                 model=args.model,
                 all_pages=args.all_pages,
+                include_ocr=args.include_ocr,
                 force=args.force,
             )
         except RuntimeError as error:
@@ -523,7 +540,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.limit_pages is not None and len(tasks) >= args.limit_pages:
                 break
             _, run = reviewer._latest_run(row["document_sha256"])
-            page_rows = reviewer._page_rows(int(run["id"]), None, all_pages=args.all_pages)
+            page_rows = reviewer._page_rows(
+                int(run["id"]), None,
+                all_pages=args.all_pages,
+                include_ocr=args.include_ocr,
+            )
             if not args.force:
                 page_rows = [
                     page for page in page_rows
@@ -550,7 +571,10 @@ def main(argv: list[str] | None = None) -> int:
             started = time.monotonic()
             try:
                 worker_state.reviewer.adjudicate(
-                    document_sha, pages=[page_number], all_pages=args.all_pages
+                    document_sha,
+                    pages=[page_number],
+                    all_pages=args.all_pages,
+                    include_ocr=args.include_ocr,
                 )
                 return document_sha, page_number, None, time.monotonic() - started
             except Exception as error:  # classified by the caller
@@ -569,6 +593,7 @@ def main(argv: list[str] | None = None) -> int:
             parliament=args.parliament,
             session=args.session,
             all_pages=args.all_pages,
+            include_ocr=args.include_ocr,
             workers=args.workers,
             limit_pages=args.limit_pages,
             pages_pending=len(tasks),
@@ -611,6 +636,7 @@ def main(argv: list[str] | None = None) -> int:
             "models": models,
             "scope": {"house": args.house, "parliament": args.parliament, "session": args.session},
             "all_pages": args.all_pages,
+            "include_ocr": args.include_ocr,
             "workers": args.workers,
             "limit_pages": args.limit_pages,
             "pages_considered": len(tasks),
@@ -733,6 +759,7 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
             include_raw=not args.no_raw,
             minimum_pdf_saving_percent=args.minimum_pdf_saving_percent,
+            canonical_policy=args.canonical_policy,
         )
         verification = PublicationBuilder.verify(args.output)
         print(json.dumps({"publication": result, "verification": verification}, indent=2))

@@ -38,7 +38,16 @@ on:
       all_pages:
         description: Adjudicate every page, not only flagged pages
         type: boolean
-        default: false
+        default: true
+      canonical_policy:
+        description: Which layer becomes canonical text (local or model)
+        type: choice
+        options: [local, model]
+        default: local
+      include_ocr:
+        description: Adjudicate every OCR-routed page, not only flagged pages
+        type: boolean
+        default: true
       verify_sample:
         description: Pages to cross-check with MiMo via OpenCode Go; 0 disables
         type: string
@@ -70,7 +79,13 @@ on:
         default: "500"
       all_pages:
         type: string
-        default: "false"
+        default: "true"
+      canonical_policy:
+        type: string
+        default: local
+      include_ocr:
+        type: string
+        default: "true"
       verify_sample:
         type: string
         default: "0"
@@ -95,7 +110,9 @@ jobs:
       SESSION: ${{ inputs.session || vars.PILOT_SESSION || '8' }}
       LIMIT: ${{ inputs.limit || vars.PILOT_LIMIT || '200' }}
       MAX_PAGES: ${{ inputs.max_pages || vars.PILOT_MAX_PAGES || '500' }}
-      ALL_PAGES: ${{ inputs.all_pages || 'false' }}
+      ALL_PAGES: ${{ inputs.all_pages || 'true' }}
+      CANONICAL_POLICY: ${{ inputs.canonical_policy || 'local' }}
+      INCLUDE_OCR: ${{ inputs.include_ocr || 'true' }}
       VERIFY_SAMPLE: ${{ inputs.verify_sample || '0' }}
       PUBLISH: ${{ inputs.publish || 'true' }}
       TRANCHE_INPUT: ${{ inputs.tranche || '' }}
@@ -170,20 +187,38 @@ jobs:
           set -uo pipefail
           ALL_FLAG=""
           if [ "$ALL_PAGES" = "true" ]; then ALL_FLAG="--all-pages"; fi
-          for i in $(seq 1 8); do
+          OCR_FLAG=""
+          if [ "$INCLUDE_OCR" = "true" ]; then OCR_FLAG="--include-ocr"; fi
+          DEADLINE=$(( $(date +%s) + 18000 ))
+          ADJ_COMPLETE=false
+          for i in $(seq 1 24); do
             python -m sansad_pipeline adjudicate-scope-openrouter \
               --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-              --workers 3 --limit-pages "$MAX_PAGES" $ALL_FLAG \
+              --workers 3 --limit-pages "$MAX_PAGES" $ALL_FLAG $OCR_FLAG \
               --summary-out "/tmp/adjudication-$i.json" \
               --log "data/logs/adjudication-$i.jsonl" || true
-            if [ -n "$HF_REPO" ]; then
+            SUMMARY="/tmp/adjudication-$i.json"
+            if [ ! -f "$SUMMARY" ]; then break; fi
+            read -r CONSIDERED FAILED RATE < <(python -c "import json;d=json.load(open('$SUMMARY'));print(d['pages_considered'],d['failed'],'true' if d['rate_limited'] else 'false')")
+            echo "chunk $i considered=$CONSIDERED failed=$FAILED rate_limited=$RATE"
+            if [ "$RATE" = "true" ]; then break; fi
+            if [ "$CONSIDERED" -lt "$MAX_PAGES" ] && [ "$FAILED" = "0" ]; then
+              ADJ_COMPLETE=true
+              break
+            fi
+            if [ $((i % 2)) -eq 0 ] && [ -n "$HF_REPO" ]; then
               python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH" || true
             fi
-            if [ ! -f "/tmp/adjudication-$i.json" ]; then break; fi
-            CONSIDERED=$(python -c "import json;print(json.load(open('/tmp/adjudication-$i.json'))['pages_considered'])")
-            echo "chunk $i considered=$CONSIDERED"
-            if [ "$CONSIDERED" -lt "$MAX_PAGES" ]; then break; fi
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "time budget reached after chunk $i"
+              break
+            fi
           done
+          if [ -n "$HF_REPO" ]; then
+            python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH" || true
+          fi
+          if [ "$ADJ_COMPLETE" = "true" ]; then touch /tmp/adjudication-complete; fi
+          echo "adjudication_complete=$ADJ_COMPLETE"
 
       - name: Cross-model verification (MiMo via OpenCode Go)
         if: env.VERIFY_SAMPLE != '0' && env.OPENCODE_API_KEY != ''
@@ -220,7 +255,7 @@ jobs:
           PATH_IN_REPO="data/$HOUSE/parliament-$PARLIAMENT/session-$SESSION/tranche-$TRANCHE"
           python -m sansad_pipeline prepare-publication \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-            --output "$BUNDLE"
+            --output "$BUNDLE" --canonical-policy "$CANONICAL_POLICY"
           python -m sansad_pipeline verify-publication "$BUNDLE"
           python -m sansad_pipeline publish-hf "$BUNDLE" \
             --repo "$HF_REPO" --path-in-repo "$PATH_IN_REPO"

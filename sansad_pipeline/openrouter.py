@@ -121,11 +121,25 @@ class OpenRouterAdjudicator:
             raise RuntimeError("process the document locally before adjudicating it")
         return document, run
 
-    def _page_rows(self, run_id: int, pages: list[int] | None, *, all_pages: bool = False):
+    def _page_rows(
+        self,
+        run_id: int,
+        pages: list[int] | None,
+        *,
+        all_pages: bool = False,
+        include_ocr: bool = False,
+    ):
         if pages is None:
             if all_pages:
                 return self.store.db.all(
                     "SELECT * FROM pages WHERE run_id=? ORDER BY page_number",
+                    (run_id,),
+                )
+            if include_ocr:
+                return self.store.db.all(
+                    """SELECT * FROM pages WHERE run_id=?
+                       AND (validation_status='review' OR route='ocr')
+                       ORDER BY page_number""",
                     (run_id,),
                 )
             return self.store.db.all(
@@ -158,9 +172,12 @@ class OpenRouterAdjudicator:
         pages: list[int] | None,
         *,
         all_pages: bool = False,
+        include_ocr: bool = False,
     ) -> tuple[int, list[int]]:
         _, run = self._latest_run(identifier)
-        rows = self._page_rows(int(run["id"]), pages, all_pages=all_pages)
+        rows = self._page_rows(
+            int(run["id"]), pages, all_pages=all_pages, include_ocr=include_ocr
+        )
         numbers = [int(row["page_number"]) for row in rows]
         if len(numbers) > self.config.openrouter.max_pages_per_command:
             raise RuntimeError(
@@ -176,12 +193,15 @@ class OpenRouterAdjudicator:
         pages: list[int] | None = None,
         model: str | None = None,
         all_pages: bool = False,
+        include_ocr: bool = False,
         force: bool = False,
     ) -> dict:
         models = self.configured_models(model)
         if not models:
             raise RuntimeError("no OpenRouter models configured")
-        run_id, page_numbers = self._page_numbers(identifier, pages, all_pages=all_pages)
+        run_id, page_numbers = self._page_numbers(
+            identifier, pages, all_pages=all_pages, include_ocr=include_ocr
+        )
         summary: dict = {"models": models, "completed": [], "skipped": [], "failed": []}
         for page_number in page_numbers:
             if not force:
@@ -206,6 +226,7 @@ class OpenRouterAdjudicator:
                         pages=[page_number],
                         model=selected_model,
                         all_pages=all_pages,
+                        include_ocr=include_ocr,
                     )
                     summary["completed"].append({"page": page_number, "model": selected_model})
                     break
@@ -351,6 +372,7 @@ class OpenRouterAdjudicator:
         pages: list[int] | None = None,
         model: str | None = None,
         all_pages: bool = False,
+        include_ocr: bool = False,
     ) -> list[int]:
         cfg = self.config.openrouter
         if not cfg.enabled:
@@ -363,7 +385,9 @@ class OpenRouterAdjudicator:
             raise RuntimeError("set OPENROUTER_MODEL in .env or pass --model")
         model_snapshot = self._model_snapshot(selected_model)
         document, run = self._latest_run(identifier)
-        page_rows = self._page_rows(int(run["id"]), pages, all_pages=all_pages)
+        page_rows = self._page_rows(
+            int(run["id"]), pages, all_pages=all_pages, include_ocr=include_ocr
+        )
         if len(page_rows) > cfg.max_pages_per_command:
             raise RuntimeError(
                 f"refusing {len(page_rows)} model pages; limit is {cfg.max_pages_per_command} per command"

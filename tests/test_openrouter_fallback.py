@@ -16,10 +16,12 @@ class FakeAdjudicator(OpenRouterAdjudicator):
     def configured_models(self, override=None):
         return [override] if override else ["primary", "fallback"]
 
-    def _page_numbers(self, identifier, pages, *, all_pages=False):
+    def _page_numbers(self, identifier, pages, *, all_pages=False, include_ocr=False):
         return 1, pages or [7]
 
-    def adjudicate(self, identifier, *, pages=None, model=None, all_pages=False):
+    def adjudicate(
+        self, identifier, *, pages=None, model=None, all_pages=False, include_ocr=False
+    ):
         self.attempts.append((pages[0], model))
         if model == "primary":
             raise OpenRouterHTTPError(400, "provider moderation failure")
@@ -27,7 +29,9 @@ class FakeAdjudicator(OpenRouterAdjudicator):
 
 
 class RateLimitedAdjudicator(FakeAdjudicator):
-    def adjudicate(self, identifier, *, pages=None, model=None, all_pages=False):
+    def adjudicate(
+        self, identifier, *, pages=None, model=None, all_pages=False, include_ocr=False
+    ):
         self.attempts.append((pages[0], model))
         raise OpenRouterHTTPError(429, "provider capacity exhausted")
 

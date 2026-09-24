@@ -28,6 +28,18 @@ on:
         description: Model pages per adjudication chunk
         type: string
         default: "500"
+      all_pages:
+        description: Send every page to Space Bunny, not only flagged pages
+        type: string
+        default: "true"
+      canonical_policy:
+        description: Which layer becomes canonical text (local or model)
+        type: string
+        default: local
+      include_ocr:
+        description: Adjudicate every OCR-routed page per session
+        type: string
+        default: "true"
       verify_sample:
         description: Cross-model verification pages per session; 0 disables
         type: string
@@ -91,6 +103,9 @@ jobs:
       session: ${{ matrix.session }}
       limit: ${{ inputs.limit || '0' }}
       max_pages: ${{ inputs.max_pages || '500' }}
+      all_pages: ${{ inputs.all_pages || 'true' }}
+      canonical_policy: ${{ inputs.canonical_policy || 'local' }}
+      include_ocr: ${{ inputs.include_ocr || 'true' }}
       verify_sample: ${{ inputs.verify_sample || '0' }}
       publish: "true"
     secrets: inherit
