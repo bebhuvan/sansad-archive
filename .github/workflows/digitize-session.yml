@@ -160,6 +160,10 @@ jobs:
           python -m sansad_pipeline process-scope \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" --workers 2
 
+      - name: Checkpoint after extraction
+        if: env.HF_REPO != ''
+        run: python scripts/cloud_state.py save --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+
       - name: Adjudicate with Space Bunny in resumable chunks
         if: env.MAX_PAGES != '0'
         run: |
