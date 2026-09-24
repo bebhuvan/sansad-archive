@@ -55,6 +55,13 @@ checkpoint absence alone is not evidence that its GitHub job stopped.
 For historical checkpoints it also distinguishes an old database without an
 attachment ledger (`not_recorded`) from a new ledger with missing item
 inventories, and counts source PDF bitstreams separately from distinct bytes.
+Historical snapshot-complete markers created before attachment inventory are
+no longer sufficient for the batch planner to skip a scope. New run summaries
+write `attachment_complete=true` only when every downloaded eLibrary item has
+an attachment ledger containing its selected PDF SHA; the planner requires
+that flag in addition to page coverage, matching census snapshot and live
+tranche-file presence. This intentionally queues old selected-PDF-only scopes
+for a raw-attachment backfill and verified republication.
 
 ## Why this split
 

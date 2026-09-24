@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 
 
@@ -16,6 +17,49 @@ def tranche_files_present(files: set[str], tranche_path: str) -> bool:
     """A completion marker is unusable when its published bundle vanished."""
     prefix = tranche_path.strip("/")
     return bool(prefix and all(f"{prefix}/{name}" in files for name in REQUIRED_TRANCHE_FILES))
+
+
+def elibrary_attachment_coverage(path: Path, *, house: str,
+                                 parliament: str, session: str) -> dict:
+    """An old item-level checkpoint cannot certify every ORIGINAL bitstream."""
+    if not path.is_file():
+        return {"status": "database_missing", "complete": False}
+    connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        table = connection.execute(
+            """SELECT 1 FROM sqlite_master WHERE type='table'
+               AND name='elibrary_pdf_attachments'"""
+        ).fetchone()
+        if table is None:
+            return {"status": "not_recorded", "complete": False}
+        total, covered, selected = connection.execute(
+            """SELECT COUNT(*),
+                      SUM(EXISTS(SELECT 1 FROM elibrary_pdf_attachments a
+                                 WHERE a.record_id=c.record_id)),
+                      SUM(EXISTS(SELECT 1 FROM elibrary_pdf_attachments a
+                                 WHERE a.record_id=c.record_id
+                                   AND a.document_sha256=c.document_sha256))
+               FROM census_records c
+               WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                 AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                 AND c.acquisition_status='downloaded'""",
+            (house, parliament, session),
+        ).fetchone()
+        pdfs = connection.execute(
+            """SELECT COUNT(*) FROM elibrary_pdf_attachments a
+               JOIN census_records c ON c.record_id=a.record_id
+               WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                 AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                 AND c.acquisition_status='downloaded'""",
+            (house, parliament, session),
+        ).fetchone()[0]
+        return {"status": "recorded", "items": int(total),
+                "items_inventoried": int(covered or 0),
+                "items_with_selected_pdf": int(selected or 0),
+                "pdf_bitstreams": int(pdfs),
+                "complete": bool(total and covered == total and selected == total)}
+    finally:
+        connection.close()
 
 
 def is_session_complete(status: dict, *, tranche_path: str, all_pages: bool,
@@ -71,6 +115,14 @@ def main() -> int:
     )
     summary["adjudication_required"] = adjudication_required
     summary["adjudication_complete"] = adjudication_done
+    if os.environ.get("SOURCE") == "elibrary":
+        summary["attachment_coverage"] = elibrary_attachment_coverage(
+            Path("data/pipeline.sqlite3"),
+            house=os.environ.get("HOUSE", ""),
+            parliament=os.environ.get("PARLIAMENT", ""),
+            session=os.environ.get("SESSION", ""),
+        )
+        summary["attachment_complete"] = summary["attachment_coverage"]["complete"]
     summary["session_complete"] = is_session_complete(
         status, tranche_path=summary["tranche_path"],
         all_pages=os.environ.get("ALL_PAGES") == "true",
@@ -80,6 +132,7 @@ def main() -> int:
     summary["snapshot_complete"] = bool(
         os.environ.get("SOURCE") == "elibrary"
         and summary.get("census_snapshot", {}).get("sha256")
+        and summary.get("attachment_complete") is True
         and is_session_complete(
             status, tranche_path=summary["tranche_path"],
             all_pages=os.environ.get("ALL_PAGES") == "true",

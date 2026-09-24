@@ -74,6 +74,7 @@ def completed_scopes(repo: str, snapshot_sha256: str) -> set[tuple[str, str]]:
         if not path.endswith(f"-p{scope[0]}-s{scope[1]}.json"):
             continue
         if (payload.get("snapshot_complete") is True
+                and payload.get("attachment_complete") is True
                 and payload.get("session_complete") is False
                 and inputs.get("source") == "elibrary"
                 and (payload.get("census_snapshot") or {}).get("sha256") == snapshot_sha256
