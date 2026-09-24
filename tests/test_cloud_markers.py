@@ -27,7 +27,7 @@ class MarkerSemanticsTests(unittest.TestCase):
 
     def test_completion_requires_page_coverage_and_published_tranche(self):
         status = {"census_status": "complete", "records": 3,
-                  "acquisition": {"acquired": 3}, "acquired_documents": 3,
+                  "acquisition": {"downloaded": 3}, "acquired_documents": 3,
                   "processed_documents": 3, "pages": 7,
                   "openrouter_adjudicated_pages": 7}
         options = {"tranche_path": "data/scope/tranche-1", "all_pages": True,
@@ -40,12 +40,29 @@ class MarkerSemanticsTests(unittest.TestCase):
 
     def test_publication_waits_for_all_pages(self):
         status = {"census_status": "complete", "acquired_documents": 2,
+                  "records": 2,
                   "processed_documents": 2, "pages": 5,
                   "openrouter_adjudicated_pages": 4,
-                  "acquisition": {"acquired": 2}}
+                  "acquisition": {"downloaded": 2}}
         self.assertFalse(publication_ready(status, limited=False, all_pages=True))
         self.assertTrue(publication_ready(
             {**status, "openrouter_adjudicated_pages": 5}, limited=False, all_pages=True
+        ))
+
+    def test_proven_html_non_pdf_records_do_not_hide_pdf_coverage(self):
+        status = {"census_status": "complete", "records": 3,
+                  "acquisition": {"downloaded": 2, "failed": 1},
+                  "unsupported_html_records": 1,
+                  "acquired_documents": 2, "processed_documents": 2,
+                  "pages": 5, "openrouter_adjudicated_pages": 5}
+        self.assertTrue(publication_ready(status, limited=False, all_pages=True))
+        self.assertTrue(is_session_complete(
+            status, tranche_path="data/tranche", all_pages=True,
+            unlimited=True, adjudication_required=True,
+        ))
+        self.assertFalse(is_session_complete(
+            {**status, "unsupported_html_records": 0}, tranche_path="data/tranche",
+            all_pages=True, unlimited=True, adjudication_required=True,
         ))
 
 

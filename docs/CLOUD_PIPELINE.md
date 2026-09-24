@@ -91,7 +91,10 @@ workflow: it lists every current-API session, skips scopes already marked
 complete, and runs a bounded matrix of four scopes with at most two concurrent
 sessions by default. Each nightly batch resumes the earliest unfinished scopes.
 A scope is marked complete only when its census, acquisition, extraction,
-all-page Space Bunny coverage, and publication are proven; markers live at
+all-page Space Bunny coverage, and publication are proven. A source record
+whose official link is demonstrably HTML rather than a PDF is counted
+separately and remains visible in the run summary; it cannot hide a transient
+download failure. Markers live at
 `state/complete/session-complete-<house>-p<parl>-s<session>.json`. The nightly
 schedule re-runs the batch incrementally, so new sessions are picked up
 automatically.

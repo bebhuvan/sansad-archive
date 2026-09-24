@@ -31,13 +31,17 @@ def skip_reason(status: dict) -> str | None:
 
 def publication_ready(status: dict, *, limited: bool, all_pages: bool) -> bool:
     acquisition = status.get("acquisition") or {}
+    unsupported_html = int(status.get("unsupported_html_records") or 0)
     pages = int(status.get("pages") or 0)
     return bool(
         status.get("census_status") == "complete"
         and status.get("acquired_documents", 0) > 0
         and status.get("processed_documents") == status.get("acquired_documents")
-        and acquisition.get("failed", 0) == 0
-        and (limited or acquisition.get("discovered", 0) == 0)
+        and acquisition.get("failed", 0) == unsupported_html
+        and (limited or (
+            acquisition.get("discovered", 0) == 0
+            and acquisition.get("downloaded", 0) + unsupported_html == status.get("records")
+        ))
         and all_pages and pages > 0
         and status.get("openrouter_adjudicated_pages", 0) == pages
     )

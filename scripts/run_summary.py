@@ -10,12 +10,14 @@ from pathlib import Path
 def is_session_complete(status: dict, *, tranche_path: str, all_pages: bool,
                         unlimited: bool, adjudication_required: bool) -> bool:
     acquisition = status.get("acquisition") or {}
+    unsupported_html = int(status.get("unsupported_html_records") or 0)
     pages = status.get("pages", 0)
     return bool(
         status.get("census_status") == "complete"
         and status.get("records")
         and acquisition.get("discovered", 0) == 0
-        and acquisition.get("failed", 0) == 0
+        and acquisition.get("failed", 0) == unsupported_html
+        and acquisition.get("downloaded", 0) + unsupported_html == status.get("records")
         and status.get("acquired_documents", 0) > 0
         and status.get("processed_documents") == status.get("acquired_documents")
         and pages > 0
