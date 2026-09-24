@@ -135,6 +135,11 @@ queued at commit `6c1a17f`. GitHub cancelled only the older pending runs and
 left the active modern and historical model jobs running. The successors
 include the transcript-publication guard and missing-tranche marker recovery;
 their pending state is not evidence that model work has begun.
+At 23:09 UTC, the historical pending successor was refreshed as run
+`36071290681` on commit `8c0fc10` so newly acquired eLibrary items retain all
+ORIGINAL PDF attachments in immutable HF raw shards. GitHub cancelled the old
+pending `36068688868` and left active historical batch `36039411879` running.
+The new run is pending, not yet evidence of attachment acquisition.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
