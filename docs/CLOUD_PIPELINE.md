@@ -73,6 +73,11 @@ and 47 (historical) of 00, 04, 08, 12, 16 and 20 UTC. Each workflow's
 concurrency group allows one active batch and one pending batch, so a long
 two-wave batch cannot overlap itself. The per-scope lock separately prevents
 two runs for one session. GitHub schedules are best-effort and may start late.
+Cron events do not supply `workflow_dispatch` inputs. The current-API batch
+therefore explicitly sets `all_pages=true`, `include_ocr=true`, and
+`skip_existing=true` for scheduled runs; an explicit `false` still works for
+a manual diagnostic dispatch. Without the cron branch, all three silently
+became `false` despite their dispatch defaults.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep

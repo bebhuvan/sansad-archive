@@ -87,7 +87,7 @@ jobs:
           HOUSE: ${{ inputs.house || 'lok_sabha' }}
           EXCLUDE: ${{ inputs.exclude || '' }}
           MAX_SCOPES: ${{ inputs.max_scopes || '4' }}
-          SKIP_EXISTING: ${{ (inputs.skip_existing == true || inputs.skip_existing == 'true') && 'true' || 'false' }}
+          SKIP_EXISTING: ${{ (github.event_name == 'schedule' || inputs.skip_existing == true || inputs.skip_existing == 'true') && 'true' || 'false' }}
           HF_REPO: ${{ vars.HF_DATASET_REPO }}
         run: |
           ARGS=(--house "$HOUSE" --max "$MAX_SCOPES")
@@ -109,9 +109,9 @@ jobs:
       session: ${{ matrix.session }}
       limit: ${{ inputs.limit || '0' }}
       max_pages: ${{ inputs.max_pages || '500' }}
-      all_pages: ${{ (inputs.all_pages == true || inputs.all_pages == 'true') && 'true' || 'false' }}
+      all_pages: ${{ (github.event_name == 'schedule' || inputs.all_pages == true || inputs.all_pages == 'true') && 'true' || 'false' }}
       canonical_policy: ${{ inputs.canonical_policy || 'local' }}
-      include_ocr: ${{ (inputs.include_ocr == true || inputs.include_ocr == 'true') && 'true' || 'false' }}
+      include_ocr: ${{ (github.event_name == 'schedule' || inputs.include_ocr == true || inputs.include_ocr == 'true') && 'true' || 'false' }}
       verify_sample: ${{ inputs.verify_sample || '0' }}
       publish: "true"
     secrets: inherit
