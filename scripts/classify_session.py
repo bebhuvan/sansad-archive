@@ -55,7 +55,7 @@ def main() -> int:
         print("empty=false")
         print("publish_ready=false")
         return 0
-    reason = skip_reason(status)
+    reason = skip_reason(status) if os.environ.get("SOURCE", "current") == "current" else None
     empty = reason is not None
     print(f"empty={'true' if empty else 'false'}")
     ready = publication_ready(

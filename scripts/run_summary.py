@@ -37,7 +37,7 @@ def main() -> int:
         "commit": os.environ.get("GITHUB_SHA"),
         "inputs": {
             key.lower(): os.environ.get(key)
-            for key in ("HOUSE", "PARLIAMENT", "SESSION", "LIMIT", "MAX_PAGES",
+            for key in ("SOURCE", "HOUSE", "PARLIAMENT", "SESSION", "LIMIT", "MAX_PAGES",
                         "ALL_PAGES", "INCLUDE_OCR", "VERIFY_SAMPLE")
         },
         "tranche": os.environ.get("TRANCHE", ""),
@@ -60,7 +60,7 @@ def main() -> int:
     summary["session_complete"] = is_session_complete(
         status, tranche_path=summary["tranche_path"],
         all_pages=os.environ.get("ALL_PAGES") == "true",
-        unlimited=os.environ.get("LIMIT") == "0",
+        unlimited=(os.environ.get("LIMIT") == "0" and os.environ.get("SOURCE", "current") == "current"),
         adjudication_required=adjudication_required,
     )
     Path("/tmp/run-summary.json").write_text(

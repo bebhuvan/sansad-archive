@@ -57,6 +57,30 @@ class CensusImportTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "line 1"):
                 census.import_snapshot(path, source="elibrary")
 
+    def test_full_dated_scope_import_records_snapshot_census_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "scope.jsonl"
+            record = QuestionRecord(
+                record_id="elibrary_one", source_type="questions_answers",
+                house="lok_sabha", parliament_number="01", session="I",
+                document_number="1", document_subtype="UNSTARRED",
+                document_date="1952-07-28", title="Example", ministry="DEFENCE",
+                members=[], language="en", source_url="https://example.test/item",
+                official_page_url="https://example.test", api_url="https://example.test/api",
+                api_params={}, raw={},
+            ).metadata()
+            path.write_text(json.dumps(record) + "\n")
+            census = Census(Config(project_root=root, storage=StorageConfig(root=Path("data"))))
+            census.import_snapshot(
+                path, source="elibrary", house="lok_sabha",
+                parliament="01", session="I",
+            )
+            scope = census.store.db.one(
+                "SELECT status,records_seen FROM census_scopes WHERE house='lok_sabha'"
+            )
+            self.assertEqual((scope["status"], scope["records_seen"]), ("complete", 1))
+
 
 if __name__ == "__main__":
     unittest.main()

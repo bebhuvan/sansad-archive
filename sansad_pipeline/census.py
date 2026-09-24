@@ -124,6 +124,23 @@ class Census:
                     break
         if batch:
             self._upsert_many(batch)
+        if (source == "elibrary" and house == "lok_sabha" and parliament is not None
+                and session is not None and offset == 0 and limit == 0):
+            finished = utcnow()
+            run_id = self.store.db.execute(
+                """INSERT INTO census_runs
+                   (source_type,scope_json,status,started_at,finished_at,records_seen)
+                   VALUES ('questions_answers_elibrary_snapshot',?,'complete',?,?,?)""",
+                (json_text({"snapshot": str(path), "sha256": expected_sha256,
+                            "house": house, "parliament": parliament,
+                            "session": session}), finished, finished, imported),
+            )
+            self.store.db.execute(
+                """INSERT INTO census_scopes
+                   (run_id,house,parliament_number,session,status,records_seen,started_at,finished_at)
+                   VALUES (?,?,?,?,'complete',?,?,?)""",
+                (run_id, house, parliament, session, imported, finished, finished),
+            )
         return {"imported": imported, "matched_before_limit": matched,
                 "offset": offset, "limit": limit, "source": source,
                 "house": house, "parliament": parliament, "session": session}

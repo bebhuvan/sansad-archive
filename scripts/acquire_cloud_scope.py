@@ -24,6 +24,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--repo", required=True)
     parser.add_argument("--checkpoint-path", required=True)
+    parser.add_argument("--source", choices=("current", "elibrary"), default="current")
     parser.add_argument("--chunk", type=int, default=1000)
     parser.add_argument("--budget-seconds", type=int, default=7200)
     args = parser.parse_args()
@@ -31,13 +32,17 @@ def main() -> int:
         parser.error("limit must be non-negative; chunk and budget must be positive")
 
     census = Census(load_config(Path(__file__).resolve().parents[1] / "pipeline.toml"))
+    source_filter = (
+        "AND record_id LIKE 'elibrary_%'" if args.source == "elibrary"
+        else "AND record_id NOT LIKE 'elibrary_%'"
+    )
     started = time.monotonic()
     selected = downloaded = failed = 0
     stopped_low_disk = False
     already_acquired = census.store.db.one(
-        """SELECT COUNT(*) n FROM census_records
+        f"""SELECT COUNT(*) n FROM census_records
            WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
-             AND document_sha256 IS NOT NULL""",
+             AND document_sha256 IS NOT NULL {source_filter}""",
         (args.house, args.parliament, args.session),
     )["n"]
     while time.monotonic() - started < args.budget_seconds:
@@ -46,7 +51,7 @@ def main() -> int:
             break
         chunk = min(args.chunk, remaining)
         result = census.acquire_questions(
-            source="current", house=args.house,
+            source=args.source, house=args.house,
             lok_sabha=args.parliament or None, session=args.session,
             limit=chunk, workers=4, min_free_gib=2,
         )
@@ -60,14 +65,14 @@ def main() -> int:
             break
 
     pending_failures = census.store.db.one(
-        """SELECT COUNT(*) n FROM census_records
+        f"""SELECT COUNT(*) n FROM census_records
            WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
-             AND acquisition_status='failed'""",
+             AND acquisition_status='failed' {source_filter}""",
         (args.house, args.parliament, args.session),
     )["n"]
     if pending_failures and not stopped_low_disk and time.monotonic() - started < args.budget_seconds:
         retry = census.acquire_questions(
-            source="current", house=args.house,
+            source=args.source, house=args.house,
             lok_sabha=args.parliament or None, session=args.session,
             retry_failed=True, workers=4, min_free_gib=2,
         )
@@ -77,11 +82,11 @@ def main() -> int:
             save(args.repo, args.checkpoint_path, token=os.environ.get("HF_TOKEN"))
 
     remaining = census.store.db.one(
-        """SELECT
+        f"""SELECT
              SUM(CASE WHEN acquisition_status='discovered' THEN 1 ELSE 0 END) discovered,
              SUM(CASE WHEN acquisition_status='failed' THEN 1 ELSE 0 END) failed
            FROM census_records
-           WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?""",
+           WHERE house=? AND COALESCE(parliament_number,'')=? AND session=? {source_filter}""",
         (args.house, args.parliament, args.session),
     )
     print(json.dumps({

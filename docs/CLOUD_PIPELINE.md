@@ -55,6 +55,7 @@ Use **Actions -> Digitize session -> Run workflow**:
 
 | Input | Meaning |
 |---|---|
+| `source` | `current` API or the dated `elibrary` HF census snapshot |
 | `house` | `lok_sabha` or `rajya_sabha` |
 | `parliament` | Parliament number; blank for Rajya Sabha |
 | `session` | Session number |
@@ -137,6 +138,13 @@ stream a bounded eLibrary slice into an ephemeral runner's SQLite state. For
 example, `sansad-pipeline import-census snapshot.jsonl.gz --source elibrary
 --offset 0 --limit 1000 --sha256 <manifest SHA-256>`. Imported records start as
 unacquired; the command does not falsely mark a historical session complete.
+The session workflow also accepts `source=elibrary`: it restores a dedicated
+checkpoint, downloads and verifies the HF snapshot, imports the requested
+Lok Sabha parliament/session slice, resolves original PDF bitstreams, and
+uses the same extraction, model, and publication stages. Its run summary
+records the dated source. Even with `limit=0`, it does not claim a live
+session-complete marker from a dated snapshot; historical coverage still
+needs freshness reconciliation and a storage grant before bulk acquisition.
 The eLibrary total changes as items are added. Its crawler validates the
 returned page number, size, count, and item identifiers for each page; a
 truncated or malformed response is a failed page, not a completed census.

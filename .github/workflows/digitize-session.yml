@@ -14,6 +14,11 @@ name: Digitize session
 on:
   workflow_dispatch:
     inputs:
+      source:
+        description: Current Digital Sansad API or dated eLibrary census snapshot
+        type: choice
+        options: [current, elibrary]
+        default: current
       house:
         description: House
         type: choice
@@ -62,6 +67,9 @@ on:
         default: ""
   workflow_call:
     inputs:
+      source:
+        type: string
+        default: current
       house:
         type: string
         default: lok_sabha
@@ -97,7 +105,7 @@ on:
         default: ""
 
 concurrency:
-  group: digitize-${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
+  group: digitize-${{ inputs.source == 'elibrary' && 'elibrary-' || '' }}${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
   cancel-in-progress: false
 
 jobs:
@@ -105,6 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     env:
+      SOURCE: ${{ inputs.source || 'current' }}
       HOUSE: ${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}
       PARLIAMENT: ${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}
       SESSION: ${{ inputs.session || vars.PILOT_SESSION || '8' }}
@@ -117,7 +126,7 @@ jobs:
       PUBLISH: ${{ inputs.publish || 'true' }}
       TRANCHE_INPUT: ${{ inputs.tranche || '' }}
       HF_REPO: ${{ vars.HF_DATASET_REPO }}
-      CHECKPOINT_PATH: state/checkpoints/${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
+      CHECKPOINT_PATH: state/checkpoints/${{ inputs.source == 'elibrary' && 'elibrary-' || '' }}${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}-p${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}-s${{ inputs.session || vars.PILOT_SESSION || '8' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -161,7 +170,11 @@ jobs:
       - name: Census session
         run: |
           set -x
-          if [ "$HOUSE" = "lok_sabha" ]; then
+          if [ "$SOURCE" = "elibrary" ]; then
+            python scripts/import_cloud_scope.py \
+              --repo "$HF_REPO" --house "$HOUSE" \
+              --parliament "$PARLIAMENT" --session "$SESSION"
+          elif [ "$HOUSE" = "lok_sabha" ]; then
             python -m sansad_pipeline census-questions \
               --lok-sabha "$PARLIAMENT" --session "$SESSION" \
               --limit-per-session 0 --workers 4
@@ -174,7 +187,8 @@ jobs:
         run: |
           python scripts/acquire_cloud_scope.py \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-            --limit "$LIMIT" --repo "$HF_REPO" --checkpoint-path "$CHECKPOINT_PATH"
+            --source "$SOURCE" --limit "$LIMIT" \
+            --repo "$HF_REPO" --checkpoint-path "$CHECKPOINT_PATH"
 
       - name: Extract pages
         run: |
@@ -280,7 +294,8 @@ jobs:
           BUNDLE="data/publications/$HOUSE-p$PARLIAMENT-s$SESSION-run${GITHUB_RUN_ID}"
           FORMAT_ARGS=()
           if [ "$LIMIT" = "0" ]; then
-            FORMAT_ARGS+=(--compact --complete-session)
+            FORMAT_ARGS+=(--compact)
+            if [ "$SOURCE" = "current" ]; then FORMAT_ARGS+=(--complete-session); fi
           fi
           python -m sansad_pipeline prepare-publication \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
@@ -313,6 +328,7 @@ jobs:
             echo "## Digitize $HOUSE parliament $PARLIAMENT session $SESSION"
             echo ""
             echo "- Documents requested: $LIMIT"
+            echo "- Source: $SOURCE"
             echo "- Model pages per chunk: $MAX_PAGES"
             echo "- Cross-model verification pages: $VERIFY_SAMPLE"
             echo "- Tranche: ${PATH_IN_REPO:-not published}"
