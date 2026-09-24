@@ -81,9 +81,13 @@ def collect_prefix(existing: set[str], old_elibrary_count: int, *, page_size: in
     expected_new = live_count - old_elibrary_count
     if expected_new < 0 or expected_new > max_new:
         raise RuntimeError(f"live/base count delta {expected_new} outside 0..{max_new}")
-    if expected_new == 0:
-        return [], {"live_count": live_count, "expected_new": 0, "overlap_checked": 0}
-    pages_needed = math.ceil(expected_new / page_size) + overlap_pages
+    # A stable total is not proof of a stable inventory: one new accession
+    # and one deletion can cancel out. Check the known-ID overlap even then.
+    pages_needed = min(
+        math.ceil(live_count / page_size),
+        math.ceil(expected_new / page_size) + overlap_pages,
+    )
+    required_overlap = min(overlap_pages * page_size, old_elibrary_count)
     new: list[dict] = []
     seen: set[str] = set()
     previous_last: str | None = None
@@ -130,7 +134,7 @@ def collect_prefix(existing: set[str], old_elibrary_count: int, *, page_size: in
     if (int(last["_embedded"]["searchResult"]["page"]["totalElements"]) != live_count
             or [r.record_id for r in records_from_search_response(last, page=0)[:5]] != first_ids):
         raise RuntimeError("eLibrary accession head changed during incremental census")
-    if len(new) != expected_new or known_checked < overlap_pages * page_size:
+    if len(new) != expected_new or known_checked < required_overlap:
         raise RuntimeError("incremental census did not prove its new/known boundary")
     return new, {"live_count": live_count, "expected_new": expected_new,
                  "overlap_checked": known_checked, "sort": ACCESSION_SORT,

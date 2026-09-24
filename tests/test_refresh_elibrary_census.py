@@ -73,6 +73,25 @@ class RefreshElibraryCensusTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "live count changed"):
             collect_prefix(self.existing, 4, page_size=2, overlap_pages=1, fetch=self.fetch)
 
+    @patch("scripts.refresh_elibrary_census.time.sleep")
+    def test_zero_count_delta_still_checks_accession_head(self, _sleep):
+        self.pages[0] = page_response(0, ["new-a", "old-a"],
+                                      ["2026-09-02", "2026-08-02"], total=4)
+        with self.assertRaisesRegex(RuntimeError, "unknown ID beyond count-delta boundary"):
+            collect_prefix(self.existing, 4, page_size=2, overlap_pages=1, fetch=self.fetch)
+
+    @patch("scripts.refresh_elibrary_census.time.sleep")
+    def test_zero_delta_checks_overlap_even_for_small_collection(self, _sleep):
+        self.pages = {
+            0: page_response(0, ["old-a"], ["2026-08-02"], total=1),
+        }
+        records, evidence = collect_prefix(
+            {"elibrary_ls_question_old-a"}, 1,
+            page_size=2, overlap_pages=10, fetch=self.fetch,
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(evidence["overlap_checked"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

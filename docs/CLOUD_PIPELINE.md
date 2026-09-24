@@ -211,8 +211,12 @@ SHA-256 and ID uniqueness, requires the new-ID prefix length to equal the
 live-minus-base count, checks ten pages of known IDs beyond that boundary,
 rejects cross-page duplicates or changes in source count/order, and uploads
 the new compressed snapshot plus manifest in one HF commit with remote LFS
-hash verification. The old dated snapshot is retained. This is an incremental
-inventory of newly accessioned items, **not** a full recrawl: deletions and
+hash verification. The old dated snapshot is retained. Even when the total
+count has not changed, the same known-ID overlap
+is checked so a new accession offset by a deletion at the head fails closed
+instead of being called unchanged. The overlap is capped to the collection
+size for small inventories. This remains an incremental inventory of newly
+accessioned items, **not** a full recrawl: deletions and
 metadata changes among older items require separate reconciliation. A failed
 boundary check publishes nothing.
 Refresh run `36047393238` appended exactly 3,500 records to the August base
