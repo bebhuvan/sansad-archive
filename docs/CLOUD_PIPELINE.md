@@ -439,6 +439,12 @@ for comparison and require language-aware review before a canonical claim.
   `state/runs/20260924T195347Z-lok_sabha-p02-sIX/verification/`. Its run
   summary again has no tranche or completion marker. This validates the
   audit/report path, not the accuracy of either transcription.
+- Footer-aware cloud canary `36052696228` at commit `5cc684d` again audited
+  all three OCR pages with Tesseract 5.3.4 and no failures. The fresh HF report
+  at `state/runs/20260924T201110Z-lok_sabha-p02-sIX/verification/` contains
+  both content-number and raw-number disagreement fields, three transcript
+  hashes, and selection reasons. The run had `publish=false`, an empty
+  tranche path, and no completion marker.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
