@@ -479,6 +479,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `session_complete=false` with no publication. The pending historical batch
   is the planned continuation; a green workflow run alone is not a complete
   archive claim.
+- The historical batch `36039411879` finished its LS 01/II child at 22:43
+  UTC with 1,800 of 2,151 pages model-covered, all 1,365 original PDFs
+  retained, and no complete publication. It then started its second planned
+  scope, LS 01/III, so the pending successor cannot resume II yet. Direct
+  same-scope continuation `36069132345` was dispatched at 22:44 UTC on
+  `1c60c8e` with the pinned 2026-09-24 snapshot, all pages, both extraction
+  layers, free model, and publication enabled. GitHub confirmed it running
+  while the III child remained active; II's earlier child had completed, so
+  no same-scope writer overlaps.
 - The historical LS 01/II checkpoint's 2,017 review pages have 1,843
   inconsistent-table-width flags and 1,803 native/OCR numeric-disagreement
   flags; these can co-occur on a page. Only one page has a low-OCR-confidence
