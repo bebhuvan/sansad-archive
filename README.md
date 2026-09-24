@@ -99,7 +99,8 @@ metadata in SQLite without downloading the PDFs:
 ```
 
 The official Parliament eLibrary is the primary historical inventory. Its Lok
-Sabha Questions and Answers collection currently reports 1,155,268 items:
+Sabha Questions and Answers collection reported 1,158,768 items on 2026-09-24;
+the count can change as the collection grows:
 
 ```bash
 # Inspect a small batch first
