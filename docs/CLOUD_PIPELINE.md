@@ -446,7 +446,9 @@ substitute for validating original PDF hashes on restore or in a publication.
   temperature 0). OCR still runs on every OCR-routed page, so scanned pages
   carry both an OCR candidate and a model candidate.
 - LiteParse 2.14.7 supplies native extraction and built-in Tesseract OCR for
-  pages whose native text is missing or suspect. The model adapter rejects
+  pages whose native text is missing or suspect. The
+  [PyPI package metadata](https://pypi.org/pypi/liteparse/json) still listed
+  2.14.7 as the current release on 2026-09-24. The model adapter rejects
   nonzero or unknown provider pricing before making an inference call. If a
   response nonetheless reports a nonzero or unparseable charge, it writes a
   durable stop marker, cancels pending work, and refuses calls on resumed runs.
