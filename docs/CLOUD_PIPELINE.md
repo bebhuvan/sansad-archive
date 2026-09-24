@@ -78,6 +78,13 @@ therefore explicitly sets `all_pages=true`, `include_ocr=true`, and
 `skip_existing=true` for scheduled runs; an explicit `false` still works for
 a manual diagnostic dispatch. Without the cron branch, all three silently
 became `false` despite their dispatch defaults.
+At 20:22 UTC on 2026-09-24, GitHub had not emitted the 20:17 current-API
+cron run while batch `36039363151` remained active. An explicit full-coverage
+fallback batch `36054404767` was queued on commit `6fdd63f` with
+`all_pages=true`, `include_ocr=true`, `skip_existing=true`, and the same
+four-scope/two-runner limits. Its pending state is protected by the batch
+concurrency group; a later scheduled pending run may replace it, in which
+case the cron branch must be checked before treating the replacement as safe.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
