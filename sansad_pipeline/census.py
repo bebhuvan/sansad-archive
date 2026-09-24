@@ -26,6 +26,7 @@ from .sources.elibrary import (
     records_from_search_response,
     resolve_original_pdf,
     search_page as elibrary_search_page,
+    normalize_session_label,
 )
 from .storage import Store
 
@@ -49,6 +50,7 @@ class Census:
                 source_url,official_page_url,api_url,api_params_json,raw_json,discovered_at)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(record_id) DO UPDATE SET
+                 parliament_number=excluded.parliament_number, session=excluded.session,
                  title=excluded.title, ministry=excluded.ministry,
                  members_json=excluded.members_json, source_url=excluded.source_url,
                  official_page_url=excluded.official_page_url, api_url=excluded.api_url,
@@ -101,6 +103,13 @@ class Census:
                         continue
                     if source == "current" and record_id.startswith("elibrary_"):
                         continue
+                    if record_id.startswith("elibrary_"):
+                        normalized, repair = normalize_session_label(
+                            str(row.get("session") or ""), row.get("members") or []
+                        )
+                        if repair:
+                            row["session"] = normalized
+                            row["raw"] = {**(row.get("raw") or {}), "session_normalization": repair}
                     if house is not None and row["house"] != house:
                         continue
                     if parliament is not None and str(row["parliament_number"]) != parliament:

@@ -273,6 +273,8 @@ def upload_run(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     for kind in ("complete", "skipped"):
         for path in Path("/tmp").glob(f"session-{kind}-*.json"):
             files.append((path, f"state/{kind}/{path.name}"))
+    for path in Path("/tmp").glob("snapshot-complete-*.json"):
+        files.append((path, f"state/snapshot-complete/{path.name}"))
     for path in Path("data/logs").glob("*.jsonl"):
         files.append((path, f"{path_in_repo}/{path.name}"))
     for path in Path("results/verification").rglob("*"):

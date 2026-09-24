@@ -46,6 +46,9 @@ def main() -> int:
         parliament=args.parliament, session=args.session,
         expected_sha256=manifest["sha256"],
     )
+    Path("/tmp/census-snapshot-manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(json.dumps({"snapshot_date": manifest.get("snapshot_date"), **result}, indent=2))
     return 0
 

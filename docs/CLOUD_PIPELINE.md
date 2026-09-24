@@ -148,6 +148,19 @@ needs freshness reconciliation and a storage grant before bulk acquisition.
 The eLibrary total changes as items are added. Its crawler validates the
 returned page number, size, count, and item identifiers for each page; a
 truncated or malformed response is a failed page, not a completed census.
+`digitize-historical-batch.yml` plans Lok Sabha sessions from the verified
+dated snapshot, running up to two scopes sequentially by default. It skips
+only `state/snapshot-complete/` markers with the same census SHA-256, full
+acquisition/extraction/model coverage, and a published tranche. These markers
+do not assert that the live eLibrary has stopped changing; replacing the
+snapshot invalidates them and resumes from existing PDF/model checkpoints.
+The dated snapshot has both Roman and numeric session labels. One official
+eLibrary item has a malformed label, `Anandgajapati RajuI`; the same official
+metadata lists `Anandgajapati Raju` as a member. The crawler and snapshot
+importer normalize only an exact listed-member prefix followed by a valid
+session label, retaining the source string and rule in `raw.session_normalization`.
+Unresolved labels are reported and quarantined by the planner, never guessed
+from the question date.
 
 ## Resume semantics
 
@@ -199,6 +212,16 @@ truncated or malformed response is a failed page, not a completed census.
 - LS 17/14 continuation `36035410077` made new calls under the zero-cost
   ceiling. Its six published model pages each report `0.0` cost; the fatal-cost
   flag was false, and the two-PDF tranche passed remote verification.
+- Historical eLibrary LS 01/I run `36036700034` published two original 1952
+  PDFs and three pages under
+  `data/lok_sabha/parliament-01/session-I/tranche-snapshot-local-9d0623763e05941fe35c`.
+  Fresh HF reads verified both PDF SHA-256s, nonempty local and Space Bunny
+  layers on every page, and `0.0` reported cost. This is a two-record canary,
+  not a claim that the 2,950-record dated scope is complete. Those two source
+  PDFs include one overlapping printed page; both originals remain preserved.
+- Full LS 01/I historical continuation `36037513021` was dispatched at
+  commit `f4d7c5a`, with acquisition and extraction checkpoints and free-only
+  model enforcement. Its outcome is not yet verified here.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.

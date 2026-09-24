@@ -1,0 +1,70 @@
+name: Digitize historical Lok Sabha batch
+
+# The dated eLibrary snapshot is the scheduler's finite inventory. A separate
+# snapshot-complete marker prevents treating it as live eLibrary completeness.
+on:
+  workflow_dispatch:
+    inputs:
+      max_scopes:
+        description: Historical sessions to queue; 0 means all
+        type: string
+        default: "2"
+      max_parallel:
+        description: Concurrent historical sessions
+        type: string
+        default: "1"
+      exclude:
+        description: Comma-separated house:parliament:session scopes to skip
+        type: string
+        default: ""
+  schedule:
+    - cron: "15 17 * * *"  # 22:45 IST daily; incremental dated-snapshot scheduler
+
+concurrency:
+  group: digitize-historical-batch
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install planning dependency
+        run: pip install huggingface_hub
+      - id: plan
+        env:
+          HF_REPO: ${{ vars.HF_DATASET_REPO }}
+          MAX_SCOPES: ${{ inputs.max_scopes || '2' }}
+          EXCLUDE: ${{ inputs.exclude || '' }}
+        run: |
+          ARGS=(--repo "$HF_REPO" --max "$MAX_SCOPES")
+          if [ -n "$EXCLUDE" ]; then ARGS+=(--exclude "$EXCLUDE"); fi
+          python scripts/plan_elibrary_sessions.py "${ARGS[@]}" >> "$GITHUB_OUTPUT"
+
+  digitize:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    strategy:
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '1') }}
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    uses: ./.github/workflows/digitize-session.yml
+    with:
+      source: elibrary
+      house: ${{ matrix.house }}
+      parliament: ${{ matrix.parliament }}
+      session: ${{ matrix.session }}
+      limit: "0"
+      max_pages: "500"
+      all_pages: "true"
+      canonical_policy: local
+      include_ocr: "true"
+      verify_sample: "0"
+      publish: "true"
+    secrets: inherit

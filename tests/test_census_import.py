@@ -81,6 +81,31 @@ class CensusImportTests(unittest.TestCase):
             )
             self.assertEqual((scope["status"], scope["records_seen"]), ("complete", 1))
 
+    def test_snapshot_import_repairs_only_exact_member_prefix_and_keeps_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "scope.jsonl"
+            record = QuestionRecord(
+                record_id="elibrary_one", source_type="questions_answers",
+                house="lok_sabha", parliament_number="10", session="Anandgajapati RajuI",
+                document_number="1", document_subtype="UNSTARRED",
+                document_date="1991-07-19", title="Example", ministry="FINANCE",
+                members=["Anandgajapati Raju"], language="en",
+                source_url="https://example.test/item", official_page_url="https://example.test",
+                api_url="https://example.test/api", api_params={}, raw={},
+            ).metadata()
+            path.write_text(json.dumps(record) + "\n")
+            census = Census(Config(project_root=root, storage=StorageConfig(root=Path("data"))))
+            result = census.import_snapshot(path, source="elibrary", house="lok_sabha",
+                                            parliament="10", session="I")
+            self.assertEqual(result["imported"], 1)
+            row = census.store.db.one(
+                "SELECT session,raw_json FROM census_records WHERE record_id='elibrary_one'"
+            )
+            self.assertEqual(row["session"], "I")
+            self.assertEqual(json.loads(row["raw_json"])["session_normalization"]["original"],
+                             "Anandgajapati RajuI")
+
 
 if __name__ == "__main__":
     unittest.main()

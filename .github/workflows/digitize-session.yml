@@ -2,8 +2,8 @@ name: Digitize session
 
 # Runs the whole cloud pipeline for one House/Parliament/session scope:
 # census -> acquire -> extract -> Space Bunny adjudication -> publication -> HF.
-# State is checkpointed to the Hugging Face dataset repo after every stage, so
-# an interrupted run resumes without repeating model calls.
+# State is checkpointed to Hugging Face after acquisition and in bounded
+# extraction/model batches, so interrupted runs resume without repeating calls.
 #
 # Required repository secrets: OPENROUTER_API_KEY, HF_TOKEN
 # Optional repository secret:  OPENCODE_API_KEY (cross-model verification)

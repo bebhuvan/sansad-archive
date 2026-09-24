@@ -37,6 +37,11 @@ class ElibrarySourceTests(unittest.TestCase):
         self.assertNotIn("metadata", record.raw)
         self.assertEqual(record.api_params["page"], 7)
 
+        item["metadata"]["dc.identifier.sessionnumber"] = [{"value": "A MemberIX"}]
+        repaired = records_from_search_response(response, page=7)[0]
+        self.assertEqual(repaired.session, "IX")
+        self.assertEqual(repaired.raw["session_normalization"]["original"], "A MemberIX")
+
     def test_rejects_page_size_above_server_cap_before_network(self):
         with self.assertRaises(ValueError):
             search_page(page_size=101)

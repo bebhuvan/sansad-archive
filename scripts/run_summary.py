@@ -50,6 +50,9 @@ def main() -> int:
         except json.JSONDecodeError:
             summary["scope_status_error"] = "unreadable scope-status.json"
     status = summary.get("scope_status") or {}
+    snapshot_path = Path("/tmp/census-snapshot-manifest.json")
+    if os.environ.get("SOURCE") == "elibrary" and snapshot_path.is_file():
+        summary["census_snapshot"] = json.loads(snapshot_path.read_text(encoding="utf-8"))
     adjudication_required = os.environ.get("MAX_PAGES", "0") != "0"
     adjudication_done = bool(
         status.get("pages", 0) > 0
@@ -63,6 +66,16 @@ def main() -> int:
         unlimited=(os.environ.get("LIMIT") == "0" and os.environ.get("SOURCE", "current") == "current"),
         adjudication_required=adjudication_required,
     )
+    summary["snapshot_complete"] = bool(
+        os.environ.get("SOURCE") == "elibrary"
+        and summary.get("census_snapshot", {}).get("sha256")
+        and is_session_complete(
+            status, tranche_path=summary["tranche_path"],
+            all_pages=os.environ.get("ALL_PAGES") == "true",
+            unlimited=os.environ.get("LIMIT") == "0",
+            adjudication_required=adjudication_required,
+        )
+    )
     Path("/tmp/run-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -72,6 +85,14 @@ def main() -> int:
             f"-s{os.environ.get('SESSION', '')}"
         )
         Path(f"/tmp/session-complete-{key}.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    if summary["snapshot_complete"]:
+        key = (
+            f"{os.environ.get('HOUSE', '')}-p{os.environ.get('PARLIAMENT', '')}"
+            f"-s{os.environ.get('SESSION', '')}"
+        )
+        Path(f"/tmp/snapshot-complete-{key}.json").write_text(
             json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
         )
     print(json.dumps(summary, indent=2))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Iterator
 
 from .questions import QuestionRecord, request_json
@@ -11,6 +12,28 @@ ELIBRARY_API = f"{ELIBRARY_BASE}/server/api"
 LS_QUESTIONS_COLLECTION = "75228d43-3a98-4b7d-b90f-ffec6aa9fa11"
 LS_QUESTIONS_PAGE = f"{ELIBRARY_BASE}/collections/{LS_QUESTIONS_COLLECTION}"
 MAX_PAGE_SIZE = 100
+
+
+def normalize_session_label(value: str, members: list[str]) -> tuple[str, dict[str, str] | None]:
+    """Repair a member-name prefix accidentally joined to a session label.
+
+    Do not infer from dates or fuzzy names. Preserve the source value and rule
+    in the record's raw provenance whenever a repair is made.
+    """
+    if re.fullmatch(r"(?:[IVXLCDM]+|[0-9]+)", value, re.IGNORECASE):
+        return value, None
+    candidates = {
+        value[len(member):] for member in members
+        if member and value.startswith(member)
+        and re.fullmatch(r"(?:[IVXLCDM]+|[0-9]+)", value[len(member):], re.IGNORECASE)
+    }
+    if len(candidates) == 1:
+        normalized = candidates.pop()
+        return normalized, {
+            "original": value, "normalized": normalized,
+            "rule": "exact-listed-member-prefix",
+        }
+    return value, None
 
 
 def _values(metadata: dict[str, Any], key: str) -> list[str]:
@@ -99,19 +122,24 @@ def records_from_search_response(
             "dc.language.iso": _values(metadata, "dc.language.iso"),
             "dc.type": _values(metadata, "dc.type"),
         }
+        members = _values(metadata, "dc.contributor.members")
+        original_session = _value(metadata, "dc.identifier.sessionnumber")
+        session, repair = normalize_session_label(original_session, members)
+        if repair:
+            raw["session_normalization"] = repair
         records.append(
             QuestionRecord(
                 record_id=f"elibrary_ls_question_{item_id}",
                 source_type="questions_answers",
                 house="lok_sabha",
                 parliament_number=_value(metadata, "dc.identifier.loksabhanumber"),
-                session=_value(metadata, "dc.identifier.sessionnumber"),
+                session=session,
                 document_number=_value(metadata, "dc.identifier.questionnumber"),
                 document_subtype=_value(metadata, "dc.identifier.questiontype").upper(),
                 document_date=_value(metadata, "dc.date.issued"),
                 title=_value(metadata, "dc.title") or str(item.get("name") or "").strip(),
                 ministry=_value(metadata, "dc.relation.ministry"),
-                members=_values(metadata, "dc.contributor.members"),
+                members=members,
                 language="en",
                 source_url=source_url,
                 official_page_url=LS_QUESTIONS_PAGE,
