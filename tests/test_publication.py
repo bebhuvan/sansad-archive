@@ -85,6 +85,8 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(result["document_count"], 1)
             self.assertEqual(result["page_count"], 1)
             self.assertEqual(result["adjudicated_page_count"], 1)
+            self.assertEqual(result["model_flagged_page_count"], 0)
+            self.assertEqual(result["model_numeric_disagreement_page_count"], 0)
             self.assertTrue((output / "documents.parquet").is_file())
             self.assertTrue((output / "pages.jsonl.zst").is_file())
             self.assertTrue((output / "sansad.duckdb").is_file())

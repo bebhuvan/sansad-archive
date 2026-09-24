@@ -469,6 +469,10 @@ class PublicationBuilder:
                                     page["adjudication"]["request_sha256"]
                                     if page["adjudication"] else None
                                 ),
+                                "model_validation_flags": (
+                                    page["adjudication"]["validation_flags"]
+                                    if page["adjudication"] else []
+                                ),
                                 "canonical_source": page["canonical_source"],
                                 "canonical_status": page["canonical_validation"]["status"],
                                 "canonical_flags": page["canonical_validation"]["flags"],
@@ -519,6 +523,13 @@ class PublicationBuilder:
             "optimized_pdf_count": len(optimization_rows),
             "adjudicated_page_count": sum(
                 1 for page in page_rows if page["adjudication_provider"] is not None
+            ),
+            "model_flagged_page_count": sum(
+                bool(page["model_validation_flags"]) for page in page_rows
+            ),
+            "model_numeric_disagreement_page_count": sum(
+                "candidate-numeric-disagreement" in page["model_validation_flags"]
+                for page in page_rows
             ),
             "readable_document_count": 0 if compact else len(manifest_rows),
             "webdataset_document_count": len(manifest_rows),

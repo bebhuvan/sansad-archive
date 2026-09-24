@@ -145,9 +145,18 @@ jobs:
       - name: Set job work deadline
         run: echo "JOB_DEADLINE=$(( $(date +%s) + 19500 ))" >> "$GITHUB_ENV"
 
+      - name: Validate cloud credentials
+        run: |
+          test -n "$HF_REPO"
+          test -n "$HF_TOKEN"
+          test -n "$OPENROUTER_API_KEY"
+
       - name: Restore checkpoint
         if: env.HF_REPO != ''
         run: python scripts/cloud_state.py restore --repo "$HF_REPO" --path-in-repo "$CHECKPOINT_PATH"
+
+      - name: Check free vision model
+        run: python -m sansad_pipeline check-openrouter-model stealth/space-bunny-alpha
 
       - name: Census session
         run: |
