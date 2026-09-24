@@ -242,6 +242,11 @@ for comparison and require language-aware review before a canonical claim.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
   regenerable.
+- Raw PDF ingestion verifies the `%PDF-` signature and hashes incoming bytes.
+  If a content-addressed target already exists, it rehashes that target before
+  accepting a deduplicated source (including the concurrent-ingest race).
+  A mismatch fails closed instead of attaching another citation to corrupt
+  bytes; checkpoint restore and publication perform independent hash checks.
 - Extraction selects PDFs lacking a complete run under the current LiteParse,
   routing, and validation configuration. Each batch is durably checkpointed
   before the next; even if one PDF fails, successful work is saved before the

@@ -67,6 +67,8 @@ class Store:
             raise ValueError(f"SHA-256 mismatch for {path}: expected {expected_sha256}, got {digest}")
         target = self.root / "raw" / "sha256" / digest[:2] / f"{digest}.pdf"
         already_present = target.exists()
+        if already_present and sha256_file(target) != digest:
+            raise IOError(f"stored PDF SHA-256 mismatch: {target}")
         if not already_present:
             target.parent.mkdir(parents=True, exist_ok=True)
             descriptor, staged_name = tempfile.mkstemp(
@@ -80,6 +82,8 @@ class Store:
                     raise IOError(f"copy verification failed: {path}")
                 if target.exists():
                     already_present = True
+                    if sha256_file(target) != digest:
+                        raise IOError(f"stored PDF SHA-256 mismatch: {target}")
                 else:
                     staged.replace(target)
                     target.chmod(0o444)

@@ -12,6 +12,20 @@ from sansad_pipeline.storage import Store
 
 
 class StorageTests(unittest.TestCase):
+    def test_existing_raw_pdf_must_match_its_content_address(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.pdf"
+            Image.new("RGB", (20, 20), "white").save(source, "PDF")
+            store = Store(Config(project_root=root, storage=StorageConfig(root=Path("data"))))
+            first = store.ingest(source, source_uri="https://example.test/first.pdf")
+            first.raw_path.chmod(0o644)
+            first.raw_path.write_bytes(b"%PDF-corrupted")
+
+            with self.assertRaisesRegex(IOError, "stored PDF SHA-256 mismatch"):
+                store.ingest(source, source_uri="https://example.test/second.pdf")
+            self.assertEqual(store.db.one("SELECT COUNT(*) n FROM sources")["n"], 1)
+
     def test_concurrent_identical_ingest_uses_one_immutable_target(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
