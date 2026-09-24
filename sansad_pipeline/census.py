@@ -27,6 +27,7 @@ from .sources.elibrary import (
     resolve_original_pdf,
     search_page as elibrary_search_page,
     normalize_session_label,
+    classify_language,
 )
 from .storage import Store
 
@@ -50,8 +51,13 @@ class Census:
                 source_url,official_page_url,api_url,api_params_json,raw_json,discovered_at)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(record_id) DO UPDATE SET
+                 source_type=excluded.source_type, house=excluded.house,
                  parliament_number=excluded.parliament_number, session=excluded.session,
+                 document_number=excluded.document_number,
+                 document_subtype=excluded.document_subtype,
+                 document_date=excluded.document_date,
                  title=excluded.title, ministry=excluded.ministry,
+                 language=excluded.language,
                  members_json=excluded.members_json, source_url=excluded.source_url,
                  official_page_url=excluded.official_page_url, api_url=excluded.api_url,
                  api_params_json=excluded.api_params_json, raw_json=excluded.raw_json,
@@ -110,6 +116,9 @@ class Census:
                         if repair:
                             row["session"] = normalized
                             row["raw"] = {**(row.get("raw") or {}), "session_normalization": repair}
+                        row["language"] = classify_language(
+                            (row.get("raw") or {}).get("dc.language.iso") or []
+                        )
                     if house is not None and row["house"] != house:
                         continue
                     if parliament is not None and str(row["parliament_number"]) != parliament:

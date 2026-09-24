@@ -36,6 +36,16 @@ def normalize_session_label(value: str, members: list[str]) -> tuple[str, dict[s
     return value, None
 
 
+def classify_language(labels: list[str]) -> str:
+    """Use only explicit eLibrary language evidence; 'Original' is not English."""
+    normalized = {label.strip().casefold() for label in labels if label.strip()}
+    if normalized == {"english"}:
+        return "en"
+    if normalized == {"hindi"}:
+        return "hi"
+    return "und"
+
+
 def _values(metadata: dict[str, Any], key: str) -> list[str]:
     return [
         str(entry.get("value") or "").strip()
@@ -140,7 +150,7 @@ def records_from_search_response(
                 title=_value(metadata, "dc.title") or str(item.get("name") or "").strip(),
                 ministry=_value(metadata, "dc.relation.ministry"),
                 members=members,
-                language="en",
+                language=classify_language(raw["dc.language.iso"]),
                 source_url=source_url,
                 official_page_url=LS_QUESTIONS_PAGE,
                 api_url=f"{ELIBRARY_API}/core/items/{item_id}",

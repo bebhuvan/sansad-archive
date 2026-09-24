@@ -3,10 +3,16 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from sansad_pipeline.sources.elibrary import records_from_search_response, search_page
+from sansad_pipeline.sources.elibrary import classify_language, records_from_search_response, search_page
 
 
 class ElibrarySourceTests(unittest.TestCase):
+    def test_unlabelled_or_original_language_is_not_assumed_english(self):
+        self.assertEqual(classify_language(["English"]), "en")
+        self.assertEqual(classify_language(["Hindi"]), "hi")
+        self.assertEqual(classify_language(["Original"]), "und")
+        self.assertEqual(classify_language([]), "und")
+
     def test_normalizes_item_without_storing_full_hal_payload(self):
         item = {
             "uuid": "abc-123",
@@ -33,6 +39,7 @@ class ElibrarySourceTests(unittest.TestCase):
         record = records_from_search_response(response, page=7)[0]
         self.assertEqual(record.parliament_number, "02")
         self.assertEqual(record.document_number, "485")
+        self.assertEqual(record.language, "und")
         self.assertEqual(record.raw["uuid"], "abc-123")
         self.assertNotIn("metadata", record.raw)
         self.assertEqual(record.api_params["page"], 7)

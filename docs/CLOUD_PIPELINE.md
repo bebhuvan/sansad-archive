@@ -161,6 +161,12 @@ importer normalize only an exact listed-member prefix followed by a valid
 session label, retaining the source string and rule in `raw.session_normalization`.
 Unresolved labels are reported and quarantined by the planner, never guessed
 from the question date.
+The snapshot's eLibrary language metadata explicitly says `English` for
+273,883 records and `Hindi` for seven; 881,378 say `Original` or have no tag.
+Those are classified as `und` (undetermined), not silently marked English.
+The source tag remains in raw provenance. Current LiteParse OCR is configured
+for English; unknown/Hindi pages therefore keep both local and model layers
+for comparison and require language-aware review before a canonical claim.
 
 ## Resume semantics
 
