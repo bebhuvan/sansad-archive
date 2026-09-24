@@ -311,11 +311,17 @@ for comparison and require language-aware review before a canonical claim.
   link while raw storage deduplicates identical bitstreams.
 - Full LS 01/I historical continuation `36037513021` was dispatched at
   commit `f4d7c5a`, with acquisition and extraction checkpoints and free-only
-  model enforcement. Its outcome is not yet verified here.
+  model enforcement. At the 19:41 UTC HF checkpoint, all 2,950 census records
+  were `downloaded` with zero acquisition errors and mapped to 1,807 distinct
+  retained PDF bitstreams. Extraction was still running, so this is not a
+  published or fully digitized session.
 - Historical batch `36038615784` proved its planner selected LS 01/II and
   01/III from the verified dated snapshot. It was cancelled before acquisition
   to use the separate-process LiteParse speed fix; replacement `36039411879`
   at `6bf49de` uses the same scopes sequentially.
+  Its LS 01/II HF checkpoint at 19:44 UTC likewise had all 2,198 source
+  records downloaded with zero acquisition errors, mapping to 1,365 distinct
+  original PDFs; extraction was still in progress.
 - The older full current-API batch `36032423348` was cancelled after its
   acquisition checkpoints were verified: it had entered a single large,
   uncheckpointed extraction step under commit `8f994b9`. Replacement batch
