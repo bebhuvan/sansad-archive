@@ -10,6 +10,7 @@ GitHub Actions runner (ephemeral, 14 GB guaranteed SSD, 6 h/job)
   optional MiMo cross-model verification
   checkpoint to HF after every stage
   build publication tranche -> verify SHA256SUMS -> upload to HF dataset repo
+  verify remote file set and Git/LFS content hashes before marking published
 ```
 
 Nothing is committed to Git. Raw PDFs and derived artifacts live in the
@@ -136,6 +137,9 @@ truncated or malformed response is a failed page, not a completed census.
 - The checkpoint contains SQLite state, raw PDFs, extraction artifacts, and
   event logs. Rendered page PNGs are excluded because they are large and
   regenerable.
+- Publication succeeds only after the remote HF tranche has exactly the local
+  file set, matching sizes, and matching Git blob or LFS SHA-256 content IDs.
+  A partial or altered upload cannot produce a completion marker.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
   previous one stopped. Isolated page failures are retried in the next chunk;

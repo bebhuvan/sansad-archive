@@ -699,4 +699,62 @@ def upload_bundle(repo_id: str, bundle: Path, path_in_repo: str, *, private: boo
             wait = min(600, 30 * 2**attempt)
             print(f"Hub publication HTTP {status}; retrying in {wait}s")
             time.sleep(wait)
-    return {"repo_url": str(repo), "commit_url": str(commit.commit_url)}
+    verification = verify_remote_bundle(repo_id, bundle, path_in_repo)
+    if not verification["valid"]:
+        raise RuntimeError(
+            f"Hugging Face publication differs from local bundle: "
+            f"{json.dumps(verification['failures'][:10])}"
+        )
+    return {"repo_url": str(repo), "commit_url": str(commit.commit_url),
+            "remote_verification": verification}
+
+
+def _git_blob_id(path: Path) -> str:
+    """Git's SHA-1 object ID for a regular (non-LFS) Hub file."""
+    digest = hashlib.sha1(f"blob {path.stat().st_size}\0".encode("ascii"))
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def compare_remote_bundle(bundle: Path, path_in_repo: str, entries: list) -> dict:
+    """Check the remote file set and Git/LFS content IDs without redownloading PDFs."""
+    root = path_in_repo.strip("/") + "/"
+    local = {
+        path.relative_to(bundle).as_posix(): path
+        for path in bundle.rglob("*") if path.is_file()
+    }
+    remote = {
+        entry.path[len(root):]: entry
+        for entry in entries
+        if entry.path.startswith(root) and hasattr(entry, "size")
+    }
+    failures = []
+    for relative in sorted(local.keys() - remote.keys()):
+        failures.append({"path": relative, "error": "missing remotely"})
+    for relative in sorted(remote.keys() - local.keys()):
+        failures.append({"path": relative, "error": "unexpected remote file"})
+    for relative in sorted(local.keys() & remote.keys()):
+        path, entry = local[relative], remote[relative]
+        if entry.size != path.stat().st_size:
+            failures.append({"path": relative, "error": "size mismatch"})
+            continue
+        lfs = getattr(entry, "lfs", None)
+        if lfs:
+            if lfs.get("sha256") != sha256_file(path):
+                failures.append({"path": relative, "error": "LFS SHA-256 mismatch"})
+        elif getattr(entry, "blob_id", None) != _git_blob_id(path):
+            failures.append({"path": relative, "error": "Git blob SHA-1 mismatch"})
+    return {"valid": not failures, "local_files": len(local),
+            "remote_files": len(remote), "failures": failures}
+
+
+def verify_remote_bundle(repo_id: str, bundle: Path, path_in_repo: str) -> dict:
+    from huggingface_hub import HfApi
+
+    entries = list(HfApi().list_repo_tree(
+        repo_id, repo_type="dataset", path_in_repo=path_in_repo.strip("/"),
+        recursive=True,
+    ))
+    return compare_remote_bundle(bundle, path_in_repo, entries)

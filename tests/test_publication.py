@@ -5,12 +5,16 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 
 from sansad_pipeline.config import Config, StorageConfig
 from sansad_pipeline.db import json_text
-from sansad_pipeline.publication import PublicationBuilder, Scope, document_slug, slugify
+from sansad_pipeline.publication import (
+    PublicationBuilder, Scope, _git_blob_id, compare_remote_bundle,
+    document_slug, sha256_file, slugify,
+)
 from sansad_pipeline.storage import Store, now
 from sansad_pipeline.validation import text_flags
 from sansad_pipeline.config import ValidationConfig
@@ -154,6 +158,31 @@ class PublicationTests(unittest.TestCase):
 
 
 class NamingAndValidationTests(unittest.TestCase):
+    def test_remote_bundle_verifies_original_and_text_content_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            (bundle / "documents").mkdir()
+            pdf = bundle / "documents" / "original.pdf"
+            text = bundle / "documents" / "document.txt"
+            pdf.write_bytes(b"%PDF-1.7\noriginal")
+            text.write_text("extracted text", encoding="utf-8")
+            entries = [
+                SimpleNamespace(path="data/tranche/documents/original.pdf",
+                                size=pdf.stat().st_size,
+                                lfs={"sha256": sha256_file(pdf)}, blob_id="pointer"),
+                SimpleNamespace(path="data/tranche/documents/document.txt",
+                                size=text.stat().st_size, lfs=None,
+                                blob_id=_git_blob_id(text)),
+            ]
+            self.assertTrue(compare_remote_bundle(bundle, "data/tranche", entries)["valid"])
+            entries[0].lfs = {"sha256": "wrong"}
+            self.assertFalse(compare_remote_bundle(bundle, "data/tranche", entries)["valid"])
+            entries.pop()
+            self.assertEqual(
+                compare_remote_bundle(bundle, "data/tranche", entries)["failures"][-1]["error"],
+                "LFS SHA-256 mismatch",
+            )
+
     def test_document_slug_is_human_readable_and_hash_suffixed(self):
         record = {
             "source_type": "questions_answers",
