@@ -316,6 +316,12 @@ substitute for validating original PDF hashes on restore or in a publication.
   exactly 50 files; all `SHA256SUMS` entries, original-PDF SHA-256s, and remote
   Git/LFS content IDs matched. This is a bounded tranche, not a complete
   1,499-record session.
+- Full-session LS 17/15 run `36060610619` was dispatched at 21:18 UTC on
+  2026-09-24 with `limit=0`, `all_pages=true`, OCR inclusion, free Space Bunny,
+  `verify_sample=0`, and publication enabled. Its earlier ten-PDF pilot is a
+  resumable starting checkpoint, not a completion claim. The complete marker
+  and remotely verified PDF/text tranche are still required before calling
+  this 1,499-record session finished.
 - LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
