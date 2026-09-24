@@ -500,6 +500,15 @@ substitute for validating original PDF hashes on restore or in a publication.
   both content-number and raw-number disagreement fields, three transcript
   hashes, and selection reasons. The run had `publish=false`, an empty
   tranche path, and no completion marker.
+- Mixed-route audit code was exercised in no-publication cloud canary
+  `36059585013` at commit `f07afc2`. Its LS 17/15 checkpoint contained 34
+  native-routed pages; the independent Tesseract 5.3.4 pass selected twelve,
+  stored twelve nonempty transcripts, and reported zero audit failures. A fresh
+  HF read of `state/runs/20260924T211343Z-lok_sabha-p17-s15/verification/`
+  confirmed all twelve `liteparse_route=native` records, selection strata,
+  and the report. The run summary says `publish=false` and has no tranche.
+  This proves the native route can be audited in cloud; mixed-route selection
+  is covered by a deterministic unit test, not yet a mixed-route cloud sample.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
