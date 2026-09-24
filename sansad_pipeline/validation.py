@@ -18,7 +18,32 @@ class ValidationResult:
 
 
 def numbers(text: str) -> Counter[str]:
-    return Counter(token.replace(",", "") for token in NUMBER.findall(text))
+    return Counter(token.replace(",", "") for token in NUMBER.findall(_visible_markdown(text)))
+
+
+def _visible_markdown(text: str) -> str:
+    """Ignore link destinations: their numbers are not a second visible reading."""
+    visible: list[str] = []
+    index = 0
+    while index < len(text):
+        if text[index] == "[":
+            close = text.find("](", index + 1)
+            if close != -1:
+                depth = 1
+                end = close + 2
+                while end < len(text) and depth:
+                    if text[end] == "(" and (end == 0 or text[end - 1] != "\\"):
+                        depth += 1
+                    elif text[end] == ")" and (end == 0 or text[end - 1] != "\\"):
+                        depth -= 1
+                    end += 1
+                if depth == 0:
+                    visible.append(text[index + 1:close])
+                    index = end
+                    continue
+        visible.append(text[index])
+        index += 1
+    return "".join(visible)
 
 
 def table_widths(markdown: str) -> list[int]:
@@ -84,4 +109,3 @@ def validate(
     ):
         flags.append("native-ocr-numeric-disagreement")
     return ValidationResult("review" if flags else "accepted", tuple(flags))
-

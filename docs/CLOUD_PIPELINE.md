@@ -174,7 +174,14 @@ truncated or malformed response is a failed page, not a completed census.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
-  page tables. Flags create review evidence, never silent corrections.
+  page tables. Numeric comparison counts Markdown link labels but not their
+  destinations, so a URL rendered as `[visible URL](same URL)` is not double
+  counted. Flags create review evidence, never silent corrections.
+- A source-image check in the 10-document LS 17/15 canary found a PDF page
+  whose visible table has an empty serial-number column while its selectable
+  text layer contains row numbers. This is why image and native-text witnesses
+  remain separate and a numeric disagreement is a review queue, not an
+  automatic vote for either layer.
 - All-pages adjudication is the throughput bottleneck: a large Lok Sabha
   session is roughly 15,000 pages, so one 6-hour job adjudicates only part of
   it. The loop is time-budgeted, checkpoints every second chunk, and a scope is

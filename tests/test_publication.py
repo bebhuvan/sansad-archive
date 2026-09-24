@@ -208,6 +208,19 @@ class NamingAndValidationTests(unittest.TestCase):
             (),
         )
 
+    def test_link_targets_do_not_double_count_visible_numbers(self):
+        visible = "https://example.test/index1.php?level=1&id=795"
+        linked = f"[{visible}]({visible})"
+        self.assertEqual(
+            text_flags(linked, reference=visible, config=ValidationConfig()),
+            (),
+        )
+        self.assertEqual(
+            text_flags("[Report 2024](https://example.test/file(7).pdf)",
+                       reference="Report 2024", config=ValidationConfig()),
+            (),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
