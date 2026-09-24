@@ -660,10 +660,10 @@ a DuckDB snapshot, and SHA-256 checksums.
 
 Every document retains its official source URL and SHA-256. Original Parliament
 material retains its source copyright and must be appropriately attributed.
-OCR, layout extraction, and model review are machine-generated and may contain
-errors. Canonical text uses a stored review when available while retaining the
-local candidate beside it. Treat validation flags and review provenance as part
-of the data, not as optional metadata.
+errors. Each tranche states its canonical-text policy; the default is the local
+parser/OCR text, with the model transcription retained separately for comparison.
+Treat validation flags and review provenance as part of the data, not as
+optional metadata.
 """
 
 
