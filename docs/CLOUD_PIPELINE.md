@@ -453,11 +453,12 @@ substitute for validating original PDF hashes on restore or in a publication.
   is a promising independent QA signal, not yet a validated corpus-wide
   replacement. Preserve the originals and both existing text layers while
   evaluating that signal on more layouts, including genuine tables.
-- Each future cloud pass now samples up to twelve OCR-routed pages for a
-  separate, free Tesseract `--psm 3` layout audit. Its bounded sample reserves
-  roughly one-third each for LiteParse layout suspects (three or more Markdown
-  table separators), LiteParse/Space Bunny visible-number disagreements, and
-  a random baseline; overlap and small strata are filled from remaining pages.
+- Each future cloud pass samples up to twelve pages across native and OCR
+  routes for a separate, free Tesseract `--psm 3` image audit. When both routes
+  exist, it reserves one page from each before sampling LiteParse layout
+  suspects (three or more Markdown table separators), LiteParse/Space Bunny
+  visible-number disagreements, and a random remainder. Overlap and small
+  strata are filled from remaining pages.
   The report records each page's selection stratum, so this deliberately
   enriched sample is not mistaken for a representative error-rate estimate.
   It uploads the independent transcript plus

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sample OCR pages against a separate, free Tesseract reading-order pass.
+"""Sample native and OCR pages against a separate, free Tesseract image pass.
 
 This is an audit, not an automatic correction. It keeps the existing LiteParse
 and Space Bunny artifacts unchanged and stores the independent transcript in
@@ -62,6 +62,15 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     rng = random.Random(seed)
     selected: list[dict] = []
     chosen: set[tuple[str, int]] = set()
+    routes = sorted({row.get("route") for row in rows if row.get("route")})
+    if len(routes) > 1:
+        for route in rng.sample(routes, len(routes)):
+            if len(selected) >= count:
+                break
+            candidates = [row for row in rows if row.get("route") == route]
+            row = rng.choice(candidates)
+            selected.append({**row, "selection_stratum": "route_baseline"})
+            chosen.add((row["document_sha256"], row["page_number"]))
     quota = max(1, count // 3)
     for reason, candidates in (
         ("layout", [row for row in rows if row["separator_rows"] >= 3]),
@@ -87,7 +96,8 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
                AND c.parliament_number=? AND c.session=?
                AND c.document_sha256 IS NOT NULL
            )
-           SELECT r.document_sha256,p.page_number,p.artifact_json,d.raw_path,r.id AS run_id,
+           SELECT r.document_sha256,p.page_number,p.route,p.artifact_json,d.raw_path,
+                  r.id AS run_id,
                   (SELECT a.response_path FROM adjudications a
                     WHERE a.run_id=r.id AND a.page_number=p.page_number
                       AND a.provider='openrouter'
@@ -95,7 +105,7 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
            FROM scope_docs s JOIN runs r ON r.document_sha256=s.document_sha256
            JOIN pages p ON p.run_id=r.id
            JOIN documents d ON d.sha256=r.document_sha256
-           WHERE r.status='complete' AND p.route='ocr'
+           WHERE r.status='complete'
              AND r.id=(SELECT MAX(r2.id) FROM runs r2
                        WHERE r2.document_sha256=r.document_sha256
                          AND r2.status='complete')
@@ -150,6 +160,7 @@ def main() -> int:
             record = {
                 "document_sha256": row["document_sha256"],
                 "page_number": row["page_number"],
+                "liteparse_route": row["route"],
                 "liteparse_separator_rows": row["separator_rows"],
                 "selection_stratum": row["selection_stratum"],
                 "model_local_numeric_disagreement": row["model_numeric_disagreement"],
@@ -188,10 +199,13 @@ def main() -> int:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     summary = {
         "scope": {"house": args.house, "parliament": args.parliament, "session": args.session},
-        "ocr_candidates": len(candidates), "sampled": len(selected),
+        "page_candidates": len(candidates),
+        "candidates_by_route": {route: sum(row["route"] == route for row in candidates)
+                                for route in sorted({row["route"] for row in candidates})},
+        "sampled": len(selected),
         "model_pages": model_pages, "failures": failures,
         "selection_strata": {reason: sum(row["selection_stratum"] == reason for row in selected)
-                             for reason in ("layout", "numeric", "random")},
+                             for reason in ("route_baseline", "layout", "numeric", "random")},
         "report": report.name, "tesseract_version": version,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

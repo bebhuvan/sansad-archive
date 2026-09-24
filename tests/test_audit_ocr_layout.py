@@ -52,6 +52,18 @@ class LayoutAuditTests(unittest.TestCase):
         )
         self.assertEqual(len(sample_rows(rows, 1, 17)), 1)
 
+    def test_sample_includes_both_native_and_ocr_routes(self):
+        rows = [
+            {"document_sha256": f"{number:064x}", "page_number": 1,
+             "route": "ocr" if number == 0 else "native", "separator_rows": 0}
+            for number in range(20)
+        ]
+        selected = sample_rows(rows, 12, 17)
+        self.assertEqual({row["route"] for row in selected}, {"ocr", "native"})
+        self.assertEqual(sum(row["selection_stratum"] == "route_baseline"
+                             for row in selected), 2)
+        self.assertEqual(len(selected), 12)
+
     def test_similarity_is_format_tolerant_but_not_a_truth_claim(self):
         self.assertEqual(similarity("# Question", "Question"), 1.0)
         self.assertLess(similarity("Government are not doing it", "Government are doing it"), 1.0)
@@ -62,7 +74,7 @@ class LayoutAuditTests(unittest.TestCase):
             {"candidate_only": ["42"], "tesseract_only": ["4.2"]},
         )
 
-    def test_page_rows_selects_scoped_latest_ocr_artifact(self):
+    def test_page_rows_selects_scoped_latest_artifacts_across_routes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "source.pdf"
@@ -85,6 +97,10 @@ class LayoutAuditTests(unittest.TestCase):
                 (run, 1, "ocr", "liteparse", 10, None, "review", "[]", str(artifact)),
             )
             store.db.execute(
+                "INSERT INTO pages VALUES (?,?,?,?,?,?,?,?,?)",
+                (run, 2, "native", "liteparse", 10, None, "review", "[]", str(artifact)),
+            )
+            store.db.execute(
                 """INSERT INTO census_records
                    (record_id,source_type,house,parliament_number,session,
                     title,language,source_url,official_page_url,api_url,
@@ -95,8 +111,9 @@ class LayoutAuditTests(unittest.TestCase):
                  "", "", "", "{}", json_text({}), now(), "downloaded", item.sha256),
             )
             rows = page_rows(store, "lok_sabha", "01", "I")
-            self.assertEqual(len(rows), 1)
+            self.assertEqual(len(rows), 2)
             self.assertEqual(rows[0]["separator_rows"], 1)
+            self.assertEqual([row["route"] for row in rows], ["ocr", "native"])
             self.assertFalse(rows[0]["model_numeric_disagreement"])
             self.assertEqual(rows[0]["document_sha256"], item.sha256)
             self.assertEqual(page_rows(store, "lok_sabha", "01", "II"), [])
