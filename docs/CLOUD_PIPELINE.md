@@ -334,6 +334,11 @@ substitute for validating original PDF hashes on restore or in a publication.
   checkpoint, and the job moved to extraction. The final 64,081,820-byte
   immutable raw shard's remote LFS SHA-256 and size matched its manifest.
   Extraction/model coverage and a complete publication remained pending.
+- At 21:42 UTC, its V3 HF checkpoint showed all 1,499 original PDFs processed
+  by LiteParse, with 4,756 latest-run extracted pages. The job entered Space
+  Bunny adjudication; only the 34 previously piloted pages had a model layer
+  at that checkpoint. Complete publication still requires the remaining
+  4,722 model pages, a passing bundle verification, and a remote marker.
 - LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
