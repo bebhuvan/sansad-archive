@@ -59,6 +59,9 @@ def resolve_key(env_name: str) -> str:
 
 
 def normalize(text: str, limit: int = 20000) -> str:
+    # Markdown emphasis, headings and table pipes differ between models without
+    # changing content; strip them so similarity measures text, not formatting.
+    text = re.sub(r"[#*_>`|]", " ", text)
     return re.sub(r"\s+", " ", text)[:limit].strip()
 
 

@@ -135,6 +135,24 @@ def restore(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     return {"restored": True}
 
 
+def upload_dir(repo: str, path_in_repo: str, directory: Path, *, token: str | None) -> dict:
+    from huggingface_hub import HfApi
+
+    if not directory.is_dir():
+        raise SystemExit(f"directory not found: {directory}")
+    api = HfApi(token=token)
+    api.create_repo(repo_id=repo, repo_type="dataset", exist_ok=True)
+    commit = api.upload_folder(
+        folder_path=str(directory),
+        path_in_repo=path_in_repo.strip("/"),
+        repo_id=repo,
+        repo_type="dataset",
+        ignore_patterns=["*.png", "*.jpg", "*.jpeg"],
+        commit_message=f"Add {path_in_repo}",
+    )
+    return {"path_in_repo": path_in_repo, "commit_url": str(commit.commit_url)}
+
+
 def upload(repo: str, path_in_repo: str, files: list[Path], *, token: str | None) -> dict:
     from huggingface_hub import HfApi
 
@@ -173,8 +191,14 @@ def main() -> int:
     upload_parser.add_argument("--path-in-repo", required=True)
     upload_parser.add_argument("--file", type=Path, action="append", default=[])
 
+    dir_parser = sub.add_parser(
+        "upload-dir", help="Upload a directory tree, excluding rendered images"
+    )
+    dir_parser.add_argument("--repo", required=True)
+    dir_parser.add_argument("--path-in-repo", required=True)
+    dir_parser.add_argument("--dir", type=Path, required=True)
+
     args = parser.parse_args()
-    token = None
     import os
 
     token = os.environ.get("HF_TOKEN") or None
@@ -182,6 +206,8 @@ def main() -> int:
         print(json.dumps(save(args.repo, args.path_in_repo, token=token), indent=2))
     elif args.command == "restore":
         print(json.dumps(restore(args.repo, args.path_in_repo, token=token), indent=2))
+    elif args.command == "upload-dir":
+        print(json.dumps(upload_dir(args.repo, args.path_in_repo, args.dir, token=token), indent=2))
     else:
         if not args.file:
             raise SystemExit("--file is required at least once")

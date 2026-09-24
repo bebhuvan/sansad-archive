@@ -205,11 +205,11 @@ jobs:
             python scripts/cloud_state.py upload --repo "$HF_REPO" \
               --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION" --file "$f" || true
           done
-          for f in results/verification/*/report.md results/verification/*/report.json; do
-            [ -f "$f" ] || continue
-            python scripts/cloud_state.py upload --repo "$HF_REPO" \
-              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION/verification" --file "$f" || true
-          done
+          if [ -d results/verification ]; then
+            python scripts/cloud_state.py upload-dir --repo "$HF_REPO" \
+              --path-in-repo "state/runs/$STAMP-$HOUSE-p$PARLIAMENT-s$SESSION/verification" \
+              --dir results/verification || true
+          fi
 
       - name: Job summary
         if: always()
