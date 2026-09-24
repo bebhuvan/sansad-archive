@@ -193,6 +193,15 @@ cancelled only the older pending `36072372995`; active batch `36039411879`
 remained in LS 01/III acquisition. The direct LS 01/II replay remained active
 in acquisition. A later batch may revisit II once to replace its pre-marker-
 upgrade run summary, even if that replay finishes its PDF backfill first.
+At the 23:31 UTC watch, GitHub's scheduled historical batch `36073146060`
+replaced the manual pending `36072908147`. It uses commit `66da78a`, which
+includes attachment-aware marker semantics; the active batch was untouched.
+The scheduled modern pending run `36071728804` similarly replaced the older
+manual pending modern batch and retained full scheduled inputs. HF checkpoints
+showed LS 01/II attachment backfill at 600/2,198 items (zero extra PDFs in
+those first 600), LS 01/III acquisition at 2,000/3,677 records, LS 17/15 at
+2,034/4,756 free-model pages, LS 18/6 extracting 2,700/3,499 PDFs, and LS
+18/5 extracting 100/5,248 PDFs. All recorded OpenRouter costs were zero.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
