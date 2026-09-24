@@ -121,11 +121,17 @@ dispatch input `exclude` (comma-separated `house:parliament:session`) can
 temporarily omit a scope during a focused run. The normal batch does not
 permanently exclude known server errors; failed scopes remain visible for retry.
 
-Phase 3 is the historical eLibrary collection. It is not session-scoped, so it
-needs a census slice imported into the runner (an `import-census` command) and
-an explicit storage decision: the raw Lok Sabha Q&A originals alone are
-projected at roughly 279 GiB. Ask datasets@huggingface.co for a storage grant
-before starting, and expect weeks of wall-clock at batch parallelism.
+Phase 3 is the historical eLibrary collection. It is not exposed as a
+session-scoped API, so the workflow imports verified session slices from a
+dated census snapshot. Historical acquisition is running, but the raw Lok
+Sabha Q&A originals alone are projected at roughly 279 GiB. With one retained
+checkpoint copy and one published original, the corpus could exceed 550 GiB
+before text and metadata. HF public storage is best-effort, not a guaranteed
+free entitlement ([HF storage policy](https://huggingface.co/docs/hub/storage-limits));
+a storage grant from datasets@huggingface.co is still needed
+for confidence in a complete long-term archive. A quota failure stops the
+run without switching to paid storage. Expect weeks of wall-clock at current
+batch parallelism.
 The verified 2026-08-01 census export (1,593,344 records, SHA-256
 `f0cec93b7f078af545a4b6a1647b50fdae4e90d769172b6bfd922481dbeb2b0e`)
 is now durably stored on HF at
@@ -224,6 +230,13 @@ for comparison and require language-aware review before a canonical claim.
 - LS 17/14 continuation `36035410077` made new calls under the zero-cost
   ceiling. Its six published model pages each report `0.0` cost; the fatal-cost
   flag was false, and the two-PDF tranche passed remote verification.
+- LS 17/14 continuation `36040021087` migrated an existing V2 checkpoint to
+  V3 without re-uploading its two originals, then added one 46,430-byte raw
+  shard for a third PDF. A fresh remote restore verified all three original
+  hashes against the V3 index. Its published three-PDF/eight-page tranche at
+  `data/lok_sabha/parliament-17/session-14/tranche-snapshot-local-6bb1aa0909253c766d2e`
+  has eight nonempty local and Space Bunny layers, all with reported cost
+  `0.0`; each published `original.pdf` SHA-256 matches its document manifest.
 - Historical eLibrary LS 01/I run `36036700034` published two original 1952
   PDFs and three pages under
   `data/lok_sabha/parliament-01/session-I/tranche-snapshot-local-9d0623763e05941fe35c`.
