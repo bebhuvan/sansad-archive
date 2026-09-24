@@ -321,7 +321,7 @@ jobs:
           if [ -n "$TRANCHE_INPUT" ]; then
             TRANCHE="$TRANCHE_INPUT"
           else
-            TRANCHE="snapshot-$CANONICAL_POLICY-$(sha256sum "$BUNDLE/pages.jsonl.zst" | cut -c1-20)"
+            TRANCHE=$(python scripts/tranche_id.py "$BUNDLE" --canonical-policy "$CANONICAL_POLICY")
           fi
           PATH_IN_REPO="data/$HOUSE/parliament-$PARLIAMENT/session-$SESSION/tranche-$TRANCHE"
           python -m sansad_pipeline publish-hf "$BUNDLE" \

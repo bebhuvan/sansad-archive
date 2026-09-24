@@ -49,6 +49,29 @@ selected-PDF-only evidence until their scopes are replayed and republished;
 do not delete or replace them based solely on this discovery. A full cloud
 backfill and remote publication proof are still pending.
 
+The first full historical backfill finished in GitHub run
+[`36072353217`](https://github.com/bebhuvan/sansad-archive/actions/runs/36072353217)
+at 23:48 UTC on 2026-09-24. Its HF checkpoint reports 2,198 of 2,198
+downloaded LS 01/II items inventoried, zero missing attachment ledgers, and
+2,198 PDF bitstreams mapping to 1,365 distinct bytes. This particular scope
+has no second PDF bitstreams. Its updated published tranche has 1,365 selected
+original PDFs and 2,151 pages with both local and free-model output; the
+manifest now records each official bitstream URL, ID, name, selected status,
+and PDF SHA-256. Publication verification and remote file-identity checks
+reported zero failures. This run predates the new `attachment_complete`
+marker field, so a later planner pass must write a current marker before the
+snapshot is skipped. The earlier live two-PDF LS 17/IX canary verified that
+both selected and additional official originals survive the complete local
+acquire-to-publication path; a full cloud multi-PDF tranche remains unproved.
+
+The backfill exposed a publication identity weakness: the automatic tranche
+label was a hash of `pages.jsonl.zst` alone. Its updated PDF manifest therefore
+replaced the earlier selected-only bundle at the same HF path. The automatic
+label now hashes both page text and `manifest.jsonl`, including the source PDF
+inventory, so future provenance changes create a distinct tranche. Previously
+uploaded versions remain in HF Git history, but current HEAD only exposes the
+newest version at that old path.
+
 The read-only HF inspector reports `checkpoint_status: not_found` while a
 scope is still in its first acquisition chunk. It propagates other Hub errors;
 checkpoint absence alone is not evidence that its GitHub job stopped.
