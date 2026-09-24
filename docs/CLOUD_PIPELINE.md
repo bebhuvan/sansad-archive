@@ -417,6 +417,14 @@ for comparison and require language-aware review before a canonical claim.
   `state/runs/20260924T190806Z-lok_sabha-p02-sIX/verification/`, and skipped
   publication. Its run summary has `publish=false`, an empty tranche path and
   no completion marker; the three stored model pages each report cost `0.0`.
+- No-publication cloud canary `36050779676` at commit `fe069f1` verified the
+  stratified audit on the same bounded scope. Tesseract 5.3.4 produced three
+  nonempty transcripts with zero failures; one page was selected for layout
+  and two for model/local numeric disagreement. Fresh HF reads found all three
+  selection reasons and transcript hashes under
+  `state/runs/20260924T195347Z-lok_sabha-p02-sIX/verification/`. Its run
+  summary again has no tranche or completion marker. This validates the
+  audit/report path, not the accuracy of either transcription.
 - Model output is re-validated at publication time: empty output, replacement
   characters, inconsistent table widths, and numeric disagreement against the
   local candidate are recorded per page as `canonical_validation` and in the
