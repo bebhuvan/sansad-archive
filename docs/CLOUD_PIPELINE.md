@@ -132,6 +132,11 @@ is now durably stored on HF at
 The remote LFS SHA-256 and byte size match the local artifact. This is a dated
 inventory, not a claim that its PDFs have been downloaded or that it includes
 items added after 2026-08-01.
+The `import-census` command can now verify that compressed snapshot hash and
+stream a bounded eLibrary slice into an ephemeral runner's SQLite state. For
+example, `sansad-pipeline import-census snapshot.jsonl.gz --source elibrary
+--offset 0 --limit 1000 --sha256 <manifest SHA-256>`. Imported records start as
+unacquired; the command does not falsely mark a historical session complete.
 The eLibrary total changes as items are added. Its crawler validates the
 returned page number, size, count, and item identifiers for each page; a
 truncated or malformed response is a failed page, not a completed census.

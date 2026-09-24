@@ -176,6 +176,18 @@ def parser() -> argparse.ArgumentParser:
     elibrary_census.add_argument("--workers", type=int, default=4)
     elibrary_census.add_argument("--retry-failed-run", type=int)
 
+    import_census = commands.add_parser(
+        "import-census", help="Import a bounded slice of a verified census JSONL(.gz) export"
+    )
+    import_census.add_argument("snapshot", type=Path)
+    import_census.add_argument("--source", choices=("all", "current", "elibrary"), default="all")
+    import_census.add_argument("--house", choices=("lok_sabha", "rajya_sabha"))
+    import_census.add_argument("--parliament")
+    import_census.add_argument("--session")
+    import_census.add_argument("--offset", type=int, default=0)
+    import_census.add_argument("--limit", type=int, default=0)
+    import_census.add_argument("--sha256", help="Expected compressed-file SHA-256")
+
     acquire_census = commands.add_parser(
         "acquire-census", help="Download pending question PDFs from the census"
     )
@@ -737,6 +749,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(result, indent=2))
         return 1 if result["failed_pages"] else 0
+    if args.command == "import-census":
+        if args.offset < 0 or args.limit < 0:
+            raise SystemExit("offset and limit must be non-negative")
+        result = Census(config).import_snapshot(
+            args.snapshot, source=args.source, house=args.house,
+            parliament=args.parliament, session=args.session,
+            offset=args.offset, limit=args.limit, expected_sha256=args.sha256,
+        )
+        print(json.dumps(result, indent=2))
+        return 0
     if args.command == "census-rs-questions":
         if args.limit_per_session < 0 or args.workers < 1:
             raise SystemExit("limit must be non-negative; workers must be positive")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import math
 import shutil
@@ -66,6 +67,66 @@ class Census:
         ]
         with self.store.db.connect() as connection:
             connection.executemany(statement, values)
+
+    def import_snapshot(
+        self, path: Path, *, source: str = "all", house: str | None = None,
+        parliament: str | None = None, session: str | None = None,
+        offset: int = 0, limit: int = 0, expected_sha256: str | None = None,
+    ) -> dict:
+        """Import a bounded, idempotent slice of a verified census JSONL export."""
+        if source not in {"all", "current", "elibrary"} or offset < 0 or limit < 0:
+            raise ValueError("source must be all/current/elibrary; offset and limit must be non-negative")
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        if expected_sha256:
+            digest = hashlib.sha256()
+            with path.open("rb") as source_file:
+                for block in iter(lambda: source_file.read(1024 * 1024), b""):
+                    digest.update(block)
+            if digest.hexdigest() != expected_sha256:
+                raise RuntimeError("census snapshot SHA-256 mismatch; refusing import")
+        open_text = gzip.open if path.suffix == ".gz" else open
+        fields = tuple(QuestionRecord.__dataclass_fields__)
+        seen: set[str] = set()
+        matched = imported = 0
+        batch: list[QuestionRecord] = []
+        with open_text(path, "rt", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                try:
+                    row = json.loads(line)
+                    record_id = str(row["record_id"])
+                    if not record_id:
+                        raise ValueError("empty record ID")
+                    if source == "elibrary" and not record_id.startswith("elibrary_"):
+                        continue
+                    if source == "current" and record_id.startswith("elibrary_"):
+                        continue
+                    if house is not None and row["house"] != house:
+                        continue
+                    if parliament is not None and str(row["parliament_number"]) != parliament:
+                        continue
+                    if session is not None and str(row["session"]) != session:
+                        continue
+                    matched += 1
+                    if matched <= offset:
+                        continue
+                    if record_id in seen:
+                        raise ValueError(f"duplicate selected record ID: {record_id}")
+                    seen.add(record_id)
+                    batch.append(QuestionRecord(**{field: row[field] for field in fields}))
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                    raise RuntimeError(f"invalid census snapshot at line {line_number}: {error}") from error
+                imported += 1
+                if len(batch) >= 100:
+                    self._upsert_many(batch)
+                    batch.clear()
+                if limit and imported >= limit:
+                    break
+        if batch:
+            self._upsert_many(batch)
+        return {"imported": imported, "matched_before_limit": matched,
+                "offset": offset, "limit": limit, "source": source,
+                "house": house, "parliament": parliament, "session": session}
 
     def discover_lok_sabha(
         self,
