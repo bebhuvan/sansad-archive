@@ -244,6 +244,11 @@ for comparison and require language-aware review before a canonical claim.
   layers on every page, and `0.0` reported cost. This is a two-record canary,
   not a claim that the 2,950-record dated scope is complete. Those two source
   PDFs include one overlapping printed page; both originals remain preserved.
+- In the continuing LS 01/I run, an HF checkpoint at 18:18 UTC contained
+  1,002 acquired question records mapped to 685 distinct PDF SHA-256s, with
+  zero failed acquisitions and 1,948 records still discovered. This is source
+  sharing, not 317 missing downloads: the census retains each record-to-PDF
+  link while raw storage deduplicates identical bitstreams.
 - Full LS 01/I historical continuation `36037513021` was dispatched at
   commit `f4d7c5a`, with acquisition and extraction checkpoints and free-only
   model enforcement. Its outcome is not yet verified here.
