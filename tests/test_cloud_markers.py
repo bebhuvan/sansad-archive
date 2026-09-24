@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import unittest
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from scripts.classify_session import publication_ready, skip_reason
-from scripts.plan_sessions import valid_marker
-from scripts.run_summary import is_session_complete
+from scripts.plan_sessions import completed_scopes, valid_marker
+from scripts.run_summary import REQUIRED_TRANCHE_FILES, is_session_complete, tranche_files_present
 
 
 class MarkerSemanticsTests(unittest.TestCase):
@@ -51,6 +55,34 @@ class MarkerSemanticsTests(unittest.TestCase):
         self.assertTrue(valid_marker(path, marker))
         self.assertFalse(valid_marker(path, {**marker, "session_complete": False}))
         self.assertFalse(valid_marker(path, {**marker, "tranche_path": ""}))
+        files = {f"data/tranche/{name}" for name in REQUIRED_TRANCHE_FILES}
+        self.assertTrue(tranche_files_present(files, "data/tranche"))
+        self.assertFalse(tranche_files_present(files - {"data/tranche/SHA256SUMS"},
+                                               "data/tranche"))
+
+    def test_planner_retries_when_completion_marker_outlives_tranche(self):
+        marker_name = "state/complete/session-complete-lok_sabha-p18-s8.json"
+        status = {"census_status": "complete", "records": 1,
+                  "acquisition": {"downloaded": 1}, "acquired_documents": 1,
+                  "processed_documents": 1, "pages": 2,
+                  "openrouter_adjudicated_pages": 2}
+        payload = {"inputs": {"house": "lok_sabha", "parliament": "18",
+                              "session": "8", "limit": "0", "max_pages": "500",
+                              "all_pages": "true"}, "scope_status": status,
+                   "tranche_path": "data/tranche", "session_complete": True}
+        with tempfile.TemporaryDirectory() as directory:
+            marker_file = Path(directory) / "marker.json"
+            marker_file.write_text(json.dumps(payload), encoding="utf-8")
+            bundle_files = {f"data/tranche/{name}" for name in REQUIRED_TRANCHE_FILES}
+            with patch("huggingface_hub.HfApi.list_repo_files",
+                       return_value=[marker_name, *sorted(bundle_files)]), \
+                 patch("huggingface_hub.hf_hub_download", return_value=str(marker_file)):
+                self.assertEqual(completed_scopes("test/repo"), {"lok_sabha-p18-s8"})
+            with patch("huggingface_hub.HfApi.list_repo_files",
+                       return_value=[marker_name, *sorted(bundle_files - {
+                           "data/tranche/webdataset/shard-00000.tar"})]), \
+                 patch("huggingface_hub.hf_hub_download", return_value=str(marker_file)):
+                self.assertEqual(completed_scopes("test/repo"), set())
 
     def test_completion_requires_page_coverage_and_published_tranche(self):
         status = {"census_status": "complete", "records": 3,

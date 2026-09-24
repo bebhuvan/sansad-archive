@@ -140,6 +140,11 @@ automatically. The planner validates each existing HF completion or skip
 marker against its recorded census, acquisition, extraction, model coverage,
 and publication evidence. Older unproven marker filenames are ignored and
 their scopes are revisited.
+For both current-API and historical completion markers, the planner also
+requires the recorded HF tranche to still contain its manifest, metadata,
+checksum file and first WebDataset shard. A marker left behind after bundle
+deletion cannot suppress reprocessing. This is a remote existence check;
+publication itself performs byte-level and original-PDF hash verification.
 
 Scopes whose census returns zero records (typically pre-2000 sessions that the
 current API lists but does not serve) are classified as empty: the workflow

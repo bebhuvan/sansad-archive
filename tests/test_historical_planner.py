@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from scripts import plan_elibrary_sessions
 from scripts.plan_elibrary_sessions import roman_value, scope_counts
-from scripts.run_summary import is_session_complete
+from scripts.run_summary import REQUIRED_TRANCHE_FILES, is_session_complete
 from sansad_pipeline.sources.elibrary import normalize_session_label
 
 
@@ -77,11 +77,20 @@ class HistoricalPlannerTests(unittest.TestCase):
             }
             path.write_text(json.dumps(payload), encoding="utf-8")
             marker = "state/snapshot-complete/snapshot-complete-lok_sabha-p01-sI.json"
-            with patch.object(plan_elibrary_sessions.HfApi, "list_repo_files", return_value=[marker]), \
+            bundle_files = {f"data/test/{name}" for name in REQUIRED_TRANCHE_FILES}
+            with patch.object(plan_elibrary_sessions.HfApi, "list_repo_files",
+                              return_value=[marker, *sorted(bundle_files)]), \
                  patch.object(plan_elibrary_sessions, "hf_hub_download", return_value=str(path)):
                 self.assertEqual(plan_elibrary_sessions.completed_scopes("test/repo", "abc"), {("01", "I")})
                 self.assertEqual(plan_elibrary_sessions.completed_scopes("test/repo", "def"), set())
                 status["openrouter_adjudicated_pages"] = 2
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                self.assertEqual(plan_elibrary_sessions.completed_scopes("test/repo", "abc"), set())
+            with patch.object(plan_elibrary_sessions.HfApi, "list_repo_files",
+                              return_value=[marker, *sorted(bundle_files - {
+                                  "data/test/manifest.jsonl"})]), \
+                 patch.object(plan_elibrary_sessions, "hf_hub_download", return_value=str(path)):
+                status["openrouter_adjudicated_pages"] = 3
                 path.write_text(json.dumps(payload), encoding="utf-8")
                 self.assertEqual(plan_elibrary_sessions.completed_scopes("test/repo", "abc"), set())
 

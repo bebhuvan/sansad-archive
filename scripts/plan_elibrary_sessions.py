@@ -14,7 +14,7 @@ from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.run_summary import is_session_complete  # noqa: E402
+from scripts.run_summary import is_session_complete, tranche_files_present  # noqa: E402
 from sansad_pipeline.sources.elibrary import normalize_session_label  # noqa: E402
 
 
@@ -63,6 +63,7 @@ def roman_value(value: str) -> int:
 def completed_scopes(repo: str, snapshot_sha256: str) -> set[tuple[str, str]]:
     prefix = "state/snapshot-complete/snapshot-complete-lok_sabha-p"
     files = HfApi().list_repo_files(repo, repo_type="dataset")
+    available = set(files)
     done = set()
     for path in files:
         if not path.startswith(prefix) or not path.endswith(".json"):
@@ -82,7 +83,8 @@ def completed_scopes(repo: str, snapshot_sha256: str) -> set[tuple[str, str]]:
                     all_pages=str(inputs.get("all_pages") or "").lower() == "true",
                     unlimited=str(inputs.get("limit") or "") == "0",
                     adjudication_required=str(inputs.get("max_pages") or "0") != "0",
-                )):
+                )
+                and tranche_files_present(available, str(payload.get("tranche_path") or ""))):
             done.add(scope)
     return done
 

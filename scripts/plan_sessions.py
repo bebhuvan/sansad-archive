@@ -19,7 +19,7 @@ from sansad_pipeline.sources.questions import (  # noqa: E402
     available_rajya_sabha_sessions,
 )
 from scripts.classify_session import skip_reason  # noqa: E402
-from scripts.run_summary import is_session_complete  # noqa: E402
+from scripts.run_summary import is_session_complete, tranche_files_present  # noqa: E402
 
 
 def scope_key(house: str, parliament: str, session: str) -> str:
@@ -60,6 +60,7 @@ def completed_scopes(repo: str | None) -> set[str]:
         raise RuntimeError(
             f"cannot inspect Hub markers; refusing to schedule duplicate scopes: {error}"
         ) from error
+    available = set(files)
     markers = (
         ("state/complete/session-complete-", ".json"),
         ("state/skipped/session-skipped-", ".json"),
@@ -75,7 +76,12 @@ def completed_scopes(repo: str | None) -> set[str]:
                 except Exception as error:
                     raise RuntimeError(f"cannot validate Hub marker {path}: {error}") from error
                 if valid_marker(path, payload):
-                    done.add(path[len(prefix):-len(suffix)])
+                    if path.startswith("state/complete/") and not tranche_files_present(
+                        available, str(payload.get("tranche_path") or "")
+                    ):
+                        print(f"ignoring marker with missing tranche files: {path}", file=sys.stderr)
+                    else:
+                        done.add(path[len(prefix):-len(suffix)])
                 else:
                     print(f"ignoring unproven Hub marker: {path}", file=sys.stderr)
     return done

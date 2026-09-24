@@ -7,6 +7,17 @@ import os
 from pathlib import Path
 
 
+REQUIRED_TRANCHE_FILES = (
+    "manifest.jsonl", "metadata.json", "SHA256SUMS", "webdataset/shard-00000.tar",
+)
+
+
+def tranche_files_present(files: set[str], tranche_path: str) -> bool:
+    """A completion marker is unusable when its published bundle vanished."""
+    prefix = tranche_path.strip("/")
+    return bool(prefix and all(f"{prefix}/{name}" in files for name in REQUIRED_TRANCHE_FILES))
+
+
 def is_session_complete(status: dict, *, tranche_path: str, all_pages: bool,
                         unlimited: bool, adjudication_required: bool) -> bool:
     acquisition = status.get("acquisition") or {}
