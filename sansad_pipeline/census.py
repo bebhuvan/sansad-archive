@@ -43,6 +43,38 @@ class Census:
         self.store = Store(config)
         self.store.initialize()
 
+    def _record_elibrary_pdf_attachments(
+        self, record_id: str, pdfs: list[tuple[str, dict]], digests: list[str],
+        *, primary_sha256: str | None = None,
+    ) -> None:
+        if not pdfs or len(pdfs) != len(digests):
+            raise RuntimeError(f"eLibrary PDF inventory/download count mismatch for {record_id}")
+        if primary_sha256 and primary_sha256 not in digests:
+            raise RuntimeError(
+                f"eLibrary original PDF no longer matches selected PDF for {record_id}"
+            )
+        with self.store.db.connect() as connection:
+            for position, ((url, bitstream), digest) in enumerate(zip(pdfs, digests)):
+                bitstream_id = str(bitstream.get("uuid") or bitstream.get("id"))
+                existing = connection.execute(
+                    """SELECT document_sha256 FROM elibrary_pdf_attachments
+                       WHERE record_id=? AND bitstream_id=?""",
+                    (record_id, bitstream_id),
+                ).fetchone()
+                if existing and existing["document_sha256"] != digest:
+                    raise RuntimeError(
+                        f"eLibrary bitstream changed for {record_id} {bitstream_id}; "
+                        "refusing to replace archived bytes"
+                    )
+                connection.execute(
+                    """INSERT OR IGNORE INTO elibrary_pdf_attachments
+                       (record_id,bitstream_id,position,name,source_url,
+                        document_sha256,acquired_at)
+                       VALUES (?,?,?,?,?,?,?)""",
+                    (record_id, bitstream_id, position,
+                     str(bitstream.get("name") or ""), url, digest, utcnow()),
+                )
+
     def _upsert_many(self, records: list[QuestionRecord]) -> None:
         if not records:
             return
@@ -626,34 +658,16 @@ class Census:
                     status, value = future.result()
                     if status == "downloaded":
                         document, documents, pdfs = value
-                        if pdfs and len(pdfs) != len(documents):
-                            raise RuntimeError("eLibrary PDF inventory/download count mismatch")
-                        with self.store.db.connect() as connection:
-                            for position, ((url, bitstream), item) in enumerate(zip(pdfs, documents)):
-                                bitstream_id = str(bitstream.get("uuid") or bitstream.get("id"))
-                                existing = connection.execute(
-                                    """SELECT document_sha256 FROM elibrary_pdf_attachments
-                                       WHERE record_id=? AND bitstream_id=?""",
-                                    (row["record_id"], bitstream_id),
-                                ).fetchone()
-                                if existing and existing["document_sha256"] != item.sha256:
-                                    raise RuntimeError(
-                                        f"eLibrary bitstream changed for {row['record_id']} "
-                                        f"{bitstream_id}; refusing to replace archived bytes"
-                                    )
-                                connection.execute(
-                                    """INSERT OR IGNORE INTO elibrary_pdf_attachments
-                                       (record_id,bitstream_id,position,name,source_url,
-                                        document_sha256,acquired_at)
-                                       VALUES (?,?,?,?,?,?,?)""",
-                                    (row["record_id"], bitstream_id, position,
-                                     str(bitstream.get("name") or ""), url, item.sha256, utcnow()),
-                                )
-                            connection.execute(
-                                """UPDATE census_records SET acquisition_status='downloaded',
-                                   document_sha256=?,last_error=NULL WHERE record_id=?""",
-                                (document.sha256, row["record_id"]),
+                        if pdfs:
+                            self._record_elibrary_pdf_attachments(
+                                row["record_id"], pdfs, [item.sha256 for item in documents],
+                                primary_sha256=document.sha256,
                             )
+                        self.store.db.execute(
+                            """UPDATE census_records SET acquisition_status='downloaded',
+                               document_sha256=?,last_error=NULL WHERE record_id=?""",
+                            (document.sha256, row["record_id"]),
+                        )
                         downloaded += 1
                         original_pdfs_downloaded += len(documents)
                         bytes_added += sum(
@@ -686,6 +700,105 @@ class Census:
             "stopped_low_disk": stopped_low_disk,
             "minimum_free_gib": min_free_gib,
         }
+
+    def backfill_elibrary_pdf_attachments(
+        self, *, house: str, parliament: str, session: str,
+        limit: int = 100, after_record_id: str = "", workers: int = 4,
+        min_free_gib: float = 2.0,
+    ) -> dict:
+        """Archive all ORIGINAL PDFs for previously acquired eLibrary items.
+
+        The selected PDF is reused only when its recorded source URI matches
+        the current bitstream URL. An item gets a complete attachment ledger
+        only after every PDF has been acquired and one matches its selected SHA.
+        """
+        if limit < 1 or workers < 1:
+            raise ValueError("backfill limit and workers must be positive")
+        rows = self.store.db.all(
+            """SELECT c.* FROM census_records c
+               WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                 AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                 AND c.acquisition_status='downloaded' AND c.document_sha256 IS NOT NULL
+                 AND c.record_id>?
+                 AND NOT EXISTS (SELECT 1 FROM elibrary_pdf_attachments a
+                                 WHERE a.record_id=c.record_id)
+               ORDER BY c.record_id LIMIT ?""",
+            (house, parliament, session, after_record_id, limit),
+        )
+        minimum_free = round(min_free_gib * 1024**3)
+        if shutil.disk_usage(self.config.data_root).free < minimum_free:
+            return {"selected": 0, "completed": 0, "failed": 0,
+                    "original_pdfs": 0, "new_original_pdfs": 0, "bytes_added": 0,
+                    "stopped_low_disk": True, "last_record_id": after_record_id}
+
+        def archive(row):
+            item_id = str(json.loads(row["raw_json"]).get("uuid") or "")
+            pdfs = list_original_pdfs(item_id)
+            known = {
+                source["source_uri"] for source in self.store.db.all(
+                    "SELECT source_uri FROM sources WHERE document_sha256=?",
+                    (row["document_sha256"],),
+                )
+            }
+            inventory = [
+                {"uuid": str(pdf.get("uuid") or pdf.get("id")),
+                 "name": pdf.get("name"), "size_bytes": pdf.get("sizeBytes"),
+                 "content_url": url}
+                for url, pdf in pdfs
+            ]
+            digests = []
+            new_pdfs = bytes_added = 0
+            source_metadata = {key: row[key] for key in row.keys() if key != "raw_json"}
+            for url, pdf in pdfs:
+                if url in known:
+                    digests.append(row["document_sha256"])
+                    continue
+                document = self.store.download(
+                    url,
+                    metadata={**source_metadata, "elibrary_bitstream": pdf,
+                              "elibrary_original_pdf_inventory": inventory},
+                )
+                digests.append(document.sha256)
+                new_pdfs += 1
+                if not document.already_present:
+                    bytes_added += document.size_bytes
+            return pdfs, digests, new_pdfs, bytes_added
+
+        completed = failed = original_pdfs = new_original_pdfs = bytes_added = 0
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(archive, row): row for row in rows}
+            for future in as_completed(futures):
+                row = futures[future]
+                try:
+                    pdfs, digests, new_pdfs, added = future.result()
+                    self._record_elibrary_pdf_attachments(
+                        row["record_id"], pdfs, digests,
+                        primary_sha256=row["document_sha256"],
+                    )
+                except Exception as error:
+                    failed += 1
+                    self.store.db.execute(
+                        "UPDATE census_records SET last_error=? WHERE record_id=?",
+                        (f"attachment backfill: {type(error).__name__}: {error}",
+                         row["record_id"]),
+                    )
+                    print(f"attachment backfill failed {row['record_id']}: {error}", flush=True)
+                    continue
+                completed += 1
+                original_pdfs += len(pdfs)
+                new_original_pdfs += new_pdfs
+                bytes_added += added
+                self.store.db.execute(
+                    "UPDATE census_records SET last_error=NULL WHERE record_id=?",
+                    (row["record_id"],),
+                )
+                print(f"attachment backfill {row['record_id']} original_pdfs={len(pdfs)}",
+                      flush=True)
+        return {"selected": len(rows), "completed": completed, "failed": failed,
+                "original_pdfs": original_pdfs,
+                "new_original_pdfs": new_original_pdfs, "bytes_added": bytes_added,
+                "stopped_low_disk": False,
+                "last_record_id": rows[-1]["record_id"] if rows else after_record_id}
 
     def estimate_elibrary_storage(self, *, samples: int, workers: int) -> dict:
         total = elibrary_question_count()

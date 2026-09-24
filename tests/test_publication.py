@@ -22,6 +22,90 @@ from sansad_pipeline.config import ValidationConfig
 
 
 class PublicationTests(unittest.TestCase):
+    def test_elibrary_bundle_requires_and_verifies_every_original_pdf(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selected_path = root / "english.pdf"
+            extra_path = root / "hindi.pdf"
+            Image.new("RGB", (100, 100), "white").save(selected_path, "PDF")
+            Image.new("RGB", (100, 100), "black").save(extra_path, "PDF")
+            config = Config(project_root=root, storage=StorageConfig(root=Path("data")))
+            store = Store(config)
+            selected = store.ingest(selected_path, source_uri="https://example.test/english")
+            extra = store.ingest(extra_path, source_uri="https://example.test/hindi")
+            artifact_dir = root / "data" / "artifacts" / selected.sha256 / "run-00000001"
+            artifact_dir.mkdir(parents=True)
+            (artifact_dir / "document.json").write_text(json.dumps([{
+                "document_sha256": selected.sha256, "run_id": 1, "page_number": 1,
+                "route": "native", "route_reasons": [], "engine": "test",
+                "engine_version": "1", "text": "Question", "markdown": "Question",
+                "width": 100.0, "height": 100.0, "mean_confidence": None,
+                "validation_status": "accepted", "validation_flags": [],
+            }]), encoding="utf-8")
+            (artifact_dir / "document.md").write_text("Question", encoding="utf-8")
+            store.db.execute(
+                """INSERT INTO runs(document_sha256,status,config_json,artifact_dir,
+                   started_at,finished_at) VALUES (?,'complete','{}',?,?,?)""",
+                (selected.sha256, str(artifact_dir), now(), now()),
+            )
+            record_id = "elibrary_ls_question_item"
+            store.db.execute(
+                """INSERT INTO census_records
+                   (record_id,source_type,house,parliament_number,session,title,language,
+                    source_url,official_page_url,api_url,api_params_json,raw_json,
+                    discovered_at,acquisition_status,document_sha256)
+                   VALUES (?,'questions_answers','lok_sabha','17','IX','Question','und',
+                           'https://example.test/item','','','{}','{}',?,'downloaded',?)""",
+                (record_id, now(), selected.sha256),
+            )
+            builder = PublicationBuilder(config)
+            with self.assertRaisesRegex(RuntimeError, "attachment inventory missing"):
+                builder.build(Scope("lok_sabha", "17", "IX"), root / "missing",
+                              minimum_pdf_saving_percent=100, compact=True)
+            for position, (name, item) in enumerate((("english", selected), ("hindi", extra))):
+                store.db.execute(
+                    """INSERT INTO elibrary_pdf_attachments
+                       (record_id,bitstream_id,position,name,source_url,document_sha256,acquired_at)
+                       VALUES (?,?,?,?,?,?,?)""",
+                    (record_id, name, position, f"{name}.pdf",
+                     f"https://example.test/{name}", item.sha256, now()),
+                )
+            output = root / "bundle"
+            builder.build(Scope("lok_sabha", "17", "IX"), output,
+                          minimum_pdf_saving_percent=100, compact=True)
+            manifest = json.loads((output / "manifest.jsonl").read_text().splitlines()[0])
+            self.assertEqual(len(manifest["original_pdfs"]), 2)
+            self.assertEqual(json.loads((output / "metadata.json").read_text())[
+                "additional_original_pdf_count"], 1)
+            with tarfile.open(output / manifest["webdataset_shard"]) as archive:
+                for attachment in manifest["original_pdfs"]:
+                    self.assertEqual(
+                        sha256_file(selected_path if attachment["selected_for_text"] else extra_path),
+                        attachment["document_sha256"],
+                    )
+                    self.assertEqual(
+                        archive.extractfile(attachment["webdataset_file"]).read(),
+                        selected_path.read_bytes() if attachment["selected_for_text"]
+                        else extra_path.read_bytes(),
+                    )
+            self.assertTrue(PublicationBuilder.verify(output)["valid"])
+            shard = output / manifest["webdataset_shard"]
+            corrupt = root / "corrupt.tar"
+            extra_member = next(
+                attachment["webdataset_file"] for attachment in manifest["original_pdfs"]
+                if not attachment["selected_for_text"]
+            )
+            with tarfile.open(shard) as original, tarfile.open(corrupt, "w") as altered:
+                for member in original:
+                    payload = original.extractfile(member).read()
+                    if member.name == extra_member:
+                        payload = bytes([payload[0] ^ 1]) + payload[1:]
+                    altered.addfile(member, io.BytesIO(payload))
+            corrupt.replace(shard)
+            failures = PublicationBuilder.verify(output)["failures"]
+            self.assertTrue(any(item.get("error") == "attachment SHA-256 mismatch"
+                                for item in failures))
+
     def test_builds_and_verifies_multiformat_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

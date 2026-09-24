@@ -83,6 +83,41 @@ def main() -> int:
         if retry["downloaded"]:
             save(args.repo, args.checkpoint_path, token=os.environ.get("HF_TOKEN"))
 
+    attachment_backfill = {"selected": 0, "completed": 0, "failed": 0,
+                           "original_pdfs": 0, "new_original_pdfs": 0,
+                           "bytes_added": 0, "stopped_low_disk": False}
+    if args.source == "elibrary" and not stopped_low_disk:
+        last_record_id = ""
+        while time.monotonic() - started < args.budget_seconds:
+            result = census.backfill_elibrary_pdf_attachments(
+                house=args.house, parliament=args.parliament, session=args.session,
+                limit=100, after_record_id=last_record_id, workers=4,
+                min_free_gib=2,
+            )
+            for key in ("selected", "completed", "failed", "original_pdfs",
+                        "new_original_pdfs", "bytes_added"):
+                attachment_backfill[key] += result[key]
+            last_record_id = result["last_record_id"]
+            if result["completed"]:
+                save(args.repo, args.checkpoint_path, token=os.environ.get("HF_TOKEN"))
+            if result["stopped_low_disk"]:
+                stopped_low_disk = attachment_backfill["stopped_low_disk"] = True
+                break
+            if result["selected"] < 100:
+                break
+
+    attachments_remaining = 0
+    if args.source == "elibrary":
+        attachments_remaining = census.store.db.one(
+            """SELECT COUNT(*) n FROM census_records c
+               WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                 AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                 AND c.acquisition_status='downloaded'
+                 AND NOT EXISTS (SELECT 1 FROM elibrary_pdf_attachments a
+                                 WHERE a.record_id=c.record_id)""",
+            (args.house, args.parliament, args.session),
+        )["n"]
+
     remaining = census.store.db.one(
         f"""SELECT
              SUM(CASE WHEN acquisition_status='discovered' THEN 1 ELSE 0 END) discovered,
@@ -94,12 +129,14 @@ def main() -> int:
     print(json.dumps({
         "selected": selected, "downloaded": downloaded,
         "original_pdfs_downloaded": original_pdfs_downloaded,
+        "attachment_backfill": attachment_backfill,
+        "attachments_remaining": attachments_remaining,
         "failed": int(remaining["failed"] or 0),
         "discovered": int(remaining["discovered"] or 0),
         "stopped_low_disk": stopped_low_disk,
         "budget_reached": time.monotonic() - started >= args.budget_seconds,
     }, indent=2))
-    return 1 if stopped_low_disk else 0
+    return 1 if stopped_low_disk or attachments_remaining else 0
 
 
 if __name__ == "__main__":

@@ -321,6 +321,51 @@ class PublicationBuilder:
                     if sha256_file(raw_path) != digest:
                         raise RuntimeError(f"raw PDF checksum mismatch: {raw_path}")
 
+                    original_pdfs = []
+                    for source_record in source_records:
+                        record_id = source_record["record_id"]
+                        if not record_id.startswith("elibrary_"):
+                            continue
+                        attachments = self.store.db.all(
+                            """SELECT a.*,d.raw_path FROM elibrary_pdf_attachments a
+                               JOIN documents d ON d.sha256=a.document_sha256
+                               WHERE a.record_id=? ORDER BY a.position""",
+                            (record_id,),
+                        )
+                        if not attachments:
+                            raise RuntimeError(
+                                f"eLibrary PDF attachment inventory missing for {record_id}"
+                            )
+                        if digest not in {row["document_sha256"] for row in attachments}:
+                            raise RuntimeError(
+                                f"eLibrary selected PDF absent from attachment inventory: {record_id}"
+                            )
+                        for attachment in attachments:
+                            attachment_digest = attachment["document_sha256"]
+                            attachment_path = Path(attachment["raw_path"])
+                            if sha256_file(attachment_path) != attachment_digest:
+                                raise RuntimeError(
+                                    f"eLibrary attachment checksum mismatch: {record_id} "
+                                    f"{attachment['bitstream_id']}"
+                                )
+                            selected_pdf = attachment_digest == digest
+                            archive_name = f"{digest}.original.pdf"
+                            if not selected_pdf:
+                                identity = hashlib.sha256(
+                                    f"{record_id}\0{attachment['bitstream_id']}".encode()
+                                ).hexdigest()
+                                archive_name = f"{digest}.attachment-{identity}.original.pdf"
+                                _tar_file(archive, archive_name, attachment_path)
+                            original_pdfs.append({
+                                "record_id": record_id,
+                                "bitstream_id": attachment["bitstream_id"],
+                                "name": attachment["name"],
+                                "source_url": attachment["source_url"],
+                                "document_sha256": attachment_digest,
+                                "webdataset_file": archive_name,
+                                "selected_for_text": selected_pdf,
+                            })
+
                     public_sources = [
                         {
                             key: record[key]
@@ -348,6 +393,7 @@ class PublicationBuilder:
                         "size_bytes": primary["size_bytes"],
                         "media_type": primary["media_type"],
                         "sources": public_sources,
+                        "original_pdfs": original_pdfs,
                         "run": {
                             "id": run["id"],
                             "config": json.loads(run["config_json"]),
@@ -414,6 +460,7 @@ class PublicationBuilder:
                             "ministry": primary["ministry"],
                             "language": primary["language"],
                             "record_ids": [item["record_id"] for item in public_sources],
+                            "original_pdfs": original_pdfs,
                             "source_urls": source_urls,
                             "official_page_urls": sorted(
                                 item["official_page_url"]
@@ -531,6 +578,10 @@ class PublicationBuilder:
             "document_count": len(document_rows),
             "page_count": len(page_rows),
             "raw_pdfs_included": include_raw,
+            "additional_original_pdf_count": sum(
+                not attachment["selected_for_text"]
+                for row in manifest_rows for attachment in row["original_pdfs"]
+            ),
             "optimized_pdf_count": len(optimization_rows),
             "adjudicated_page_count": sum(
                 1 for page in page_rows if page["adjudication_provider"] is not None
@@ -590,6 +641,12 @@ class PublicationBuilder:
         ]
         if len(manifest) != metadata["document_count"]:
             failures.append({"path": "manifest.jsonl", "error": "document count mismatch"})
+        additional_count = sum(
+            not attachment.get("selected_for_text", False)
+            for record in manifest for attachment in record.get("original_pdfs", [])
+        )
+        if metadata.get("additional_original_pdf_count", 0) != additional_count:
+            failures.append({"path": "metadata.json", "error": "attachment count mismatch"})
         shards: dict[str, list[dict]] = {}
         for record in manifest:
             shards.setdefault(record["webdataset_shard"], []).append(record)
@@ -631,6 +688,31 @@ class PublicationBuilder:
                                         "path": f"{record['path']}/original.pdf",
                                         "error": "SHA-256 mismatch",
                                     })
+                    for attachment in record.get("original_pdfs", []):
+                        name = attachment["webdataset_file"]
+                        expected = attachment["document_sha256"]
+                        selected = attachment["selected_for_text"]
+                        if selected and (name != f"{digest}.original.pdf" or expected != digest):
+                            failures.append({"path": f"{shard}:{name}",
+                                             "error": "selected PDF mapping mismatch"})
+                            continue
+                        if not selected and not name.startswith(f"{digest}.attachment-"):
+                            failures.append({"path": f"{shard}:{name}",
+                                             "error": "attachment path mismatch"})
+                            continue
+                        member = members.get(name)
+                        if member is None or member.size == 0:
+                            failures.append({"path": f"{shard}:{name}",
+                                             "error": "attachment missing or empty"})
+                            continue
+                        actual = hashlib.sha256()
+                        with archive.extractfile(member) as source:
+                            for block in iter(lambda: source.read(1024 * 1024), b""):
+                                actual.update(block)
+                        if actual.hexdigest() != expected:
+                            failures.append({"path": f"{shard}:{name}",
+                                             "error": "attachment SHA-256 mismatch",
+                                             "expected": expected, "actual": actual.hexdigest()})
         return {"checked": checked, "failures": failures, "valid": not failures}
 
     @staticmethod

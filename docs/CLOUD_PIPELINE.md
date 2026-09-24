@@ -34,12 +34,18 @@ the immutable raw checkpoint, records each bitstream-to-SHA mapping in SQLite,
 and leaves the item retryable if an attachment fails. Only the first PDF enters
 the present text pipeline; Hindi extraction remains a later phase. The listing
 rejects truncation rather than silently treating the first page as complete.
-Already-downloaded items in older checkpoints have **not** been backfilled,
-and the publication tranche still embeds only the selected PDF. Existing
-complete markers certify selected-PDF coverage, **not all attachments**. A
-variant backfill, publication mapping, and variant-level completion check are
-required before claiming that every eLibrary PDF is archived. Do not delete
-or replace existing markers based on this discovery.
+On a new-code continuation, the acquisition step revisits older downloaded
+items without an attachment ledger, reuses a selected PDF only when its source
+URL matches, downloads the other PDFs, and checkpoints every 100 completed
+items. It exits nonzero while any downloaded item still lacks a complete
+ledger, so extraction/publication cannot advance through an unresolved
+attachment backfill. Publication now includes every ledger PDF in the same
+WebDataset shard as the selected PDF and text, with per-bitstream source URL,
+name and SHA-256 in `manifest.jsonl` and document JSON. The verifier rehashes
+each attachment. Existing older publications and complete markers remain
+selected-PDF-only evidence until their scopes are replayed and republished;
+do not delete or replace them based solely on this discovery. A full cloud
+backfill and remote publication proof are still pending.
 
 The read-only HF inspector reports `checkpoint_status: not_found` while a
 scope is still in its first acquisition chunk. It propagates other Hub errors;
@@ -140,6 +146,19 @@ At 23:09 UTC, the historical pending successor was refreshed as run
 ORIGINAL PDF attachments in immutable HF raw shards. GitHub cancelled the old
 pending `36068688868` and left active historical batch `36039411879` running.
 The new run is pending, not yet evidence of attachment acquisition.
+At 23:15 UTC, direct historical continuation `36069132345` completed LS
+01/II on the older selected-PDF code. Its HF checkpoint has 1,365 distinct
+selected originals and all 2,151 extracted pages with 2,151 free Space Bunny
+transcripts; the read-only archive audit found zero missing or blank model
+transcripts and zero nonzero/unknown reported costs. It published tranche
+`data/lok_sabha/parliament-01/session-II/tranche-snapshot-local-47af5d6d55d88e8673eb`
+with 1,365 PDF-keyed documents, 2,198 source records and 2,151 model pages.
+The workflow's local and remote publication checks reported zero failures and
+set `snapshot_complete=true`, while `session_complete=false` correctly limits
+the claim to the dated census snapshot. That publication predates attachment
+backfill and must not be cited as proof that all ORIGINAL bitstream variants
+were retained. A direct replay is required because the historical planner
+would otherwise skip the snapshot-complete marker.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
