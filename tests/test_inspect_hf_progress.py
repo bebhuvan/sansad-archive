@@ -52,6 +52,30 @@ class CheckpointMonitorTests(unittest.TestCase):
                 ("one", "questions_answers", "lok_sabha", "18", "8", "Test", "English",
                  "", "", "", "{}", "{}", "now", "downloaded", digest),
             )
+            unrelated_digest = "b" * 64
+            db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?,?)",
+                (unrelated_digest, 12, "application/pdf", "/other.pdf", "now"),
+            )
+            unrelated_run = db.execute(
+                """INSERT INTO runs(document_sha256,status,config_json,started_at)
+                   VALUES (?,'complete','{}','now')""", (unrelated_digest,),
+            )
+            db.execute(
+                """INSERT INTO adjudications
+                   (run_id,page_number,provider,model,request_sha256,response_path,
+                    reported_cost,created_at) VALUES (?,?,?,?,?,?,?,?)""",
+                (unrelated_run, 1, "openrouter", "paid/other", "hash", "other.json", 1, "now"),
+            )
+            db.execute(
+                """INSERT INTO census_records
+                   (record_id,source_type,house,parliament_number,session,title,language,
+                    source_url,official_page_url,api_url,api_params_json,raw_json,
+                    discovered_at,acquisition_status,document_sha256)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("other", "questions_answers", "lok_sabha", "18", "7", "Other", "English",
+                 "", "", "", "{}", "{}", "now", "downloaded", unrelated_digest),
+            )
             raw_tar = root / "state.tar"
             with tarfile.open(raw_tar, "w") as archive:
                 archive.add(db_path, arcname="data/pipeline.sqlite3")
@@ -91,6 +115,8 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(result["processed_pdfs"], 1)
             self.assertEqual(result["model_pages"], 1)
             self.assertEqual(result["cost_zero_calls"], 1)
+            self.assertEqual(result["cost_nonzero_calls"], 0)
+            self.assertEqual(result["model_calls"], 1)
             self.assertTrue(all(not location.exists() for location in locations))
             verify_archive(state, state_info)
             with self.assertRaisesRegex(RuntimeError, "disk limit"):

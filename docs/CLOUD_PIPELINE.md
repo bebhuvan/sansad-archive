@@ -280,7 +280,11 @@ for comparison and require language-aware review before a canonical claim.
 `python scripts/inspect_hf_progress.py --repo bebhuvan1/sansad-corpus
 --scope lok_sabha-p18-s8 --scope elibrary-lok_sabha-p01-sI` reports scoped
 acquisition, distinct retained originals, extraction/model coverage, and
-zero/unknown/nonzero reported-cost counts. It downloads only each checkpoint's
+zero/unknown/nonzero reported-cost counts. Cost calls are scoped through the
+session's acquired document digests, even if a checkpoint database contains
+unrelated sessions; all historical calls for those digests are counted, while
+page coverage uses each document's latest complete extraction run. It
+downloads only each checkpoint's
 mutable state archive into a temporary directory, verifies its size and
 SHA-256, reads SQLite without writing to it, and removes the temporary files
 on exit. Immutable original-PDF shards are not downloaded for monitoring;

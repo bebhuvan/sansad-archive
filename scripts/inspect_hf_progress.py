@@ -91,9 +91,15 @@ def summarize_database(path: Path, scope: str) -> dict:
                FROM latest l""", params,
         ).fetchone()
         cost = connection.execute(
-            """SELECT COUNT(*),SUM(reported_cost IS NULL),SUM(reported_cost=0),
-                      SUM(reported_cost!=0) FROM adjudications
-               WHERE provider='openrouter'"""
+            """SELECT COUNT(*),SUM(a.reported_cost IS NULL),SUM(a.reported_cost=0),
+                      SUM(a.reported_cost!=0)
+               FROM adjudications a JOIN runs r ON r.id=a.run_id
+               WHERE a.provider='openrouter'
+                 AND EXISTS (SELECT 1 FROM census_records c
+                             WHERE c.document_sha256=r.document_sha256
+                               AND c.house=?
+                               AND COALESCE(c.parliament_number,'')=?
+                               AND c.session=?)""", params,
         ).fetchone()
         return {
             "source_records_by_acquisition_status": statuses,
