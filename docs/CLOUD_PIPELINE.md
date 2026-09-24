@@ -345,6 +345,13 @@ for comparison and require language-aware review before a canonical claim.
   hint, so these are separate outputs but **not independent witnesses**.
   Independence requires source-image review or the optional separate-model
   audit; disagreement flags alone cannot decide which is correct.
+- A read-only quality check of the LS 18/8 HF checkpoint dated
+  2026-09-24 19:37 UTC found all 853 stored Space Bunny page artifacts present
+  and nonempty. Its visible-number multiset differed from LiteParse on 328
+  pages (38.5%). This is a disagreement rate for the first checkpointed
+  model pages, **not** an error rate or evidence that either layer is right.
+  Keep both layers and source PDFs; investigate disagreements against page
+  images before considering a canonical-policy change.
 - A bounded image-only Space Bunny test on the visible 1952 LS 01/I page 25
   cost `0.0` but changed the printed “Government are, however, doing
   everything possible” to “Government are not doing everything possible.”
