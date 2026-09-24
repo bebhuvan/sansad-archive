@@ -213,8 +213,12 @@ jobs:
               --log "data/logs/adjudication-$i.jsonl" || true
             SUMMARY="/tmp/adjudication-$i.json"
             if [ ! -f "$SUMMARY" ]; then break; fi
-            read -r CONSIDERED FAILED RATE < <(python -c "import json;d=json.load(open('$SUMMARY'));print(d['pages_considered'],d['failed'],'true' if d['rate_limited'] else 'false')")
-            echo "chunk $i considered=$CONSIDERED failed=$FAILED rate_limited=$RATE"
+            read -r CONSIDERED FAILED RATE FATAL < <(python -c "import json;d=json.load(open('$SUMMARY'));print(d['pages_considered'],d['failed'],'true' if d['rate_limited'] else 'false','true' if d.get('fatal_error') else 'false')")
+            echo "chunk $i considered=$CONSIDERED failed=$FAILED rate_limited=$RATE fatal_error=$FATAL"
+            if [ "$FATAL" = "true" ]; then
+              echo "provider reported a charge or unknown cost; stopping all model work"
+              break
+            fi
             if [ "$RATE" = "true" ]; then break; fi
             if [ "$FAILED" != "0" ]; then
               COMPLETED=$((CONSIDERED - FAILED))

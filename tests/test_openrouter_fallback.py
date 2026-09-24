@@ -3,13 +3,17 @@ from __future__ import annotations
 import unittest
 import io
 import json
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from sansad_pipeline.openrouter import (
     OpenRouterAdjudicator,
+    OpenRouterCostViolationError,
     OpenRouterHTTPError,
     OpenRouterRateLimitError,
+    checked_reported_cost,
 )
 
 
@@ -40,7 +44,33 @@ class RateLimitedAdjudicator(FakeAdjudicator):
         raise OpenRouterHTTPError(429, "provider capacity exhausted")
 
 
+class CostViolationAdjudicator(FakeAdjudicator):
+    def adjudicate(
+        self, identifier, *, pages=None, model=None, all_pages=False, include_ocr=False
+    ):
+        self.attempts.append((pages[0], model))
+        raise OpenRouterCostViolationError("provider reported a charge")
+
+
 class OpenRouterFallbackTests(unittest.TestCase):
+    def test_nonzero_or_invalid_reported_cost_stops_free_only_calls(self):
+        self.assertIsNone(checked_reported_cost({}))
+        self.assertEqual(str(checked_reported_cost({"cost": 0})), "0")
+        for value in (0.0001, "unknown", "NaN"):
+            with self.subTest(value=value), self.assertRaises(OpenRouterCostViolationError):
+                checked_reported_cost({"cost": value})
+
+    def test_persisted_cost_stop_refuses_resumed_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker = root / "artifacts" / ".openrouter-paid-stop.json"
+            marker.parent.mkdir()
+            marker.write_text("{}")
+            worker = FakeAdjudicator()
+            worker.config = SimpleNamespace(data_root=root, openrouter=SimpleNamespace())
+            with self.assertRaisesRegex(OpenRouterCostViolationError, "prior OpenRouter cost violation"):
+                OpenRouterAdjudicator.adjudicate(worker, "document")
+
     def test_paid_model_is_rejected_before_any_page_call(self):
         worker = FakeAdjudicator()
         worker.config = SimpleNamespace(openrouter=SimpleNamespace(
@@ -67,6 +97,12 @@ class OpenRouterFallbackTests(unittest.TestCase):
         with self.assertRaises(OpenRouterRateLimitError):
             worker.adjudicate_with_fallback("document", pages=[7], force=True)
         self.assertEqual(worker.attempts, [(7, "primary"), (7, "fallback")])
+
+    def test_cost_violation_does_not_try_fallback_model(self):
+        worker = CostViolationAdjudicator()
+        with self.assertRaises(OpenRouterCostViolationError):
+            worker.adjudicate_with_fallback("document", pages=[7], force=True)
+        self.assertEqual(worker.attempts, [(7, "primary")])
 
 
 if __name__ == "__main__":

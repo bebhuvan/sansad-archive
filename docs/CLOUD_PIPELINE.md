@@ -183,7 +183,10 @@ truncated or malformed response is a failed page, not a completed census.
   carry both an OCR candidate and a model candidate.
 - LiteParse 2.14.7 supplies native extraction and built-in Tesseract OCR for
   pages whose native text is missing or suspect. The model adapter rejects
-  nonzero or unknown provider pricing before making an inference call. The
+  nonzero or unknown provider pricing before making an inference call. If a
+  response nonetheless reports a nonzero or unparseable charge, it writes a
+  durable stop marker, cancels pending work, and refuses calls on resumed runs.
+  The cumulative cost ceiling is zero. The
   optional MiMo verification stays disabled in the free-only overnight run.
 - The layers stay separate in every record: `local_text`/`local_markdown`
   (native or OCR), `adjudicated_markdown` (Space Bunny), and the canonical

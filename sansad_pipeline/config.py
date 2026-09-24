@@ -53,7 +53,7 @@ class OpenRouterConfig:
     timeout_seconds: int = 300
     image_dpi: int = 150
     max_pages_per_command: int = 200
-    max_cumulative_cost_usd: float = 10.0
+    max_cumulative_cost_usd: float = 0.0
     reasoning_effort: str = ""
     reasoning_exclude: bool = True
     store_reasoning: bool = False

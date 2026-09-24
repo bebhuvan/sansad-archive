@@ -101,6 +101,23 @@ class OpenRouterRateLimitError(RuntimeError):
     """Every configured model exhausted its retries with HTTP 429."""
 
 
+class OpenRouterCostViolationError(RuntimeError):
+    """The supposedly free provider reported a charge or unparseable cost."""
+
+
+def checked_reported_cost(usage: dict) -> Decimal | None:
+    value = usage.get("cost")
+    if value is None:
+        return None
+    try:
+        cost = Decimal(str(value))
+    except InvalidOperation as error:
+        raise OpenRouterCostViolationError(f"unparseable OpenRouter reported cost: {value!r}") from error
+    if not cost.is_finite() or cost != 0:
+        raise OpenRouterCostViolationError(f"OpenRouter reported a nonzero or invalid charge: {value!r}")
+    return cost
+
+
 class OpenRouterAdjudicator:
     def __init__(self, config: Config, *, sleep=time.sleep, random_value=random.random):
         self.config = config
@@ -237,6 +254,8 @@ class OpenRouterAdjudicator:
                         raise
                     if error.status == 429:
                         rate_limited = True
+                except OpenRouterCostViolationError:
+                    raise
                 except RuntimeError as error:
                     errors.append({"model": selected_model, "error": str(error)})
             else:
@@ -392,6 +411,11 @@ class OpenRouterAdjudicator:
         include_ocr: bool = False,
     ) -> list[int]:
         cfg = self.config.openrouter
+        paid_stop = self.config.data_root / "artifacts" / ".openrouter-paid-stop.json"
+        if paid_stop.is_file():
+            raise OpenRouterCostViolationError(
+                f"prior OpenRouter cost violation recorded at {paid_stop}; refusing further calls"
+            )
         if not cfg.enabled:
             raise RuntimeError("OpenRouter is disabled; set openrouter.enabled = true in pipeline.toml")
         api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
@@ -413,11 +437,17 @@ class OpenRouterAdjudicator:
         model_dir = re.sub(r"[^a-zA-Z0-9._-]+", "__", selected_model)
         destination = Path(run["artifact_dir"]) / "openrouter" / model_dir
         for page_row in page_rows:
+            if paid_stop.is_file():
+                raise OpenRouterCostViolationError(
+                    f"prior OpenRouter cost violation recorded at {paid_stop}; refusing further calls"
+                )
             spent = self.store.db.one(
                 "SELECT COALESCE(SUM(reported_cost), 0) AS total FROM adjudications"
             )
-            if float(spent["total"]) >= cfg.max_cumulative_cost_usd:
-                raise RuntimeError(
+            total_cost = Decimal(str(spent["total"]))
+            ceiling = Decimal(str(cfg.max_cumulative_cost_usd))
+            if (ceiling == 0 and total_cost > 0) or (ceiling > 0 and total_cost >= ceiling):
+                raise OpenRouterCostViolationError(
                     f"OpenRouter cumulative cost ceiling reached: ${float(spent['total']):.6f} "
                     f">= ${cfg.max_cumulative_cost_usd:.2f}"
                 )
@@ -529,6 +559,16 @@ class OpenRouterAdjudicator:
                 encoding="utf-8",
             )
             usage = response_payload.get("usage") or {}
+            try:
+                checked_reported_cost(usage)
+            except OpenRouterCostViolationError as error:
+                paid_stop.parent.mkdir(parents=True, exist_ok=True)
+                paid_stop.write_text(json.dumps({
+                    "error": str(error), "model": selected_model,
+                    "document_sha256": document["sha256"], "page_number": number,
+                    "response_path": str(response_path), "created_at": utcnow(),
+                }, indent=2), encoding="utf-8")
+                raise
             self.store.db.execute(
                 """INSERT INTO adjudications
                    (run_id,page_number,provider,model,request_sha256,response_path,

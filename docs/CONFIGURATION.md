@@ -41,7 +41,7 @@ from that file's directory. `--config` must precede the subcommand.
 | `openrouter.timeout_seconds` | `300` | HTTP timeout |
 | `openrouter.image_dpi` | `150` | Page render sent to vision model |
 | `openrouter.max_pages_per_command` | `200` | Model-page ceiling per invocation |
-| `openrouter.max_cumulative_cost_usd` | `10.0` | Stop after stored reported spend reaches it |
+| `openrouter.max_cumulative_cost_usd` | `0.0` | Free-only ceiling: stop if any reported charge appears |
 | `openrouter.reasoning_effort` | `low` | Reasoning budget; Space Bunny requires reasoning and rejects `none` |
 | `openrouter.reasoning_exclude` | `true` | Keep hidden reasoning out of the stored adjudication |
 | `openrouter.store_reasoning` | `false` | Also save the reasoning text beside the response |

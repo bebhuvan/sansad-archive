@@ -35,7 +35,7 @@ max_tokens = 32768
 timeout_seconds = 300
 image_dpi = 150
 max_pages_per_command = 200
-max_cumulative_cost_usd = 10.0
+max_cumulative_cost_usd = 0.0
 # Space Bunny Alpha is a reasoning model; reasoning is mandatory and cannot be
 # disabled. "low" keeps latency and token burn per page reasonable. The hidden
 # reasoning text is excluded from the stored adjudication by default.

@@ -13,7 +13,10 @@ from .config import load_config
 from .events import EventLog
 from .pipeline import Pipeline
 from .publication import PublicationBuilder, Scope, upload_bundle
-from .openrouter import OpenRouterAdjudicator, OpenRouterHTTPError, OpenRouterRateLimitError
+from .openrouter import (
+    OpenRouterAdjudicator, OpenRouterCostViolationError,
+    OpenRouterHTTPError, OpenRouterRateLimitError,
+)
 from .nvidia import NvidiaAdjudicator
 from .secondary import compare_pdf_inspector
 from .storage import Store
@@ -624,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
             log=str(log_path),
         )
         completed = failed = 0
-        rate_limited = False
+        rate_limited = fatal_error = False
         from concurrent.futures import ThreadPoolExecutor, as_completed
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = [executor.submit(transcribe_page, task) for task in tasks]
@@ -645,6 +648,12 @@ def main(argv: list[str] | None = None) -> int:
                 ):
                     rate_limited = True
                     events.emit("rate_limited", detail=str(error))
+                    for pending in futures:
+                        pending.cancel()
+                    break
+                if isinstance(error, OpenRouterCostViolationError):
+                    fatal_error = True
+                    events.emit("cost_violation", detail=str(error))
                     for pending in futures:
                         pending.cancel()
                     break
@@ -669,6 +678,7 @@ def main(argv: list[str] | None = None) -> int:
             "completed": completed,
             "failed": failed,
             "rate_limited": rate_limited,
+            "fatal_error": fatal_error,
             "log": str(log_path),
         }
         events.emit("scope_summary", **summary)
@@ -678,7 +688,7 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps(summary, indent=2), encoding="utf-8"
             )
         print(json.dumps(summary, indent=2))
-        return 1 if failed or rate_limited else 0
+        return 1 if failed or rate_limited or fatal_error else 0
     if args.command == "compare-native":
         path = compare_pdf_inspector(config, args.document)
         print(path)
