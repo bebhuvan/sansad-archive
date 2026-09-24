@@ -17,7 +17,7 @@ from sansad_pipeline.publication import (
     document_slug, sha256_file, slugify,
 )
 from sansad_pipeline.storage import Store, now
-from sansad_pipeline.validation import text_flags
+from sansad_pipeline.validation import content_numbers, numbers, text_flags
 from sansad_pipeline.config import ValidationConfig
 
 
@@ -229,6 +229,21 @@ class PublicationTests(unittest.TestCase):
 
 
 class NamingAndValidationTests(unittest.TestCase):
+    def test_standalone_page_footer_does_not_flag_content_numbers(self):
+        local = "The allocation was 2380.86."
+        model = "The allocation was 2380.86.\n\n**Page 2 of 2**"
+        self.assertNotEqual(numbers(local), numbers(model))
+        self.assertEqual(content_numbers(local), content_numbers(model))
+        self.assertNotIn(
+            "candidate-numeric-disagreement",
+            text_flags(model, reference=local, config=ValidationConfig()),
+        )
+        self.assertIn(
+            "candidate-numeric-disagreement",
+            text_flags(model.replace("2380.86", "2380.87"), reference=local,
+                       config=ValidationConfig()),
+        )
+
     def test_remote_bundle_verifies_original_and_text_content_ids(self):
         with tempfile.TemporaryDirectory() as directory:
             bundle = Path(directory)

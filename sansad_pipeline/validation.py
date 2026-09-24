@@ -9,6 +9,10 @@ from .liteparse_engine import ExtractedPage
 
 
 NUMBER = re.compile(r"(?<![A-Za-z])\d[\d,]*(?:\.\d+)?")
+STANDALONE_PAGE_FOOTER = re.compile(
+    r"(?im)^[ \t]*(?:\*\*|__)?page[ \t]+\d+[ \t]+of[ \t]+\d+"
+    r"(?:\*\*|__)?[ \t]*$"
+)
 
 
 @dataclass(frozen=True)
@@ -19,6 +23,11 @@ class ValidationResult:
 
 def numbers(text: str) -> Counter[str]:
     return Counter(token.replace(",", "") for token in NUMBER.findall(_visible_markdown(text)))
+
+
+def content_numbers(text: str) -> Counter[str]:
+    """Compare document numbers while ignoring only standalone page-count footers."""
+    return numbers(STANDALONE_PAGE_FOOTER.sub("", text))
 
 
 def _visible_markdown(text: str) -> str:
@@ -76,7 +85,7 @@ def text_flags(
         config.flag_numeric_disagreement
         and reference is not None
         and reference.strip()
-        and numbers(text) != numbers(reference)
+        and content_numbers(text) != content_numbers(reference)
     ):
         flags.append("candidate-numeric-disagreement")
     return tuple(flags)

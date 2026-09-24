@@ -120,6 +120,12 @@ class LayoutAuditTests(unittest.TestCase):
             rows = page_rows(store, "lok_sabha", "01", "I")
             self.assertTrue(rows[0]["model_numeric_disagreement"])
             self.assertEqual(rows[0]["model_markdown"], "Question 42")
+            (model_dir / "adjudicated.md").write_text(
+                "| A | B |\n|---|---|\nPage 1 of 1", encoding="utf-8"
+            )
+            rows = page_rows(store, "lok_sabha", "01", "I")
+            self.assertFalse(rows[0]["model_numeric_disagreement"])
+            self.assertTrue(rows[0]["model_raw_numeric_disagreement"])
 
 
 if __name__ == "__main__":

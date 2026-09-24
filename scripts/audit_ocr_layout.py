@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.config import load_config  # noqa: E402
 from sansad_pipeline.openrouter import render_page  # noqa: E402
 from sansad_pipeline.storage import Store  # noqa: E402
-from sansad_pipeline.validation import numbers  # noqa: E402
+from sansad_pipeline.validation import content_numbers, numbers  # noqa: E402
 
 
 def separator_rows(markdown: str) -> int:
@@ -111,6 +111,8 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
         candidates.append({**dict(row), "separator_rows": separator_rows(page["markdown"]),
                            "local_markdown": page["markdown"], "model_markdown": model,
                            "model_numeric_disagreement": model is not None and
+                           content_numbers(page["markdown"]) != content_numbers(model),
+                           "model_raw_numeric_disagreement": model is not None and
                            numbers(page["markdown"]) != numbers(model)})
     return candidates
 
@@ -151,6 +153,7 @@ def main() -> int:
                 "liteparse_separator_rows": row["separator_rows"],
                 "selection_stratum": row["selection_stratum"],
                 "model_local_numeric_disagreement": row["model_numeric_disagreement"],
+                "model_local_raw_numeric_disagreement": row["model_raw_numeric_disagreement"],
                 "tesseract_version": version,
                 "psm": 3,
                 "language": "eng",

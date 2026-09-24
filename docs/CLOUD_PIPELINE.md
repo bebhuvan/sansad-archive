@@ -370,6 +370,13 @@ for comparison and require language-aware review before a canonical claim.
   model pages, **not** an error rate or evidence that either layer is right.
   Keep both layers and source PDFs; investigate disagreements against page
   images before considering a canonical-policy change.
+  A later 1,253-page checkpoint had 466 raw visible-number disagreements;
+  excluding only standalone `Page N of M` footer lines reduced that to 293.
+  One source-image spot check confirmed the model retained a printed page
+  footer that LiteParse omitted while both matched the table's financial
+  figures. Model/local content-number flags and audit sampling now exclude
+  that pagination-only noise; the transcripts still retain their original
+  wording, and the audit report separately records raw-number disagreement.
 - A bounded image-only Space Bunny test on the visible 1952 LS 01/I page 25
   cost `0.0` but changed the printed “Government are, however, doing
   everything possible” to “Government are not doing everything possible.”
@@ -438,6 +445,9 @@ for comparison and require language-aware review before a canonical claim.
   page tables. Numeric comparison counts Markdown link labels but not their
   destinations, so a URL rendered as `[visible URL](same URL)` is not double
   counted. Flags create review evidence, never silent corrections.
+  Standalone `Page N of M` lines are ignored only for the model/local content-
+  number comparison, because one extractor may omit a footer; the full text
+  layers and raw-number audit remain available for pagination review.
 - A source-image check in the 10-document LS 17/15 canary found a PDF page
   whose visible table has an empty serial-number column while its selectable
   text layer contains row numbers. This is why image and native-text witnesses
