@@ -166,6 +166,11 @@ truncated or malformed response is a failed page, not a completed census.
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
   remote verification reported no missing or changed files.
+- LS 17/15 run `36034109479` restored the real V1 checkpoint, migrated it to
+  V2, reused all 34 stored model responses, and published a corrected 10-PDF
+  tranche. Remote verification passed; visible-text numeric normalization
+  reduced model comparison flags from seven to six without altering either
+  source text layer.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.
