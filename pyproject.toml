@@ -7,7 +7,7 @@ name = "sansad-pipeline"
 version = "0.1.0"
 description = "Local-first, provenance-preserving Sansad PDF extraction pipeline"
 requires-python = ">=3.11"
-dependencies = ["liteparse==2.10.1", "Pillow==12.3.0"]
+dependencies = ["liteparse==2.14.7", "Pillow==12.3.0"]
 
 [project.optional-dependencies]
 publication = [
