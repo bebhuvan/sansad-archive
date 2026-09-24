@@ -202,6 +202,18 @@ showed LS 01/II attachment backfill at 600/2,198 items (zero extra PDFs in
 those first 600), LS 01/III acquisition at 2,000/3,677 records, LS 17/15 at
 2,034/4,756 free-model pages, LS 18/6 extracting 2,700/3,499 PDFs, and LS
 18/5 extracting 100/5,248 PDFs. All recorded OpenRouter costs were zero.
+At 23:34 UTC, a bounded live-source canary of eLibrary item
+`49d60eef-b8d0-4c19-83bf-2804f0a8c3d0` (LS 17/IX) exercised the actual
+acquire -> LiteParse -> compact publication path in a temporary local directory.
+Its two official originals (`AU3055.pdf`, 33,608 bytes, and
+`AU3055_hindi.pdf`, 58,974 bytes) had distinct verified SHA-256 values;
+the selected PDF produced two extracted pages. The publication manifest
+linked both originals, reported one additional PDF, and passed the bundle
+verifier with zero failures. The temporary files were removed automatically.
+This proves the multi-PDF code path on real source bytes but is not a cloud
+HF multi-PDF publication and did not call the free vision model. The ongoing
+LS 01/II cloud replay supplies separate all-pages model and HF durability
+evidence; inspect its final attachment counts before combining the claims.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
