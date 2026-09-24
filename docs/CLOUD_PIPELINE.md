@@ -185,6 +185,11 @@ for comparison and require language-aware review before a canonical claim.
   before the next; even if one PDF fails, successful work is saved before the
   job fails. It stops at a deadline that leaves two hours for model work and
   publication, resuming from the checkpoint on the next run.
+- LiteParse 2.14.7 serializes in-process PDFium parses, so `process-scope`
+  uses separate persistent worker processes instead of threads for true
+  document-level parallelism. SQLite WAL provides concurrent writes. A dead
+  worker is reported as a failure and the wrapper checkpoints completed work
+  before stopping.
 - Publication succeeds only after the remote HF tranche has exactly the local
   file set, matching sizes, and matching Git blob or LFS SHA-256 content IDs.
   A partial or altered upload cannot produce a completion marker.
@@ -228,6 +233,15 @@ for comparison and require language-aware review before a canonical claim.
 - Full LS 01/I historical continuation `36037513021` was dispatched at
   commit `f4d7c5a`, with acquisition and extraction checkpoints and free-only
   model enforcement. Its outcome is not yet verified here.
+- Historical batch `36038615784` was dispatched at `acc74e7` with LS 01/I
+  excluded because it was already running. Its planner selected LS 01/II and
+  01/III from the verified dated snapshot, one at a time.
+- The older full current-API batch `36032423348` was cancelled after its
+  acquisition checkpoints were verified: it had entered a single large,
+  uncheckpointed extraction step under commit `8f994b9`. Replacement batch
+  `36039029404` at `639eb39` restores the same original PDFs and saves
+  extraction state every 100 PDFs. Cancellation can lose only extraction work
+  since the acquisition checkpoints, not originals already on HF.
 - LS 18/1 returned zero records despite appearing in the official session
   inventory, so its green skip run is not an extraction canary. The planner
   retains this distinction in the marker evidence.

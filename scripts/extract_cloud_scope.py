@@ -46,6 +46,7 @@ def extract(args: argparse.Namespace) -> int:
             ]
             result = subprocess.run(command, check=False)
             if not summary_path.is_file():
+                subprocess.run(checkpoint, check=True)
                 print("Extraction command did not write its summary", file=sys.stderr)
                 return 1
             summary = json.loads(summary_path.read_text(encoding="utf-8"))

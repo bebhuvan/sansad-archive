@@ -25,6 +25,21 @@ from .storage import Store
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "pipeline.toml"
+_PROCESS_PIPELINE: Pipeline | None = None
+
+
+def _init_process_worker(config) -> None:
+    global _PROCESS_PIPELINE
+    _PROCESS_PIPELINE = Pipeline(config)
+
+
+def _process_in_worker(identifier: str, force: bool) -> tuple[str, int | None, str | None]:
+    if _PROCESS_PIPELINE is None:
+        raise RuntimeError("extraction process worker was not initialized")
+    try:
+        return identifier, _PROCESS_PIPELINE.process(identifier, force=force), None
+    except Exception as error:
+        return identifier, None, f"{type(error).__name__}: {error}"
 
 
 def parser() -> argparse.ArgumentParser:
@@ -318,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{item.sha256}\t{item.size_bytes}\t{item.raw_path}")
         return 0
     if args.command in {"process", "batch", "process-scope"}:
-        pipeline = Pipeline(config)
+        pipeline = Pipeline(config) if args.command != "process-scope" else None
         if args.command == "process":
             identifiers = args.document
         elif args.command == "batch":
@@ -360,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def process_one(identifier: str):
             try:
+                assert pipeline is not None
                 run_id = pipeline.process(identifier, force=args.force)
                 return identifier, run_id, None
             except Exception as error:
@@ -368,13 +384,27 @@ def main(argv: list[str] | None = None) -> int:
         workers = args.workers if args.command in {"batch", "process-scope"} else 1
         if workers < 1:
             raise SystemExit("--workers must be positive")
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+        from multiprocessing import get_context
 
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(process_one, identifier): identifier for identifier in identifiers}
+        if args.command == "process-scope":
+            executor = ProcessPoolExecutor(
+                max_workers=workers, mp_context=get_context("spawn"),
+                initializer=_init_process_worker, initargs=(config,),
+            )
+            submit = lambda identifier: executor.submit(_process_in_worker, identifier, args.force)
+        else:
+            executor = ThreadPoolExecutor(max_workers=workers)
+            submit = lambda identifier: executor.submit(process_one, identifier)
+        with executor:
+            futures = {submit(identifier): identifier for identifier in identifiers}
             completed = 0
             for future in as_completed(futures):
-                identifier, run_id, error = future.result()
+                try:
+                    identifier, run_id, error = future.result()
+                except Exception as error:
+                    identifier, run_id = futures[future], None
+                    error = f"worker failure: {type(error).__name__}: {error}"
                 completed += 1
                 if error is None:
                     print(
