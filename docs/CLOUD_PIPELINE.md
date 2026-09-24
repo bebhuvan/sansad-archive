@@ -42,6 +42,8 @@ without repeating model calls.
    - `HF_TOKEN` with write access to the dataset repository (required);
    - `OPENCODE_API_KEY` for MiMo cross-model verification (optional).
 3. Repository variable `HF_DATASET_REPO`, for example `your-user/sansad-corpus`.
+   Set `ELIBRARY_SNAPSHOT_ROOT` to an immutable, verified HF census root when
+   switching historical batches to a newer dated snapshot.
 4. Optional repository variables for directly dispatched pilot sessions:
    `PILOT_HOUSE`, `PILOT_PARLIAMENT`, `PILOT_SESSION`, `PILOT_LIMIT`,
    `PILOT_MAX_PAGES`.
@@ -173,6 +175,16 @@ hash verification. The old dated snapshot is retained. This is an incremental
 inventory of newly accessioned items, **not** a full recrawl: deletions and
 metadata changes among older items require separate reconciliation. A failed
 boundary check publishes nothing.
+Refresh run `36047393238` appended exactly 3,500 records to the August base
+and published `state/census/snapshot-2026-09-24T192308Z` (SHA-256
+`9c2efb8cdfb624398b8468faa82e1c5c771a7f28b8e808e056b3a266ad58aeb9`,
+329,911,157 bytes). The manifest reports 1,596,844 total records, including
+1,158,768 eLibrary Lok Sabha questions, and records 1,000 known IDs checked
+beyond the new-item boundary. An independent HF LFS read matched its byte
+size and SHA-256. Historical batch planning now pins the repo variable's
+snapshot root into every child run, so a later variable change cannot make
+one batch plan against one inventory and import another. The current active
+workers remain on the August snapshot until their runs finish.
 `digitize-historical-batch.yml` plans Lok Sabha sessions from the verified
 dated snapshot, running up to two scopes sequentially by default. It skips
 only `state/snapshot-complete/` markers with the same census SHA-256, full

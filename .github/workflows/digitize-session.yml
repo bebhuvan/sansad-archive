@@ -19,6 +19,10 @@ on:
         type: choice
         options: [current, elibrary]
         default: current
+      snapshot_root:
+        description: Immutable HF eLibrary census snapshot root (blank uses repo variable)
+        type: string
+        default: ""
       house:
         description: House
         type: choice
@@ -70,6 +74,9 @@ on:
       source:
         type: string
         default: current
+      snapshot_root:
+        type: string
+        default: ""
       house:
         type: string
         default: lok_sabha
@@ -114,6 +121,7 @@ jobs:
     timeout-minutes: 350
     env:
       SOURCE: ${{ inputs.source || 'current' }}
+      SNAPSHOT_ROOT: ${{ inputs.snapshot_root || vars.ELIBRARY_SNAPSHOT_ROOT || 'state/census/snapshot-2026-08-01' }}
       HOUSE: ${{ inputs.house || vars.PILOT_HOUSE || 'lok_sabha' }}
       PARLIAMENT: ${{ inputs.parliament || vars.PILOT_PARLIAMENT || '18' }}
       SESSION: ${{ inputs.session || vars.PILOT_SESSION || '8' }}
@@ -173,7 +181,8 @@ jobs:
           if [ "$SOURCE" = "elibrary" ]; then
             python scripts/import_cloud_scope.py \
               --repo "$HF_REPO" --house "$HOUSE" \
-              --parliament "$PARLIAMENT" --session "$SESSION"
+              --parliament "$PARLIAMENT" --session "$SESSION" \
+              --snapshot-root "$SNAPSHOT_ROOT"
           elif [ "$HOUSE" = "lok_sabha" ]; then
             python -m sansad_pipeline census-questions \
               --lok-sabha "$PARLIAMENT" --session "$SESSION" \
