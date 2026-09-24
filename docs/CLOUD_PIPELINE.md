@@ -18,6 +18,26 @@ Hugging Face dataset repository under `data/<house>/parliament-<n>/session-<s>/`
 A checkpoint under `state/checkpoints/...` makes an interrupted run resumable
 without repeating model calls.
 
+The published WebDataset shard stores each selected official PDF as
+`<sha256>.original.pdf` beside its local, OCR/model, and canonical text layers.
+Publication verification rehashes the embedded PDF and requires its SHA-256 to
+match the manifest key; the remote verifier checks uploaded file identities.
+The HF checkpoint also retains immutable raw-PDF shards for resumability.
+
+**eLibrary attachment completeness is a separate question from item coverage.**
+At 22:52 UTC on 2026-09-24, live item
+`49d60eef-b8d0-4c19-83bf-2804f0a8c3d0` (LS 17/IX) exposed two ORIGINAL
+bitstreams, `AU3055.pdf` and `AU3055_hindi.pdf`. The current English-first
+item-level pipeline selects and archives the first PDF; it does not yet archive
+or extract the second. It now retains the full PDF bitstream inventory in the
+acquired source's checkpoint metadata and rejects truncated listings instead
+of silently treating the first page as complete. Existing complete markers
+certify selected-PDF coverage, **not all attachments**. A separate variant
+backfill and variant-level completion check are required before claiming that
+every eLibrary PDF is archived, including Hindi. Do not delete or replace
+existing markers based on this discovery; preserve the current selected-PDF
+archive while the variant backfill is designed and run.
+
 ## Why this split
 
 - GitHub repositories are not storage: 100 MB per-file rejections, roughly

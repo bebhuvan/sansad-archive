@@ -24,6 +24,7 @@ from .sources.questions import (
 from .sources.elibrary import (
     lok_sabha_question_count as elibrary_question_count,
     records_from_search_response,
+    list_original_pdfs,
     resolve_original_pdf,
     search_page as elibrary_search_page,
     normalize_session_label,
@@ -556,8 +557,18 @@ class Census:
                 extra_metadata = {}
                 if raw.get("_source_system") == "sansad_elibrary_dspace":
                     item_id = str(raw.get("uuid") or raw.get("id") or "")
-                    source_url, bitstream = resolve_original_pdf(item_id)
+                    pdfs = list_original_pdfs(item_id)
+                    source_url, bitstream = pdfs[0]
                     extra_metadata["elibrary_bitstream"] = bitstream
+                    extra_metadata["elibrary_original_pdf_inventory"] = [
+                        {
+                            "uuid": str(pdf.get("uuid") or pdf.get("id")),
+                            "name": pdf.get("name"),
+                            "size_bytes": pdf.get("sizeBytes"),
+                            "content_url": url,
+                        }
+                        for url, pdf in pdfs
+                    ]
                 document = self.store.download(
                     source_url,
                     metadata={

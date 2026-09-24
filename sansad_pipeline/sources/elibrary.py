@@ -191,30 +191,47 @@ def discover_lok_sabha_questions(
             return
 
 
-def resolve_original_pdf(item_id: str) -> tuple[str, dict[str, Any]]:
-    bundles = request_json(
+def list_original_pdfs(item_id: str) -> list[tuple[str, dict[str, Any]]]:
+    bundles_response = request_json(
         f"{ELIBRARY_API}/core/items/{item_id}/bundles", params={"size": 100}
-    ).get("_embedded", {}).get("bundles", [])
+    )
+    bundles = bundles_response.get("_embedded", {}).get("bundles", [])
+    bundle_page = bundles_response.get("page") or {}
+    if bundle_page and (int(bundle_page.get("number", -1)) != 0
+                        or int(bundle_page.get("totalElements", -1)) != len(bundles)):
+        raise RuntimeError(f"eLibrary item {item_id} bundle listing is incomplete")
     original = next((bundle for bundle in bundles if bundle.get("name") == "ORIGINAL"), None)
     if original is None:
         raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bundle")
     bitstreams_url = original.get("_links", {}).get("bitstreams", {}).get("href")
     if not bitstreams_url:
         raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bitstream link")
-    bitstreams = request_json(bitstreams_url, params={"size": 100}).get("_embedded", {}).get(
-        "bitstreams", []
-    )
-    pdf = next(
-        (
-            bitstream
-            for bitstream in bitstreams
-            if str(bitstream.get("name") or "").casefold().endswith(".pdf")
-        ),
-        None,
-    )
-    if pdf is None:
+    response = request_json(bitstreams_url, params={"size": 100})
+    bitstreams = response.get("_embedded", {}).get("bitstreams", [])
+    page = response.get("page") or {}
+    if not isinstance(bitstreams, list) or not page or (
+        int(page.get("number", -1)) != 0
+        or int(page.get("totalElements", -1)) != len(bitstreams)
+    ):
+        raise RuntimeError(f"eLibrary item {item_id} ORIGINAL bitstream listing is incomplete")
+    pdfs = [
+        bitstream for bitstream in bitstreams
+        if str(bitstream.get("name") or "").casefold().endswith(".pdf")
+    ]
+    if not pdfs:
         raise RuntimeError(f"eLibrary item {item_id} has no PDF in ORIGINAL bundle")
-    content_url = pdf.get("_links", {}).get("content", {}).get("href")
-    if not content_url:
-        raise RuntimeError(f"eLibrary item {item_id} PDF has no content link")
-    return str(content_url), pdf
+    resolved = []
+    seen_ids = set()
+    for pdf in pdfs:
+        bitstream_id = str(pdf.get("uuid") or pdf.get("id") or "")
+        content_url = pdf.get("_links", {}).get("content", {}).get("href")
+        if not bitstream_id or bitstream_id in seen_ids or not content_url:
+            raise RuntimeError(f"eLibrary item {item_id} PDF has invalid bitstream identity or content link")
+        seen_ids.add(bitstream_id)
+        resolved.append((str(content_url), pdf))
+    return resolved
+
+
+def resolve_original_pdf(item_id: str) -> tuple[str, dict[str, Any]]:
+    """Compatibility selector; callers needing completeness must use list_original_pdfs."""
+    return list_original_pdfs(item_id)[0]

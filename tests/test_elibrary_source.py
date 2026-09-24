@@ -3,10 +3,31 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from sansad_pipeline.sources.elibrary import classify_language, records_from_search_response, search_page
+from sansad_pipeline.sources.elibrary import (
+    classify_language, list_original_pdfs, records_from_search_response, search_page,
+)
 
 
 class ElibrarySourceTests(unittest.TestCase):
+    def test_lists_every_original_pdf_without_silently_truncating(self):
+        pdfs = [
+            {"uuid": name, "name": f"{name}.pdf", "_links": {"content": {"href": f"https://example.test/{name}"}}}
+            for name in ("english", "hindi")
+        ]
+        bundles = {"_embedded": {"bundles": [
+            {"name": "ORIGINAL", "_links": {"bitstreams": {"href": "https://example.test/bitstreams"}}}
+        ]}}
+        listing = {"page": {"number": 0, "totalElements": 2},
+                   "_embedded": {"bitstreams": pdfs}}
+        with patch("sansad_pipeline.sources.elibrary.request_json", side_effect=[bundles, listing]):
+            resolved = list_original_pdfs("item")
+        self.assertEqual([pdf["uuid"] for _, pdf in resolved], ["english", "hindi"])
+
+        listing["page"]["totalElements"] = 3
+        with patch("sansad_pipeline.sources.elibrary.request_json", side_effect=[bundles, listing]):
+            with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                list_original_pdfs("item")
+
     def test_unlabelled_or_original_language_is_not_assumed_english(self):
         self.assertEqual(classify_language(["English"]), "en")
         self.assertEqual(classify_language(["Hindi"]), "hi")
