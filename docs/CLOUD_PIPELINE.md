@@ -732,6 +732,20 @@ checkpoint (22:12 and 22:10 UTC respectively).
   and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
   the stored model transcription. Both numeric comparisons disagreed with
   Tesseract, so similarity alone cannot adjudicate that page.
+  The full LS 01/II cloud audit in run `36072353217` covered twelve pages
+  (two route baselines, four layout suspects, four numeric-disagreement
+  suspects, two random). Model/Tesseract text similarity exceeded
+  LiteParse/Tesseract similarity on all twelve; the medians were 0.549 and
+  0.192 respectively. Exact visible-number agreement with Tesseract was only
+  one of twelve for the model and zero for local text. This enriched sample
+  diagnoses a serious historical OCR/layout problem but cannot estimate its
+  prevalence. We redownloaded the official two-page PDF with SHA-256
+  `0ba8f0ab53d47041de951ff158d65f749218d6fdb0ca1428bce62174d372bd88`
+  and inspected page two against the published layers: it is a degraded
+  two-column scan, LiteParse inserted spurious tables and scrambled words,
+  while Space Bunny largely preserved the visible questions and column order.
+  Neither model/Tesseract agreement nor a single visual check proves perfect
+  transcription; keep the source PDF, both layers, and review flags together.
 - A two-document cloud canary (`36045023595`) exposed two workflow-boundary
   failures before this audit could be trusted: the runner lacked the system
   `tesseract` executable, and `inputs.publish || 'true'` treated an explicit
