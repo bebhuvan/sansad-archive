@@ -56,6 +56,72 @@ def extract_database(state_archive: Path, target: Path, *, max_bytes: int) -> No
     raise RuntimeError("checkpoint state archive has no SQLite database")
 
 
+def model_transcript_members(path: Path, scope: str) -> set[str]:
+    match = SCOPE.fullmatch(scope)
+    if not match:
+        raise ValueError(f"invalid checkpoint scope: {scope}")
+    connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    try:
+        members = set()
+        for (response_path,) in connection.execute(
+            """WITH scoped AS (
+                 SELECT DISTINCT document_sha256 FROM census_records
+                 WHERE house=? AND COALESCE(parliament_number,'')=? AND session=?
+                   AND document_sha256 IS NOT NULL
+               ), latest AS (
+                 SELECT (SELECT MAX(r.id) FROM runs r
+                         WHERE r.document_sha256=s.document_sha256
+                           AND r.status='complete') run_id FROM scoped s
+               )
+               SELECT (SELECT a.response_path FROM adjudications a
+                       WHERE a.run_id=p.run_id AND a.page_number=p.page_number
+                         AND a.provider='openrouter'
+                       ORDER BY a.id DESC LIMIT 1)
+               FROM pages p JOIN latest x ON x.run_id=p.run_id""",
+            match.groups(),
+        ):
+            if response_path is None:
+                continue
+            marker = "data/artifacts/"
+            normalized = response_path.replace("\\", "/")
+            if marker not in normalized:
+                raise RuntimeError(f"model response path is outside checkpoint artifacts: {response_path}")
+            relative = marker + normalized.split(marker, 1)[1]
+            members.add(str(Path(relative).with_name("adjudicated.md")))
+        return members
+    finally:
+        connection.close()
+
+
+def audit_transcript_archive(state_archive: Path, expected: set[str]) -> dict:
+    import zstandard
+
+    found: set[str] = set()
+    blank: set[str] = set()
+    with state_archive.open("rb") as source:
+        with zstandard.ZstdDecompressor().stream_reader(source) as stream:
+            with tarfile.open(fileobj=stream, mode="r|") as archive:
+                for member in archive:
+                    if member.name not in expected:
+                        continue
+                    found.add(member.name)
+                    if not member.isfile() or member.size > 8 * 1024 * 1024:
+                        blank.add(member.name)
+                        continue
+                    with archive.extractfile(member) as transcript:
+                        payload = transcript.read()
+                    try:
+                        if not payload.decode("utf-8").strip():
+                            blank.add(member.name)
+                    except UnicodeDecodeError:
+                        blank.add(member.name)
+    return {
+        "model_transcript_artifacts_expected": len(expected),
+        "model_transcript_artifacts_missing": len(expected - found),
+        "model_transcript_artifacts_blank_or_invalid": len(blank),
+    }
+
+
 def summarize_database(path: Path, scope: str) -> dict:
     match = SCOPE.fullmatch(scope)
     if not match:
@@ -156,7 +222,8 @@ def summarize_database(path: Path, scope: str) -> dict:
 
 
 def inspect(repo: str, scope: str, *, max_db_bytes: int,
-            max_state_bytes: int = 512 * 1024 * 1024) -> dict:
+            max_state_bytes: int = 512 * 1024 * 1024,
+            audit_transcripts: bool = False) -> dict:
     from huggingface_hub import hf_hub_download
 
     if not SCOPE.fullmatch(scope):
@@ -182,13 +249,21 @@ def inspect(repo: str, scope: str, *, max_db_bytes: int,
         verify_archive(state_path, state)
         database_path = temporary / "monitor.sqlite3"
         extract_database(state_path, database_path, max_bytes=max_db_bytes)
+        summary = summarize_database(database_path, scope)
+        transcript_audit = {}
+        if audit_transcripts:
+            expected = model_transcript_members(database_path, scope)
+            if len(expected) != summary["model_pages"]:
+                raise RuntimeError("model page count and transcript paths disagree")
+            transcript_audit = audit_transcript_archive(state_path, expected)
         return {
             "repo": repo,
             "scope": scope,
             "checkpoint_at": manifest.get("created_at"),
             "checkpoint_version": manifest.get("version"),
             "retained_original_pdfs": raw_pdf_count(manifest),
-            **summarize_database(database_path, scope),
+            **summary,
+            **transcript_audit,
         }
 
 
@@ -198,13 +273,16 @@ def main() -> int:
     parser.add_argument("--scope", action="append", required=True)
     parser.add_argument("--max-db-mib", type=int, default=1024)
     parser.add_argument("--max-state-mib", type=int, default=512)
+    parser.add_argument("--audit-transcripts", action="store_true",
+                        help="stream checkpoint state to verify saved model transcripts")
     args = parser.parse_args()
     if args.max_db_mib < 1 or args.max_state_mib < 1:
         parser.error("monitor disk limits must be positive")
     for scope in args.scope:
         print(json.dumps(inspect(args.repo, scope,
                                  max_db_bytes=args.max_db_mib * 1024 * 1024,
-                                 max_state_bytes=args.max_state_mib * 1024 * 1024)))
+                                 max_state_bytes=args.max_state_mib * 1024 * 1024,
+                                 audit_transcripts=args.audit_transcripts)))
     return 0
 
 

@@ -13,7 +13,8 @@ import zstandard
 
 from sansad_pipeline.db import Database
 from scripts.inspect_hf_progress import (
-    extract_database, inspect, raw_pdf_count, summarize_database, verify_archive,
+    audit_transcript_archive, extract_database, inspect, raw_pdf_count,
+    summarize_database, verify_archive,
 )
 
 
@@ -51,11 +52,15 @@ class CheckpointMonitorTests(unittest.TestCase):
                 (run_id, 2, "ocr", "liteparse", 12, 42.0, "review",
                  '["low-ocr-confidence","native-ocr-numeric-disagreement"]', "page2.json"),
             )
+            transcript_path = root / "data" / "artifacts" / digest / "adjudicated.md"
+            transcript_path.parent.mkdir(parents=True)
+            transcript_path.write_text("Model reading", encoding="utf-8")
             db.execute(
                 """INSERT INTO adjudications
                    (run_id,page_number,provider,model,request_sha256,response_path,
                     reported_cost,created_at) VALUES (?,?,?,?,?,?,?,?)""",
-                (run_id, 1, "openrouter", "free/test", "hash", "response.json", 0, "now"),
+                (run_id, 1, "openrouter", "free/test", "hash",
+                 str(transcript_path.with_name("response.json")), 0, "now"),
             )
             db.execute(
                 """INSERT INTO census_records
@@ -93,6 +98,8 @@ class CheckpointMonitorTests(unittest.TestCase):
             raw_tar = root / "state.tar"
             with tarfile.open(raw_tar, "w") as archive:
                 archive.add(db_path, arcname="data/pipeline.sqlite3")
+                archive.add(transcript_path,
+                            arcname=f"data/artifacts/{digest}/adjudicated.md")
             state = root / "state.tar.zst"
             with raw_tar.open("rb") as source, state.open("wb") as target:
                 zstandard.ZstdCompressor().copy_stream(source, target)
@@ -121,6 +128,8 @@ class CheckpointMonitorTests(unittest.TestCase):
 
             with patch("huggingface_hub.hf_hub_download", side_effect=fake_download):
                 result = inspect("test/corpus", "lok_sabha-p18-s8", max_db_bytes=1024 * 1024)
+                audited = inspect("test/corpus", "lok_sabha-p18-s8",
+                                  max_db_bytes=1024 * 1024, audit_transcripts=True)
                 with self.assertRaisesRegex(RuntimeError, "state archive exceeds"):
                     inspect("test/corpus", "lok_sabha-p18-s8", max_db_bytes=1024 * 1024,
                             max_state_bytes=1)
@@ -136,6 +145,9 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(result["cost_zero_calls"], 1)
             self.assertEqual(result["cost_nonzero_calls"], 0)
             self.assertEqual(result["model_calls"], 1)
+            self.assertEqual(audited["model_transcript_artifacts_expected"], 1)
+            self.assertEqual(audited["model_transcript_artifacts_missing"], 0)
+            self.assertEqual(audited["model_transcript_artifacts_blank_or_invalid"], 0)
             self.assertTrue(all(not location.exists() for location in locations))
             verify_archive(state, state_info)
             with self.assertRaisesRegex(RuntimeError, "disk limit"):
@@ -149,7 +161,28 @@ class CheckpointMonitorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             raw_pdf_count({"version": 1})
         with self.assertRaisesRegex(ValueError, "invalid checkpoint scope"):
-            summarize_database(Path("unused.sqlite3"), "../../other")
+                summarize_database(Path("unused.sqlite3"), "../../other")
+
+    def test_archive_audit_distinguishes_missing_and_blank_transcripts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            blank = root / "blank.md"
+            blank.write_text("  \n", encoding="utf-8")
+            raw_tar = root / "state.tar"
+            with tarfile.open(raw_tar, "w") as archive:
+                archive.add(blank, arcname="data/artifacts/blank/adjudicated.md")
+            state = root / "state.tar.zst"
+            with raw_tar.open("rb") as source, state.open("wb") as target:
+                zstandard.ZstdCompressor().copy_stream(source, target)
+            audit = audit_transcript_archive(state, {
+                "data/artifacts/blank/adjudicated.md",
+                "data/artifacts/missing/adjudicated.md",
+            })
+            self.assertEqual(audit, {
+                "model_transcript_artifacts_expected": 2,
+                "model_transcript_artifacts_missing": 1,
+                "model_transcript_artifacts_blank_or_invalid": 1,
+            })
 
 
 if __name__ == "__main__":

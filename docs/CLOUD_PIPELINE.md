@@ -301,8 +301,7 @@ for comparison and require language-aware review before a canonical claim.
 --scope lok_sabha-p18-s8 --scope elibrary-lok_sabha-p01-sI` reports scoped
 acquisition, distinct retained originals, extraction/model coverage, latest-run
 page counts by extraction route and validation status, validation-flag counts,
-and
-zero/unknown/nonzero reported-cost counts. The route and status counts each
+and zero/unknown/nonzero reported-cost counts. The route and status counts each
 sum to `extracted_pages`; `review` means that local validation requested
 comparison or inspection, not that extraction failed. Cost calls are scoped through the
 session's acquired document digests, even if a checkpoint database contains
@@ -314,8 +313,15 @@ SHA-256, reads SQLite without writing to it, and removes the temporary files
 on exit. Immutable original-PDF shards are not downloaded for monitoring;
 the PDF count is read from the checkpoint manifest. Default 512 MiB compressed
 state and 1 GiB SQLite-file caps limit temporary local disk use. This is a
-progress check, not a
-substitute for validating original PDF hashes on restore or in a publication.
+progress check, not a substitute for validating original PDF hashes on restore
+or in a publication.
+Use `--audit-transcripts` for a deeper, optional check: it streams the same
+verified state archive and confirms that each latest-run OpenRouter page has
+a distinct, nonblank UTF-8 `adjudicated.md` member. It reports missing and
+blank/invalid counts without extracting artifacts or downloading raw-PDF
+shards. A live audit found 634/634 present for LS 17/15 and 1,400/1,400 for
+historical LS 01/II, with zero missing or blank transcripts in each
+checkpoint (22:12 and 22:10 UTC respectively).
 
 ## Verified cloud canaries (2026-09-24)
 
