@@ -91,6 +91,13 @@ commit `ed37ac1`. Its planner reads the current `ELIBRARY_SNAPSHOT_ROOT`
 variable, so the next pass uses the verified 2026-09-24 eLibrary inventory;
 a later scheduled run may replace this pending run under the same concurrency
 rule. Neither pending run is evidence that a new scope has started.
+At 20:50 UTC, both scheduled events were still absent although GitHub reported
+both workflows `active`. After the raw-PDF integrity fix, pending-only fallback
+runs `36057524092` (current API) and `36057536325` (historical) were dispatched
+at commit `9f6b419`; GitHub cancelled the older pending runs under the declared
+concurrency groups. The three active jobs remained in Space Bunny adjudication.
+The fallback inputs preserve full-session acquisition, all-pages model coverage,
+OCR inclusion, local canonical text, and no paid cross-model verification.
 `PILOT_*` variables apply only to a directly dispatched session workflow.
 GitHub disables scheduled
 workflows after 60 days without repository activity; dispatch manually or keep
