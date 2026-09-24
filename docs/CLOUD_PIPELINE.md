@@ -83,7 +83,7 @@ being mistaken for a successful empty session.
 
 | Inventory | House | Records | Dates | Cloud status |
 |---|---:|---:|---|---|
-| eLibrary Q&A | Lok Sabha | 1,155,268 | 1952-2026 | phase 3, not session-scoped |
+| eLibrary Q&A | Lok Sabha | 1,158,768 (live count, 2026-09-24) | 1952-2026 | phase 3, not session-scoped |
 | Current API | Lok Sabha | 179,089 | 2000-2026 | phase 2, 84 listed sessions (some empty/HTML-only) |
 | Current RS API | Rajya Sabha | 258,987 | 2001-2026 | phase 2, 73 sessions |
 
@@ -124,6 +124,9 @@ needs a census slice imported into the runner (an `import-census` command) and
 an explicit storage decision: the raw Lok Sabha Q&A originals alone are
 projected at roughly 279 GiB. Ask datasets@huggingface.co for a storage grant
 before starting, and expect weeks of wall-clock at batch parallelism.
+The eLibrary total changes as items are added. Its crawler validates the
+returned page number, size, count, and item identifiers for each page; a
+truncated or malformed response is a failed page, not a completed census.
 
 ## Resume semantics
 

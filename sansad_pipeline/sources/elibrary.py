@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Iterator
 
 from .questions import QuestionRecord, request_json
@@ -26,9 +27,9 @@ def _value(metadata: dict[str, Any], key: str) -> str:
 
 
 def search_page(*, page: int = 0, page_size: int = 100) -> dict[str, Any]:
-    if not 1 <= page_size <= MAX_PAGE_SIZE:
+    if page < 0 or not 1 <= page_size <= MAX_PAGE_SIZE:
         raise ValueError(f"eLibrary page_size must be between 1 and {MAX_PAGE_SIZE}")
-    return request_json(
+    response = request_json(
         f"{ELIBRARY_API}/discover/search/objects",
         params={
             "scope": LS_QUESTIONS_COLLECTION,
@@ -37,6 +38,27 @@ def search_page(*, page: int = 0, page_size: int = 100) -> dict[str, Any]:
             "size": page_size,
         },
     )
+    result = response.get("_embedded", {}).get("searchResult", {})
+    page_info = result.get("page") or {}
+    try:
+        actual_page = int(page_info["number"])
+        actual_size = int(page_info["size"])
+        total = int(page_info["totalElements"])
+        total_pages = int(page_info["totalPages"])
+        objects = result["_embedded"]["objects"]
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError(f"eLibrary search page {page} has incomplete pagination metadata") from error
+    expected = max(0, min(page_size, total - page * page_size))
+    if (actual_page != page or actual_size != page_size or total < 0
+            or total_pages != math.ceil(total / page_size)
+            or not isinstance(objects, list) or len(objects) != expected):
+        raise RuntimeError(
+            f"eLibrary search page {page} is incomplete or inconsistent: "
+            f"number={actual_page} size={actual_size} total={total} "
+            f"totalPages={total_pages} objects={len(objects) if isinstance(objects, list) else 'invalid'} "
+            f"expected={expected}"
+        )
+    return response
 
 
 def lok_sabha_question_count() -> int:
@@ -51,11 +73,15 @@ def records_from_search_response(
     result = response.get("_embedded", {}).get("searchResult", {})
     objects = result.get("_embedded", {}).get("objects", [])
     records: list[QuestionRecord] = []
+    seen: set[str] = set()
     for hit in objects:
         item = hit.get("_embedded", {}).get("indexableObject", {})
         item_id = str(item.get("uuid") or item.get("id") or "").strip()
         if not item_id:
-            continue
+            raise RuntimeError(f"eLibrary search page {page} contains an item without an ID")
+        if item_id in seen:
+            raise RuntimeError(f"eLibrary search page {page} repeats item {item_id}")
+        seen.add(item_id)
         metadata = item.get("metadata") or {}
         handle = str(item.get("handle") or "").strip()
         source_url = _value(metadata, "dc.identifier.uri")
