@@ -339,6 +339,12 @@ substitute for validating original PDF hashes on restore or in a publication.
   Bunny adjudication; only the 34 previously piloted pages had a model layer
   at that checkpoint. Complete publication still requires the remaining
   4,722 model pages, a passing bundle verification, and a remote marker.
+- A no-publication same-scope continuation `36063269806` was queued behind
+  `36060610619` at 21:43 UTC. The per-session concurrency group prevents
+  overlap. Its `limit=0`, all-pages, zero-paid-verification inputs let it
+  resume missing model pages if the first run exhausts its time budget, while
+  `publish=false` prevents a duplicate tranche if the first run finishes.
+  Publication still needs a separate verified pass if this fallback does work.
 - LS 17/14 run `36032323135` exercised V2 checkpoints and the automatic
   remote verifier. It published one PDF and two fully adjudicated pages. The
   raw archive SHA-256 was unchanged between extraction and model checkpoints;
