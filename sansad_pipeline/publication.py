@@ -272,36 +272,45 @@ class PublicationBuilder:
                         if adjudication:
                             response_path = Path(adjudication["response_path"])
                             adjudicated_path = response_path.with_name("adjudicated.md")
-                            if adjudicated_path.is_file():
-                                model_markdown = adjudicated_path.read_text(encoding="utf-8")
-                                flags = text_flags(
-                                    model_markdown,
-                                    reference=page["local_markdown"],
-                                    config=self.config.validation,
+                            if not adjudicated_path.is_file():
+                                raise RuntimeError(
+                                    f"model transcript missing for {digest} page "
+                                    f"{page['page_number']}: {adjudicated_path}"
                                 )
-                                page["adjudicated_text"] = model_markdown
-                                page["adjudicated_markdown"] = model_markdown
-                                if canonical_policy == "model":
-                                    page["markdown"] = model_markdown
-                                    page["text"] = model_markdown
-                                    page["canonical_source"] = (
-                                        f"{adjudication['provider']}:{adjudication['model']}"
-                                    )
-                                    page["canonical_validation"] = {
-                                        "status": "review" if flags else "accepted",
-                                        "flags": list(flags),
-                                    }
-                                page["adjudication"] = {
-                                    "provider": adjudication["provider"],
-                                    "model": adjudication["model"],
-                                    "request_sha256": adjudication["request_sha256"],
-                                    "prompt_tokens": adjudication["prompt_tokens"],
-                                    "completion_tokens": adjudication["completion_tokens"],
-                                    "total_tokens": adjudication["total_tokens"],
-                                    "reported_cost": adjudication["reported_cost"],
-                                    "created_at": adjudication["created_at"],
-                                    "validation_flags": list(flags),
+                            model_markdown = adjudicated_path.read_text(encoding="utf-8")
+                            if not model_markdown.strip():
+                                raise RuntimeError(
+                                    f"model transcript empty for {digest} page "
+                                    f"{page['page_number']}: {adjudicated_path}"
+                                )
+                            flags = text_flags(
+                                model_markdown,
+                                reference=page["local_markdown"],
+                                config=self.config.validation,
+                            )
+                            page["adjudicated_text"] = model_markdown
+                            page["adjudicated_markdown"] = model_markdown
+                            if canonical_policy == "model":
+                                page["markdown"] = model_markdown
+                                page["text"] = model_markdown
+                                page["canonical_source"] = (
+                                    f"{adjudication['provider']}:{adjudication['model']}"
+                                )
+                                page["canonical_validation"] = {
+                                    "status": "review" if flags else "accepted",
+                                    "flags": list(flags),
                                 }
+                            page["adjudication"] = {
+                                "provider": adjudication["provider"],
+                                "model": adjudication["model"],
+                                "request_sha256": adjudication["request_sha256"],
+                                "prompt_tokens": adjudication["prompt_tokens"],
+                                "completion_tokens": adjudication["completion_tokens"],
+                                "total_tokens": adjudication["total_tokens"],
+                                "reported_cost": adjudication["reported_cost"],
+                                "created_at": adjudication["created_at"],
+                                "validation_flags": list(flags),
+                            }
                         publication_pages.append(page)
                     markdown = "\n\n".join(page["markdown"] for page in publication_pages)
                     plain_text = "\n\n".join(page["text"] for page in publication_pages)

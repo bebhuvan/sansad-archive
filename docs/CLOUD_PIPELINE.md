@@ -280,6 +280,10 @@ for comparison and require language-aware review before a canonical claim.
   substituted PDF is rejected even when the tar and outer checksum agree.
   The original and derived text share
   the source PDF's SHA-256 key, so readers can retrieve and compare both.
+- A model-call row is not itself a transcript. Publication now fails if its
+  referenced `adjudicated.md` is missing or blank, even under the default
+  local-canonical policy. This prevents a page counted as model-covered in
+  SQLite from silently losing its separate model layer in the archive.
 - Adjudication runs in bounded chunks and skips pages that already have a
   stored adjudication for a configured model, so a re-run continues where the
   previous one stopped. Isolated page failures are retried in the next chunk;

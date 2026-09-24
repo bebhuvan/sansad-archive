@@ -156,6 +156,20 @@ class PublicationTests(unittest.TestCase):
                     source.read_bytes(),
                 )
             self.assertTrue(PublicationBuilder.verify(compact_output)["valid"])
+            model_transcript = review_dir / "adjudicated.md"
+            model_transcript.unlink()
+            with self.assertRaisesRegex(RuntimeError, "model transcript missing"):
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), root / "bundle-missing-model",
+                    compact=True, complete_session=True,
+                )
+            model_transcript.write_text("  ", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "model transcript empty"):
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), root / "bundle-empty-model",
+                    compact=True, complete_session=True,
+                )
+            model_transcript.write_text("# Reviewed text", encoding="utf-8")
             readable_pdf = readable / "original.pdf"
             readable_pdf.write_bytes(bytes([source.read_bytes()[0] ^ 1]) + source.read_bytes()[1:])
             readable_relative = readable_pdf.relative_to(output).as_posix()
