@@ -1,0 +1,51 @@
+name: Refresh eLibrary Lok Sabha census
+
+# A bounded accession-prefix append to a dated HF snapshot. This does not
+# replace a full recrawl, and it publishes only when the live count, sorted
+# source boundary, overlap and remote LFS hashes agree.
+on:
+  workflow_dispatch:
+    inputs:
+      base_root:
+        description: Dated HF census snapshot root to extend
+        type: string
+        default: state/census/snapshot-2026-08-01
+      overlap_pages:
+        description: Known-record pages to verify beyond the new-item boundary
+        type: string
+        default: "10"
+      max_new:
+        description: Fail if more new records are found; requires full recrawl review
+        type: string
+        default: "10000"
+
+concurrency:
+  group: refresh-elibrary-census
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      HF_REPO: ${{ vars.HF_DATASET_REPO }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      BASE_ROOT: ${{ inputs.base_root }}
+      OVERLAP_PAGES: ${{ inputs.overlap_pages }}
+      MAX_NEW: ${{ inputs.max_new }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install HF client
+        run: python -m pip install 'huggingface_hub>=1.2,<2'
+      - name: Verify credentials
+        run: |
+          test -n "$HF_REPO"
+          test -n "$HF_TOKEN"
+      - name: Append verified accession prefix to HF snapshot
+        run: |
+          python scripts/refresh_elibrary_census.py \
+            --repo "$HF_REPO" --base-root "$BASE_ROOT" \
+            --overlap-pages "$OVERLAP_PAGES" --max-new "$MAX_NEW"

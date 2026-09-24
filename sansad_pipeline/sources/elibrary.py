@@ -59,17 +59,21 @@ def _value(metadata: dict[str, Any], key: str) -> str:
     return values[0] if values else ""
 
 
-def search_page(*, page: int = 0, page_size: int = 100) -> dict[str, Any]:
+def search_page(*, page: int = 0, page_size: int = 100,
+                sort: str | None = None) -> dict[str, Any]:
     if page < 0 or not 1 <= page_size <= MAX_PAGE_SIZE:
         raise ValueError(f"eLibrary page_size must be between 1 and {MAX_PAGE_SIZE}")
+    params = {
+        "scope": LS_QUESTIONS_COLLECTION,
+        "dsoType": "ITEM",
+        "page": page,
+        "size": page_size,
+    }
+    if sort is not None:
+        params["sort"] = sort
     response = request_json(
         f"{ELIBRARY_API}/discover/search/objects",
-        params={
-            "scope": LS_QUESTIONS_COLLECTION,
-            "dsoType": "ITEM",
-            "page": page,
-            "size": page_size,
-        },
+        params=params,
     )
     result = response.get("_embedded", {}).get("searchResult", {})
     page_info = result.get("page") or {}

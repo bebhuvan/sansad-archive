@@ -159,6 +159,20 @@ needs freshness reconciliation and a storage grant before bulk acquisition.
 The eLibrary total changes as items are added. Its crawler validates the
 returned page number, size, count, and item identifiers for each page; a
 truncated or malformed response is a failed page, not a completed census.
+The manual **Refresh eLibrary Lok Sabha census** workflow can append a bounded
+new-accession prefix to a dated HF snapshot. The
+[DSpace REST contract](https://github.com/DSpace/RestContract/blob/dspace-7_x/search-endpoint.md#matching-dspace-objects-search-results)
+documents the sort parameter; the live eLibrary endpoint accepted
+`sort=dc.date.accessioned,desc` and returned stable,
+descending pages in repeated probes. The refresh verifies the base snapshot's
+SHA-256 and ID uniqueness, requires the new-ID prefix length to equal the
+live-minus-base count, checks ten pages of known IDs beyond that boundary,
+rejects cross-page duplicates or changes in source count/order, and uploads
+the new compressed snapshot plus manifest in one HF commit with remote LFS
+hash verification. The old dated snapshot is retained. This is an incremental
+inventory of newly accessioned items, **not** a full recrawl: deletions and
+metadata changes among older items require separate reconciliation. A failed
+boundary check publishes nothing.
 `digitize-historical-batch.yml` plans Lok Sabha sessions from the verified
 dated snapshot, running up to two scopes sequentially by default. It skips
 only `state/snapshot-complete/` markers with the same census SHA-256, full
