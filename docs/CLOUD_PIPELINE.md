@@ -387,7 +387,10 @@ Sabha Q&A originals alone are projected at roughly 279 GiB. With one retained
 checkpoint copy and one published original, the corpus could exceed 550 GiB
 before text and metadata. HF public storage is best-effort, not a guaranteed
 free entitlement ([HF storage policy](https://huggingface.co/docs/hub/storage-limits));
-a storage grant from datasets@huggingface.co is still needed
+a read-only Hub `used_storage` check on 2026-09-25 reported 37,446,288,484
+bytes (about 34.9 GiB) already used by this dataset. The observed use is well
+below the projected archive size and does not establish a future free quota.
+A storage grant from datasets@huggingface.co is still needed
 for confidence in a complete long-term archive. A quota failure stops the
 run without switching to paid storage. Expect weeks of wall-clock at current
 batch parallelism.
