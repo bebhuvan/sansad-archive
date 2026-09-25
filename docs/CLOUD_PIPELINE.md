@@ -1267,6 +1267,16 @@ checkpoint (22:12 and 22:10 UTC respectively).
   check out the new commit; the already-running continuation still uses its
   earlier checkout.
 
+- Historical batch `36145853002` completed LS 01/IV, then LS 01/V acquired
+  all 2,114 inventoried attachments (1,378 distinct original PDFs), extracted
+  2,070 pages and checkpointed 400 zero-cost model transcripts. Its GitHub
+  runner later marked the job failed while the model step still appeared
+  `in_progress`; no step completion or job-log blob was available from GitHub,
+  so the immediate cause is unverified. Direct scope-locked continuation
+  `36180387255` was dispatched from the durable HF checkpoint. Do not count
+  the unfinished batch as publication or infer a model error from the missing
+  runner log.
+
 ## Provenance and formats
 
 Each publication tranche contains:
