@@ -72,7 +72,7 @@ def source_pages(repo: str, source: str, house: str, parliament: str,
     metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
     rows = pq.read_table(page_file, columns=[
         "document_sha256", "page_number", "local_text", "local_markdown",
-        "adjudicated_markdown",
+        "adjudicated_markdown", "route",
     ]).to_pylist()
     rows.sort(key=lambda row: (row["document_sha256"], row["page_number"]))
     keys = [(row["document_sha256"], row["page_number"]) for row in rows]
@@ -200,6 +200,11 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
     model_empty_visible: list[dict] = []
     numeric_disagreements: list[dict] = []
     numeric_compared = 0
+    triad_counts = {name: 0 for name in (
+        "all_equal", "local_model_equal", "local_ocr_equal",
+        "model_ocr_equal", "all_different",
+    )}
+    triad_disagreements: list[dict] = []
     measured = 0
     blank = 0
     ocr_unmeasured = 0
@@ -225,6 +230,29 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
                     "ocr_only_count": len(ocr_only), "model_only_count": len(model_only),
                     "ocr_only_sample": ocr_only[:20], "model_only_sample": model_only[:20],
                 })
+            if not local_content_empty(published["local_text"], published["local_markdown"]):
+                local_text = str(published["local_markdown"] or published["local_text"] or "")
+                local_numbers = content_numbers(local_text)
+                if local_numbers or ocr_numbers or model_numbers:
+                    if local_numbers == ocr_numbers == model_numbers:
+                        pattern = "all_equal"
+                    elif local_numbers == model_numbers:
+                        pattern = "local_model_equal"
+                    elif local_numbers == ocr_numbers:
+                        pattern = "local_ocr_equal"
+                    elif model_numbers == ocr_numbers:
+                        pattern = "model_ocr_equal"
+                    else:
+                        pattern = "all_different"
+                    triad_counts[pattern] += 1
+                    if pattern != "all_equal":
+                        triad_disagreements.append({
+                            "document_sha256": key[0], "page_number": key[1],
+                            "route": published.get("route"), "pattern": pattern,
+                            "local_sample": sorted(local_numbers.elements())[:20],
+                            "ocr_sample": sorted(ocr_numbers.elements())[:20],
+                            "model_sample": sorted(model_numbers.elements())[:20],
+                        })
         ocr_metrics = ocr if ocr is not None and "visually_blank" in ocr else None
         if ocr_metrics is not None and not valid_image_metrics(ocr_metrics):
             raise RuntimeError(f"invalid OCR visual evidence for {key}")
@@ -276,7 +304,10 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             "model_empty_on_visible": model_empty_visible,
             "ocr_model_numeric_pages_compared": numeric_compared,
             "ocr_model_numeric_disagreement_pages": len(numeric_disagreements),
-            "ocr_model_numeric_disagreements": numeric_disagreements}
+            "ocr_model_numeric_disagreements": numeric_disagreements,
+            "numeric_triad_pages_compared": sum(triad_counts.values()),
+            "numeric_triad_pattern_counts": triad_counts,
+            "numeric_triad_disagreements": triad_disagreements}
 
 
 def publish_report(repo: str, scope: str, report_bytes: bytes, ocr_pages: int,
@@ -337,6 +368,7 @@ def main() -> int:
         "visually_blank_pages_among_assessed", "conflict_counts",
         "model_empty_on_visible_pages",
         "ocr_model_numeric_pages_compared", "ocr_model_numeric_disagreement_pages",
+        "numeric_triad_pages_compared", "numeric_triad_pattern_counts",
     )} | {"report_path": published}))
     return 0
 

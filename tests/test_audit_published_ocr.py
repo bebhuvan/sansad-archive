@@ -115,6 +115,34 @@ class PublishedOcrAuditTests(unittest.TestCase):
         self.assertEqual(report["ocr_model_numeric_disagreements"][0]["model_only_sample"], ["43"])
         self.assertEqual(report["conflicts"], [])
 
+    def test_three_way_numeric_patterns_are_review_labels_not_accuracy_votes(self):
+        digest = "a" * 64
+        cases = [(1, 1, 1), (1, 2, 1), (1, 1, 2),
+                 (1, 2, 2), (1, 2, 3)]
+        pages = [
+            {"document_sha256": digest, "page_number": index,
+             "route": "native", "local_text": f"Amount {local}",
+             "local_markdown": f"Amount {local}",
+             "adjudicated_markdown": f"Amount {model}"}
+            for index, (local, _, model) in enumerate(cases, 1)
+        ]
+        ocr = [
+            {"document_sha256": digest, "page_number": index,
+             "text": f"Amount {ocr_number}"}
+            for index, (_, ocr_number, _) in enumerate(cases, 1)
+        ]
+        report = audit_layers(pages, ocr)
+        self.assertEqual(report["numeric_triad_pages_compared"], 5)
+        self.assertEqual(report["numeric_triad_pattern_counts"], {
+            "all_equal": 1, "local_model_equal": 1, "local_ocr_equal": 1,
+            "model_ocr_equal": 1, "all_different": 1,
+        })
+        self.assertEqual(len(report["numeric_triad_disagreements"]), 4)
+        self.assertEqual(report["numeric_triad_disagreements"][-1]["pattern"],
+                         "all_different")
+        self.assertEqual(report["numeric_triad_disagreements"][-1]["route"],
+                         "native")
+
     def test_mismatched_identity_and_bad_metrics_fail_closed(self):
         pages = [{"document_sha256": "a" * 64, "page_number": 1,
                   "local_text": "", "local_markdown": "",

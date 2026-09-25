@@ -985,6 +985,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   false disagreements. The report records page-keyed OCR-only/model-only
   counts and bounded token samples as a review queue, distinct from the
   image-proven blank-page conflicts; neither transcript is ground truth.
+  When local, full-image OCR and model text all contain a visible number, the
+  report additionally labels the exact three-way token-multiset pattern:
+  all equal, one of the three possible agreeing pairs, or all different.
+  Pages without any number are excluded from this triad denominator. These
+  labels prioritize source-image review; the model saw the local candidate,
+  so a local/model match is not an independent vote or accuracy estimate.
 
 ### Verified 2026-09-25 milestones
 
@@ -1079,6 +1085,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   its SHA-256 filename prefix. It reports zero empty model transcripts on
   visibly inked pages, 33 blank-page model-text conflicts, and 1,416
   OCR/model numeric disagreements among 2,900 comparable pages.
+  A read-only three-way replay at 3,100 OCR pages found 3,025 pages with a
+  number in at least one of local, OCR or model text: 1,470 all equal, 925
+  local/model equal only, 306 local/OCR equal only, 32 model/OCR equal only,
+  and 292 all different. The model was prompted with local text, so the 925
+  local/model matches are not independent corroboration; all four disagreement
+  groups remain source-image review queues.
 
 ## Provenance and formats
 
