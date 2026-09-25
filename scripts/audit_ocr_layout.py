@@ -26,6 +26,7 @@ from sansad_pipeline.config import load_config  # noqa: E402
 from sansad_pipeline.image_quality import rendered_ink_metrics  # noqa: E402
 from sansad_pipeline.openrouter import render_page  # noqa: E402
 from sansad_pipeline.storage import Store  # noqa: E402
+from sansad_pipeline.text_quality import local_content_empty  # noqa: E402
 from sansad_pipeline.validation import content_numbers, numbers  # noqa: E402
 
 
@@ -55,14 +56,6 @@ def numeric_difference(candidate: str, tesseract: str) -> dict[str, list[str]]:
         "candidate_only": sorted((candidate_numbers - tesseract_numbers).elements()),
         "tesseract_only": sorted((tesseract_numbers - candidate_numbers).elements()),
     }
-
-
-EMPTY_CODE_FENCE = re.compile(r"\A\s*```[^\n]*\n\s*```\s*\Z")
-
-
-def local_content_empty(text: str, markdown: str) -> bool:
-    """An empty LiteParse code block is formatting, not visible page content."""
-    return not text.strip() and (not markdown.strip() or bool(EMPTY_CODE_FENCE.fullmatch(markdown)))
 
 
 def audit_empty_ocr(transcript: str, *, visually_blank: bool,

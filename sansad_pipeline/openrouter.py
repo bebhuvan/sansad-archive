@@ -19,7 +19,9 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from .config import Config
+from .image_quality import rendered_ink_metrics
 from .storage import Store
+from .text_quality import local_content_empty
 
 
 PROMPT = """Transcribe this parliamentary document page exactly into Markdown.
@@ -46,6 +48,25 @@ Preserve reading order, headings, question/answer labels, table rows and columns
 punctuation, decimal points, signs, and footnotes. Never calculate, normalize,
 summarize, or silently repair a number. If a character or cell is illegible, use
 [ILLEGIBLE] instead of guessing. Return only the transcription Markdown."""
+
+
+def local_candidate(local: dict) -> str:
+    """Do not offer an empty parser code fence as if it were page content."""
+    text = str(local.get("text") or "")
+    markdown = str(local.get("markdown") or "")
+    return "" if local_content_empty(text, markdown) else markdown
+
+
+def visual_quality_flags(metrics: dict, local: dict, model_text: str) -> list[str]:
+    if not metrics["visually_blank"]:
+        return []
+    flags = []
+    if not local_content_empty(str(local.get("text") or ""),
+                               str(local.get("markdown") or "")):
+        flags.append("local-nonempty-on-visually-blank-page")
+    if model_text.strip():
+        flags.append("model-nonempty-on-visually-blank-page")
+    return flags
 
 
 def utcnow() -> str:
@@ -460,9 +481,10 @@ class OpenRouterAdjudicator:
                 json.dumps(model_snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
             )
             image = self._render_page(Path(document["raw_path"]), number, page_dir)
+            visual_quality = rendered_ink_metrics(image)
             mime = "image/png" if image.suffix.casefold() == ".png" else "image/jpeg"
             image_url = f"data:{mime};base64,{base64.b64encode(image.read_bytes()).decode('ascii')}"
-            candidate = str(local.get("markdown") or "")
+            candidate = local_candidate(local)
             prompt = PROMPT.format(candidate=candidate) if candidate.strip() else BASE_PROMPT
             payload: dict = {
                 "model": selected_model,
@@ -544,6 +566,8 @@ class OpenRouterAdjudicator:
                         "image_dpi": cfg.image_dpi,
                         "reasoning_effort": cfg.reasoning_effort or None,
                         "reasoning_excluded": bool(cfg.reasoning_exclude),
+                        "visual_quality": visual_quality,
+                        "quality_flags": visual_quality_flags(visual_quality, local, message),
                         "response_rate_limit_headers": {
                             key: value for key, value in response_headers.items()
                             if key.casefold() in {

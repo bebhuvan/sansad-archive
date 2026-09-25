@@ -913,7 +913,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   similarity. It never mutates stored output.
 - Every model call stores the raw response, the exact request SHA-256, the
   model snapshot, token counts, reported cost, and timestamps under the run
-  artifact directory.
+  artifact directory. New calls also store conservative rendered-image ink
+  metrics and separate quality flags when the selected local or model text is
+  nonempty on a visually blank page; the raw responses remain unchanged. An
+  empty LiteParse Markdown fence is no longer sent to Space Bunny as candidate
+  page content.
 
 ### Verified 2026-09-25 milestones
 
