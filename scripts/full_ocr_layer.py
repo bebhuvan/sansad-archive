@@ -149,7 +149,8 @@ def completion_evidence(repo: str, source: str, house: str, parliament: str,
 
 
 def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
-                      version: str) -> None:
+                      version: str) -> dict[str, int]:
+    origins = {"selected-local-rasterized-ocr": 0, "sidecar-rasterized-ocr": 0}
     with gzip.open(archive, "rt", encoding="utf-8") as handle:
         for index in range(start, end + 1):
             line = handle.readline()
@@ -166,8 +167,14 @@ def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
                     or row.get("origin", "sidecar-rasterized-ocr") not in
                     {"sidecar-rasterized-ocr", "selected-local-rasterized-ocr"}):
                 raise RuntimeError(f"OCR shard has invalid page {page.key}: {archive}")
+            if (row.get("origin") == "selected-local-rasterized-ocr"
+                    and not re.fullmatch(r"[0-9a-f]{64}",
+                                         str(row.get("source_artifact_sha256") or ""))):
+                raise RuntimeError(f"OCR shard lacks reusable artifact SHA-256: {archive}")
+            origins[row.get("origin", "sidecar-rasterized-ocr")] += 1
         if handle.readline():
             raise RuntimeError(f"OCR shard has extra rows: {archive}")
+    return origins
 
 
 def completed_shards(api: HfApi, repo: str, root: str, pages: list[Page],
@@ -208,7 +215,9 @@ def completed_shards(api: HfApi, repo: str, root: str, pages: list[Page],
         local = Path(hf_hub_download(repo, archive_path, repo_type="dataset", token=token))
         if local.stat().st_size != manifest.get("bytes") or sha256_file(local) != manifest.get("sha256"):
             raise RuntimeError(f"OCR shard local checksum mismatch: {archive_path}")
-        verify_shard_rows(local, pages, start, end, version)
+        origins = verify_shard_rows(local, pages, start, end, version)
+        if "origin_counts" in manifest and manifest["origin_counts"] != origins:
+            raise RuntimeError(f"OCR shard origin counts mismatch: {path}")
         result.append(manifest)
         expected_start = end + 1
     return result
@@ -305,17 +314,15 @@ def publish_shard(api: HfApi, repo: str, root: str, pages: list[tuple[int, Page]
         with gzip.open(archive, "wt", encoding="utf-8", compresslevel=6) as handle:
             for row in rows:
                 handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
-        verify_shard_rows(archive, requested, 0, len(requested) - 1, engine.version)
+        origins = verify_shard_rows(archive, requested, 0, len(requested) - 1,
+                                    engine.version)
         manifest = {
             "path": archive_path, "start_index": start, "end_index": end,
             "first_key": requested[0].key, "last_key": requested[-1].key,
             "record_count": len(rows), "inventory_sha256": inventory,
             "engine": "liteparse", "engine_version": engine.version,
             "method": "image-only-rasterized-ocr",
-            "origin_counts": {
-                origin: sum(row["origin"] == origin for row in rows)
-                for origin in ("selected-local-rasterized-ocr", "sidecar-rasterized-ocr")
-            },
+            "origin_counts": origins,
             "sha256": sha256_file(archive), "bytes": archive.stat().st_size,
         }
         manifest_file.write_text(json.dumps(manifest, ensure_ascii=False, indent=2),

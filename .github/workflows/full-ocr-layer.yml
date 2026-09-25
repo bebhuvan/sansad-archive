@@ -1,4 +1,4 @@
-name: Full independent LiteParse OCR layer
+name: Full LiteParse OCR layer
 
 on:
   workflow_call:

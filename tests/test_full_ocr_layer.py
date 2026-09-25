@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import tempfile
 import unittest
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from sansad_pipeline.config import LiteParseConfig
-from scripts.full_ocr_layer import Page, inventory_sha256, ocr_rows, verify_shard_rows
+from scripts.full_ocr_layer import (Page, completed_shards, inventory_sha256,
+                                    ocr_rows, shard_paths, verify_shard_rows)
 from scripts.plan_full_ocr import plan
 
 
@@ -50,11 +53,65 @@ class FullOcrLayerTests(unittest.TestCase):
             with gzip.open(path, "wt", encoding="utf-8") as handle:
                 for row in rows:
                     handle.write(json.dumps(row) + "\n")
-            verify_shard_rows(path, pages, 0, 1, "2.14.7")
+            self.assertEqual(verify_shard_rows(path, pages, 0, 1, "2.14.7"), {
+                "selected-local-rasterized-ocr": 0, "sidecar-rasterized-ocr": 2,
+            })
             with gzip.open(path, "wt", encoding="utf-8") as handle:
                 handle.write(json.dumps(rows[1]) + "\n")
             with self.assertRaisesRegex(RuntimeError, "invalid page"):
                 verify_shard_rows(path, pages, 0, 1, "2.14.7")
+
+    def test_shard_verifier_counts_reused_origins_and_rejects_unknown_origin(self):
+        page = Page("a" * 64, 1, Path("a.pdf"))
+        row = ocr_rows(FakeEngine(), [page])[0]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "part.jsonl.gz"
+            row["origin"] = "selected-local-rasterized-ocr"
+            row["source_artifact_sha256"] = "b" * 64
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            self.assertEqual(verify_shard_rows(path, [page], 0, 0, "2.14.7"), {
+                "selected-local-rasterized-ocr": 1, "sidecar-rasterized-ocr": 0,
+            })
+            row["origin"] = "unknown"
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            with self.assertRaisesRegex(RuntimeError, "invalid page"):
+                verify_shard_rows(path, [page], 0, 0, "2.14.7")
+
+    def test_resume_rejects_manifest_origin_counts_that_disagree_with_rows(self):
+        page = Page("a" * 64, 1, Path("a.pdf"))
+        root = "layers/test"
+        archive_path, manifest_path = shard_paths(root, 0, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "part.jsonl.gz"
+            manifest_file = Path(directory) / "part.json"
+            row = ocr_rows(FakeEngine(), [page])[0]
+            with gzip.open(archive, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+            manifest_file.write_text(json.dumps({
+                "start_index": 0, "end_index": 0, "inventory_sha256": inventory_sha256([page]),
+                "engine": "liteparse", "engine_version": "2.14.7",
+                "first_key": page.key, "last_key": page.key, "record_count": 1,
+                "path": archive_path, "bytes": archive.stat().st_size, "sha256": digest,
+                "origin_counts": {"selected-local-rasterized-ocr": 1,
+                                  "sidecar-rasterized-ocr": 0},
+            }))
+            class FakeApi:
+                def list_repo_files(self, repo, *, repo_type):
+                    return [archive_path, manifest_path]
+
+                def get_paths_info(self, repo, paths, *, repo_type, expand):
+                    return [SimpleNamespace(size=archive.stat().st_size,
+                                            lfs=SimpleNamespace(sha256=digest))]
+
+            with mock.patch("scripts.full_ocr_layer.hf_hub_download",
+                            side_effect=lambda repo, path, **kwargs:
+                            str(archive if path == archive_path else manifest_file)):
+                with self.assertRaisesRegex(RuntimeError, "origin counts mismatch"):
+                    completed_shards(FakeApi(), "repo", root, [page],
+                                     inventory_sha256([page]), "2.14.7", "token")
 
     def test_inventory_digest_changes_with_page_identity(self):
         first = [Page("a" * 64, 1, Path("a.pdf"))]
