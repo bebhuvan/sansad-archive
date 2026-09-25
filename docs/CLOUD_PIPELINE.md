@@ -1243,9 +1243,17 @@ checkpoint (22:12 and 22:10 UTC respectively).
   626,053,120-byte WebDataset tar with a matching LFS checksum. The raw
   inventory SHA-256 is
   `ed547d47c9f80486ca70b5891b8ad175f54dbd88cee0e8aee59b80fcff86a96b`.
-  Separate full-page image-only LiteParse OCR run `36158421720` was dispatched
-  on 2026-09-25 for all 2,381 pages; its completion and independent page/visual
-  audit remain pending.
+  Separate full-page image-only LiteParse OCR run `36158421720` completed on
+  2026-09-25. Independent replay found all 2,381 page keys, OCR outputs and
+  visual measurements, with no unprocessed pages, strictly near-white-page
+  conflicts or empty text on visibly marked pages. The cloud audit report is
+  `audits/full-ocr-model-visual/lok_sabha-p01-sIV/`
+  `ocr-pages-00002381-059a116335c729d8.json`, downloaded SHA-256
+  `059a116335c729d8c12653ff14c69902b1c8b82d08a21eba18bdfc649399c342`.
+  All 2,381 OCR rows reuse the selected local rasterized-OCR artifact;
+  therefore the local/OCR agreement is not independent evidence of accuracy.
+  OCR/model visible-number differences on 2,279 pages are a review queue,
+  not an error-rate estimate.
 
 ## Provenance and formats
 
