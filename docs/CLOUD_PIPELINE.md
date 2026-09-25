@@ -1123,6 +1123,22 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `AU951.pdf` page 2 and its 531 dark pixels; 1,256 OCR pages remained at
   that checkpoint. The job was still processing, so this does not establish
   sidecar completion.
+  Run `36096755991` subsequently completed. An independent read-only audit
+  verified all 4,756 OCR pages in 48 contiguous shards against each remote
+  checksum, the published page inventory and the full visual sidecar;
+  `complete.json` matched the inventory and original publication marker.
+  The run-published report is
+  `audits/full-ocr-model-visual/lok_sabha-p17-s15/`
+  `ocr-pages-00004756-7af592cf632490e3.json`, and its independently
+  downloaded SHA-256 is
+  `7af592cf632490e3861939a4a3b9cdaab85ab9ad2e82b5f030e0d0a3ba94fdd1`.
+  It reports two empty-OCR-on-visible pages, 33 model-text conflicts on
+  near-white pages, and no local or OCR text on those blank pages. The second
+  OCR omission is official `AU949.pdf` page 3 (SHA-256
+  `f2f785022fa968b7c7be8b274dfae57413458292ab2753a4666bdf26d101e869`):
+  its source PDF hash matches the manifest, and both its text layer and visual
+  render show only `*****` (531 dark pixels). These two omissions remain
+  review items; their native local and model transcripts were not replaced.
 
 ## Provenance and formats
 
