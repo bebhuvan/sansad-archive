@@ -1277,6 +1277,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   the unfinished batch as publication or infer a model error from the missing
   runner log.
 
+- Current-API LS 18/6 published in batch `36096941153`. Independent HF
+  checkpoint replay verified 3,499 retained original PDFs, 12,038 extracted
+  pages and all 12,038 separate Space Bunny transcript artifacts; every call
+  reported zero cost. The publication marker and checksummed `pages.parquet`
+  agree on 12,038 unique page keys across those 3,499 PDF hashes. Separate
+  full-page LiteParse OCR and visual run `36183459175` was dispatched for all
+  12,038 pages; completion and independent audit are pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
