@@ -52,5 +52,5 @@ jobs:
       house: ${{ matrix.house }}
       parliament: ${{ matrix.parliament }}
       session: ${{ matrix.session }}
-      max_pages: "500"
+      max_pages: "2000"
     secrets: inherit
