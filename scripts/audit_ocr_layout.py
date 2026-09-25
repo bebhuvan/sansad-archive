@@ -218,7 +218,7 @@ def main() -> int:
         "sampled": len(selected),
         "model_pages": model_pages, "failures": failures,
         "selection_strata": {reason: sum(row["selection_stratum"] == reason for row in selected)
-                             for reason in ("route_baseline", "layout", "numeric", "random")},
+                             for reason in sorted({row["selection_stratum"] for row in selected})},
         "report": report.name, "tesseract_version": version,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
