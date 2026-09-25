@@ -966,9 +966,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   pages use the original shard schema without an origin field; later shards
   disclose 1,274 provenance-checked reuses of selected image OCR and 277 fresh
   sidecar OCR results. No page in these shards needed blank-page evidence.
-  A separate published-layer audit joined all 2,151 pages but found that none
-  of these older OCR rows had all-page image metrics, so it cannot establish
-  a zero blank-page-conflict rate; a visual backfill is required.
+  Cloud audit run `36089167501` joined all 2,151 pages and published a
+  SHA-256-verified report at `audits/full-ocr-model-visual/lok_sabha-p01-sII/`
+  `ocr-pages-00002151-1ee82743e0aa1f8b.json`. None of these older OCR rows
+  had all-page image metrics, so this cannot establish a zero blank-page-
+  conflict rate; a visual backfill is required.
 
 ## Provenance and formats
 
