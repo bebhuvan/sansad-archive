@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import unittest
+import hashlib
+import json
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 from unittest.mock import patch
 
-from scripts.reconcile_elibrary_census import normalized_page, scan_shard
+from scripts.reconcile_elibrary_census import (
+    load_shards, normalized_page, scan_shard, verify_first_shard_files,
+)
 
 
 def response(page: int, ids: list[str], dates: list[str], total: int) -> dict:
@@ -81,6 +89,48 @@ class ReconcileElibraryCensusTests(unittest.TestCase):
             normalized_page(response(0, ["a", "b"], ["2021", "2020"], 3), 0, 3)
         with self.assertRaisesRegex(RuntimeError, "lacks an accession"):
             normalized_page(response(0, ["a", "b"], ["", "2020"], 3), 0, 3)
+
+    def test_resume_rejects_shard_gap(self):
+        root = "state/census/full-scan-test"
+        paths = [f"{root}/first/part-{number:06d}-{number:06d}.json"
+                 for number in (0, 2)]
+        api = Mock()
+        api.list_repo_files.return_value = paths
+        with tempfile.TemporaryDirectory() as directory:
+            files = {}
+            for number, path in zip((0, 2), paths):
+                local = Path(directory) / f"{number}.json"
+                local.write_text(json.dumps({
+                    "kind": "first", "sort": "dc.date.accessioned,asc",
+                    "start_page": number, "end_page": number,
+                    "page_hashes": ["hash"],
+                }))
+                files[path] = str(local)
+            with patch("scripts.reconcile_elibrary_census.hf_hub_download",
+                       side_effect=lambda repo, path, **kw: files[path]):
+                with self.assertRaisesRegex(RuntimeError, "noncontiguous"):
+                    load_shards("test/repo", root, "first", token="token", api=api)
+
+    def test_small_git_backed_shard_is_verified_by_sha256(self):
+        root = "state/census/full-scan-test"
+        with tempfile.TemporaryDirectory() as directory:
+            local = Path(directory) / "part.jsonl.gz"
+            local.write_bytes(b"small census shard")
+            digest = hashlib.sha256(local.read_bytes()).hexdigest()
+            row = {"start_page": 0, "end_page": 0,
+                   "bytes": local.stat().st_size, "sha256": digest}
+            path = f"{root}/first/part-000000-000000.jsonl.gz"
+            api = Mock()
+            api.get_paths_info.return_value = [SimpleNamespace(
+                path=path, size=local.stat().st_size, lfs=None)]
+            with patch("scripts.reconcile_elibrary_census.hf_hub_download",
+                       return_value=str(local)):
+                verify_first_shard_files("test/repo", root, [row],
+                                         token="token", api=api)
+                row["sha256"] = "0" * 64
+                with self.assertRaisesRegex(RuntimeError, "Git-file hash mismatch"):
+                    verify_first_shard_files("test/repo", root, [row],
+                                             token="token", api=api)
 
 
 if __name__ == "__main__":
