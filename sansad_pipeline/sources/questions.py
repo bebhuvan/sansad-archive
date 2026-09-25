@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import urllib.error
@@ -40,7 +41,8 @@ def request_json(
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
+        except (urllib.error.URLError, TimeoutError, OSError,
+                http.client.HTTPException, json.JSONDecodeError) as error:
             last_error = error
             if attempt < attempts:
                 time.sleep(min(2 ** attempt, 30))

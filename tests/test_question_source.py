@@ -1,15 +1,28 @@
 from __future__ import annotations
 
 import unittest
+from http.client import IncompleteRead
 from unittest.mock import patch
 
 from sansad_pipeline.sources.questions import (
     available_lok_sabha_sessions, discover_lok_sabha_questions,
     discover_rajya_sabha_questions, parse_date,
+    request_json,
 )
 
 
 class QuestionSourceTests(unittest.TestCase):
+    @patch("sansad_pipeline.sources.questions.time.sleep")
+    @patch("sansad_pipeline.sources.questions.urllib.request.urlopen")
+    def test_request_json_retries_truncated_chunked_response(self, urlopen, sleep):
+        urlopen.return_value.__enter__.return_value.read.side_effect = [
+            IncompleteRead(b'{"partial":', 8), b'{"complete": true}',
+        ]
+        self.assertEqual(request_json("https://example.test/api", attempts=2),
+                         {"complete": True})
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(2)
+
     @patch("sansad_pipeline.sources.questions.request_json")
     def test_lok_sabha_inventory_is_sorted_and_unique(self, request_json):
         request_json.return_value = [

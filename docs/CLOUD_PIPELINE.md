@@ -1255,6 +1255,18 @@ checkpoint (22:12 and 22:10 UTC respectively).
   OCR/model visible-number differences on 2,279 pages are a review queue,
   not an error-rate estimate.
 
+- Full eLibrary census continuation `36137844798` checkpointed its first pass
+  through page 9,499/11,588. The next manual continuation `36170854700`
+  durably published through page 9,799, then failed when the official DSpace
+  API closed a chunked JSON response mid-body (`http.client.IncompleteRead`).
+  This did not corrupt an already published shard; scheduled continuation
+  `36170944939` resumed from the last complete shard. The shared JSON request
+  helper now retries incomplete HTTP responses with its existing bounded
+  backoff, and a regression test covers a truncated first response followed
+  by a complete retry. All 150 tests pass. This fix reaches cloud runs that
+  check out the new commit; the already-running continuation still uses its
+  earlier checkout.
+
 ## Provenance and formats
 
 Each publication tranche contains:
