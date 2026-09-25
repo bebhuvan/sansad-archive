@@ -16,6 +16,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+from sansad_pipeline.image_quality import verified_blank_response
+
 
 SCOPE = re.compile(r"^(?:elibrary-)?(lok_sabha|rajya_sabha)-p([0-9]*)-s([A-Za-z0-9_-]+)$")
 
@@ -97,28 +99,44 @@ def audit_transcript_archive(state_archive: Path, expected: set[str]) -> dict:
     import zstandard
 
     found: set[str] = set()
-    blank: set[str] = set()
+    empty: set[str] = set()
+    invalid: set[str] = set()
+    verified_provenance: set[str] = set()
+    provenance_paths = {str(Path(path).with_name("provenance.json")): path
+                        for path in expected}
     with state_archive.open("rb") as source:
         with zstandard.ZstdDecompressor().stream_reader(source) as stream:
             with tarfile.open(fileobj=stream, mode="r|") as archive:
                 for member in archive:
+                    if member.name in provenance_paths:
+                        if member.isfile() and member.size <= 1024 * 1024:
+                            with archive.extractfile(member) as provenance_file:
+                                try:
+                                    provenance = json.loads(provenance_file.read())
+                                except (UnicodeDecodeError, ValueError):
+                                    provenance = None
+                            if verified_blank_response(provenance):
+                                verified_provenance.add(provenance_paths[member.name])
+                        continue
                     if member.name not in expected:
                         continue
                     found.add(member.name)
                     if not member.isfile() or member.size > 8 * 1024 * 1024:
-                        blank.add(member.name)
+                        invalid.add(member.name)
                         continue
                     with archive.extractfile(member) as transcript:
                         payload = transcript.read()
                     try:
                         if not payload.decode("utf-8").strip():
-                            blank.add(member.name)
+                            empty.add(member.name)
                     except UnicodeDecodeError:
-                        blank.add(member.name)
+                        invalid.add(member.name)
+    verified_empty = empty & verified_provenance
     return {
         "model_transcript_artifacts_expected": len(expected),
         "model_transcript_artifacts_missing": len(expected - found),
-        "model_transcript_artifacts_blank_or_invalid": len(blank),
+        "model_transcript_artifacts_blank_or_invalid": len(invalid | (empty - verified_empty)),
+        "model_transcript_artifacts_verified_blank": len(verified_empty),
     }
 
 

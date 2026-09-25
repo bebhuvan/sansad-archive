@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Config
+from .image_quality import verified_blank_response
 from .storage import Store
 from .validation import text_flags
 
@@ -279,10 +280,17 @@ class PublicationBuilder:
                                 )
                             model_markdown = adjudicated_path.read_text(encoding="utf-8")
                             if not model_markdown.strip():
-                                raise RuntimeError(
-                                    f"model transcript empty for {digest} page "
-                                    f"{page['page_number']}: {adjudicated_path}"
-                                )
+                                provenance_path = response_path.with_name("provenance.json")
+                                try:
+                                    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+                                except (OSError, ValueError):
+                                    provenance = None
+                                if not verified_blank_response(provenance):
+                                    raise RuntimeError(
+                                        f"model transcript empty without verified blank-page "
+                                        f"evidence for {digest} page {page['page_number']}: "
+                                        f"{adjudicated_path}"
+                                    )
                             flags = text_flags(
                                 model_markdown,
                                 reference=page["local_markdown"],
@@ -405,7 +413,7 @@ class PublicationBuilder:
                     prefix = digest
                     _tar_bytes(archive, f"{prefix}.md", markdown.encode("utf-8"))
                     _tar_bytes(archive, f"{prefix}.local.md", local_markdown.encode("utf-8"))
-                    if adjudicated_markdown.strip():
+                    if any(page["adjudication"] is not None for page in publication_pages):
                         _tar_bytes(
                             archive,
                             f"{prefix}.adjudicated.md",

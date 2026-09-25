@@ -205,6 +205,7 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(audited["model_transcript_artifacts_expected"], 1)
             self.assertEqual(audited["model_transcript_artifacts_missing"], 0)
             self.assertEqual(audited["model_transcript_artifacts_blank_or_invalid"], 0)
+            self.assertEqual(audited["model_transcript_artifacts_verified_blank"], 0)
             self.assertTrue(all(not location.exists() for location in locations))
             verify_archive(state, state_info)
             with self.assertRaisesRegex(RuntimeError, "disk limit"):
@@ -239,7 +240,30 @@ class CheckpointMonitorTests(unittest.TestCase):
                 "model_transcript_artifacts_expected": 2,
                 "model_transcript_artifacts_missing": 1,
                 "model_transcript_artifacts_blank_or_invalid": 1,
+                "model_transcript_artifacts_verified_blank": 0,
             })
+
+    def test_archive_audit_accepts_empty_model_only_with_blank_image_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            transcript = root / "adjudicated.md"
+            transcript.write_text("", encoding="utf-8")
+            provenance = root / "provenance.json"
+            provenance.write_text(json.dumps({
+                "blank_response_verified": True,
+                "visual_quality": {"visually_blank": True, "image_pixels": 10000,
+                                   "image_dark_pixels": 0, "image_dark_pixel_cutoff": 250},
+            }))
+            raw_tar = root / "state.tar"
+            with tarfile.open(raw_tar, "w") as archive:
+                archive.add(transcript, arcname="data/artifacts/blank/adjudicated.md")
+                archive.add(provenance, arcname="data/artifacts/blank/provenance.json")
+            state = root / "state.tar.zst"
+            with raw_tar.open("rb") as source, state.open("wb") as target:
+                zstandard.ZstdCompressor().copy_stream(source, target)
+            result = audit_transcript_archive(state, {"data/artifacts/blank/adjudicated.md"})
+            self.assertEqual(result["model_transcript_artifacts_blank_or_invalid"], 0)
+            self.assertEqual(result["model_transcript_artifacts_verified_blank"], 1)
 
 
 if __name__ == "__main__":

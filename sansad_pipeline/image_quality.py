@@ -28,3 +28,24 @@ def rendered_ink_metrics(path: Path) -> dict[str, int | bool]:
         "image_dark_pixel_cutoff": DARK_PIXEL_CUTOFF,
         "visually_blank": dark_pixels <= MAX_BLANK_DARK_PIXELS,
     }
+
+
+def valid_blank_image_evidence(metrics: object) -> bool:
+    """Check the stored metrics before accepting an empty OCR/model layer."""
+    return bool(
+        isinstance(metrics, dict)
+        and metrics.get("visually_blank") is True
+        and metrics.get("image_dark_pixel_cutoff") == DARK_PIXEL_CUTOFF
+        and type(metrics.get("image_dark_pixels")) is int
+        and 0 <= metrics["image_dark_pixels"] <= MAX_BLANK_DARK_PIXELS
+        and type(metrics.get("image_pixels")) is int
+        and metrics["image_pixels"] > 0
+    )
+
+
+def verified_blank_response(provenance: object) -> bool:
+    return bool(
+        isinstance(provenance, dict)
+        and provenance.get("blank_response_verified") is True
+        and valid_blank_image_evidence(provenance.get("visual_quality"))
+    )

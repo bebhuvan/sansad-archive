@@ -260,6 +260,23 @@ class PublicationTests(unittest.TestCase):
                     Scope("lok_sabha", "18", "8"), root / "bundle-empty-model",
                     compact=True, complete_session=True,
                 )
+            provenance = review_dir / "provenance.json"
+            provenance.write_text(json.dumps({
+                "blank_response_verified": True,
+                "visual_quality": {"visually_blank": True, "image_pixels": 10000,
+                                   "image_dark_pixels": 0, "image_dark_pixel_cutoff": 250},
+            }))
+            model_transcript.write_text("", encoding="utf-8")
+            blank_output = root / "bundle-verified-blank-model"
+            blank_result = PublicationBuilder(config).build(
+                Scope("lok_sabha", "18", "8"), blank_output,
+                compact=True, complete_session=True,
+            )
+            self.assertEqual(blank_result["adjudicated_page_count"], 1)
+            with tarfile.open(blank_output / "webdataset" / "shard-00000.tar") as archive:
+                self.assertEqual(archive.extractfile(f"{item.sha256}.adjudicated.md").read(), b"")
+            self.assertTrue(PublicationBuilder.verify(blank_output)["valid"])
+            provenance.unlink()
             model_transcript.write_text("# Reviewed text", encoding="utf-8")
             readable_pdf = readable / "original.pdf"
             readable_pdf.write_bytes(bytes([source.read_bytes()[0] ^ 1]) + source.read_bytes()[1:])

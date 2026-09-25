@@ -917,7 +917,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   metrics and separate quality flags when the selected local or model text is
   nonempty on a visually blank page; the raw responses remain unchanged. An
   empty LiteParse Markdown fence is no longer sent to Space Bunny as candidate
-  page content.
+  page content. A genuinely empty model response is accepted only with stored
+  near-white image evidence; its empty transcript remains a distinct model
+  layer in the checkpoint and WebDataset. Publication and the checkpoint
+  inspector reject empty responses without that evidence.
 
 ### Verified 2026-09-25 milestones
 

@@ -19,7 +19,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from .config import Config
-from .image_quality import rendered_ink_metrics
+from .image_quality import rendered_ink_metrics, valid_blank_image_evidence
 from .storage import Store
 from .text_quality import local_content_empty
 
@@ -541,7 +541,9 @@ class OpenRouterAdjudicator:
             response_path.write_text(
                 json.dumps(response_payload, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-            if not message.strip():
+            blank_response_verified = (not message.strip()
+                                       and valid_blank_image_evidence(visual_quality))
+            if not message.strip() and not blank_response_verified:
                 raise RuntimeError(
                     f"OpenRouter model {selected_model} returned an empty transcription "
                     f"for page {number}"
@@ -567,6 +569,7 @@ class OpenRouterAdjudicator:
                         "reasoning_effort": cfg.reasoning_effort or None,
                         "reasoning_excluded": bool(cfg.reasoning_exclude),
                         "visual_quality": visual_quality,
+                        "blank_response_verified": blank_response_verified,
                         "quality_flags": visual_quality_flags(visual_quality, local, message),
                         "response_rate_limit_headers": {
                             key: value for key, value in response_headers.items()

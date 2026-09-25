@@ -66,6 +66,32 @@ class OpenRouterVisualQualityTests(unittest.TestCase):
                              ["model-nonempty-on-visually-blank-page"])
             self.assertEqual(provenance.with_name("adjudicated.md").read_text(),
                              "Invented words")
+            Image.new("RGB", (100, 100), "white").save(image)
+            empty_reply = ({"choices": [{"message": {"content": ""},
+                                          "finish_reason": "stop"}],
+                            "usage": {"cost": 0}}, {})
+            with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-only-key"}), \
+                 patch.object(worker, "_model_snapshot", return_value={"id": "free/test"}), \
+                 patch.object(worker, "_render_page", return_value=image), \
+                 patch.object(worker, "_post", return_value=empty_reply):
+                self.assertEqual(worker.adjudicate(document.sha256, pages=[1]), [1])
+            saved = [json.loads(path.read_text()) for path in artifact_dir.rglob("provenance.json")]
+            self.assertEqual(sum(item["blank_response_verified"] for item in saved), 1)
+            self.assertEqual(sum(not path.read_text().strip()
+                                 for path in artifact_dir.rglob("adjudicated.md")), 1)
+            self.assertEqual(worker.store.db.one(
+                "SELECT COUNT(*) AS n FROM adjudications WHERE run_id=?", (run_id,))["n"], 2)
+            Image.new("RGB", (100, 100), "white").save(image)
+            with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-only-key"}), \
+                 patch.object(worker, "_model_snapshot", return_value={"id": "free/test"}), \
+                 patch.object(worker, "_render_page", return_value=image), \
+                 patch.object(worker, "_post", return_value=empty_reply), \
+                 patch("sansad_pipeline.openrouter.rendered_ink_metrics", return_value={
+                     "image_pixels": 10000, "image_dark_pixels": 100,
+                     "image_dark_pixel_cutoff": 250, "visually_blank": False,
+                 }):
+                with self.assertRaisesRegex(RuntimeError, "empty transcription"):
+                    worker.adjudicate(document.sha256, pages=[1])
 
     def test_empty_liteparse_wrapper_is_not_sent_as_candidate(self):
         self.assertEqual(local_candidate({"text": "", "markdown": "```text\n\n```"}), "")
