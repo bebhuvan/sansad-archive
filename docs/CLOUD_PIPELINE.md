@@ -945,6 +945,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   counts. The published-layer audit joins these measurements with older OCR
   shards and the separate local/model text; contradictory measurements from
   newer OCR shards fail closed. Neither process rewrites text or original PDFs.
+- The shared LiteParse page screenshot subprocess has a 180-second per-page
+  deadline. A timeout or renderer failure names the affected PDF page and
+  fails the current bounded chunk; earlier immutable HF shards remain
+  resumable. This prevents one hostile PDF render from silently consuming an
+  entire 330-minute Actions job.
 - LiteParse Python is pinned to `2.14.7`, the latest version shown on its
   [PyPI project page](https://pypi.org/project/liteparse/) on 2026-09-25;
   extraction artifacts record that exact engine version.
