@@ -1265,7 +1265,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   backoff, and a regression test covers a truncated first response followed
   by a complete retry. All 150 tests pass. This fix reaches cloud runs that
   check out the new commit; the already-running continuation still uses its
-  earlier checkout.
+  earlier checkout. Scheduled continuation `36170944939` completed the first
+  ascending pass through page 11,587/11,588 and began the second audit pass,
+  checkpointing it through page 399. Its successor `36198141679` runs on the
+  retry fix. The first pass alone is not a reconciled census, and the final
+  snapshot must not replace the dated ingestion inventory until the full
+  second pass and normalized-page-hash comparison succeed.
 
 - Historical batch `36145853002` completed LS 01/IV, then LS 01/V acquired
   all 2,114 inventoried attachments (1,378 distinct original PDFs), extracted
