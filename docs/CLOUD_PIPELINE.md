@@ -954,8 +954,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   identities and separate local/model text. It publishes an immutable report
   under `audits/full-ocr-model-visual/<scope>/`. The report distinguishes OCR
   pages not yet processed, older OCR rows without image metrics, visually
-  assessed pages, and blank-page conflicts for each text layer. These counts
-  are evidence from the measured subset, never a corpus-wide accuracy rate.
+  assessed pages, blank-page conflicts for each text layer, and empty model
+  transcripts on visibly inked pages as a separate review queue. The latter
+  does not call OCR or the image heuristic transcription ground truth. These
+  counts are evidence from the measured subset, never a corpus-wide accuracy
+  rate.
 - Older sidecars receive a separate bounded visual-evidence backfill through
   `visual-evidence-layer.yml`. It restores the verified original PDFs from the
   HF checkpoint, renders every page at the configured 250 dpi, and stores
@@ -1065,6 +1068,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   complete visual layer, with zero local/OCR text conflicts; numeric
   disagreements stand at 1,005 of 2,100 comparable pages. This verifies
   recovery through page 2,100, not full OCR completion.
+  A newer read-only audit verified 2,700 contiguous OCR pages against the
+  still-complete 4,756-page visual inventory: 33 near-white/model-text
+  conflicts, zero empty model transcripts on visibly inked pages, and 1,314
+  OCR/model numeric disagreements among 2,700 comparable pages. These are
+  review signals, not adjudicated error rates.
 
 ## Provenance and formats
 

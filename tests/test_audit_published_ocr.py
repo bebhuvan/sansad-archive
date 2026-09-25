@@ -61,6 +61,23 @@ class PublishedOcrAuditTests(unittest.TestCase):
             "model-nonempty-on-blank": 2,
         })
 
+    def test_empty_model_on_visibly_inked_page_is_reviewed_not_called_blank(self):
+        digest = "a" * 64
+        pages = [
+            {"document_sha256": digest, "page_number": number,
+             "local_text": "Question", "local_markdown": "Question",
+             "adjudicated_markdown": ""}
+            for number in (1, 2)
+        ]
+        visual = [{"document_sha256": digest, "page_number": 1,
+                   "image_pixels": 10000, "image_dark_pixels": 100,
+                   "image_dark_pixel_cutoff": 250, "visually_blank": False}]
+        result = audit_layers(pages, [], visual)
+        self.assertEqual(result["model_empty_on_visible_pages"], 1)
+        self.assertEqual(result["model_empty_on_visible"][0]["page_number"], 1)
+        self.assertEqual(result["published_pages_without_visual_metrics"], 1)
+        self.assertEqual(result["visually_blank_pages_among_assessed"], 0)
+
     def test_disagreeing_ocr_and_backfill_pixels_fail_closed(self):
         digest = "a" * 64
         pages = [{"document_sha256": digest, "page_number": 1,
