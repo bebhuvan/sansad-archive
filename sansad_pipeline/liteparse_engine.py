@@ -4,6 +4,7 @@ import importlib.metadata
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from liteparse import LiteParse
@@ -11,6 +12,7 @@ from PIL import Image
 
 from .config import Config
 from .image_quality import image_ink_metrics
+from .pdf_render import render_page
 
 
 PARSE_TIMEOUT_SECONDS = 300
@@ -76,15 +78,19 @@ class LiteParseEngine:
         if ocr and target_pages and rasterize:
             # LiteParse intentionally keeps a sufficiently dense native text layer,
             # even when that layer is old OCR over a full-page scan. For archival
-            # re-OCR, render only the routed pages and parse the image-only PDF.
-            renderer = LiteParse(dpi=effective_dpi, quiet=True)
-            screenshots = renderer.screenshot(pdf, page_numbers=target_pages)
-            if not screenshots:
-                raise RuntimeError("LiteParse returned no screenshots for routed OCR pages")
-            images = [Image.open(BytesIO(item.image_bytes)).convert("RGB") for item in screenshots]
+            # re-OCR, render only the routed pages with a hard wall-clock limit
+            # per screenshot, then parse the image-only PDF.
+            images = []
+            with tempfile.TemporaryDirectory(prefix="sansad-ocr-render-") as directory:
+                for page_number in target_pages:
+                    rendered = render_page(
+                        pdf, page_number, Path(directory) / str(page_number), effective_dpi,
+                    )
+                    with Image.open(rendered) as image:
+                        images.append(image.convert("RGB"))
             visual_quality_by_page = {
-                screenshot.page_num: image_ink_metrics(image)
-                for screenshot, image in zip(screenshots, images, strict=True)
+                page_number: image_ink_metrics(image)
+                for page_number, image in zip(target_pages, images, strict=True)
             }
             raster_pdf = BytesIO()
             images[0].save(
@@ -98,8 +104,8 @@ class LiteParseEngine:
             )
             parse_input = raster_pdf.getvalue()
             page_number_map = {
-                raster_page: screenshot.page_num
-                for raster_page, screenshot in enumerate(screenshots, 1)
+                raster_page: page_number
+                for raster_page, page_number in enumerate(target_pages, 1)
             }
             parser_target_pages = None
         parser = LiteParse(

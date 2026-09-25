@@ -13,7 +13,7 @@ class PageRenderTimeoutTests(unittest.TestCase):
     def test_screenshot_timeout_identifies_page_and_has_finite_deadline(self):
         with tempfile.TemporaryDirectory() as directory:
             pdf = Path(directory) / "source.pdf"
-            with mock.patch("sansad_pipeline.openrouter.subprocess.run",
+            with mock.patch("sansad_pipeline.pdf_render.subprocess.run",
                             side_effect=subprocess.TimeoutExpired("lit", RENDER_TIMEOUT_SECONDS)) as run:
                 with self.assertRaisesRegex(RuntimeError, "timed out.*page 3"):
                     render_page(pdf, 3, Path(directory) / "image", 250)
@@ -23,7 +23,7 @@ class PageRenderTimeoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             pdf = Path(directory) / "source.pdf"
             failure = subprocess.CalledProcessError(1, ["lit"], stderr="bad source PDF")
-            with mock.patch("sansad_pipeline.openrouter.subprocess.run", side_effect=failure):
+            with mock.patch("sansad_pipeline.pdf_render.subprocess.run", side_effect=failure):
                 with self.assertRaisesRegex(RuntimeError, "page 2.*bad source PDF"):
                     render_page(pdf, 2, Path(directory) / "image", 250)
 

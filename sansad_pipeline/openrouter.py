@@ -7,10 +7,7 @@ import json
 import os
 import random
 import re
-import shutil
 import socket
-import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +17,7 @@ from pathlib import Path
 
 from .config import Config
 from .image_quality import rendered_ink_metrics, valid_blank_image_evidence
+from .pdf_render import RENDER_TIMEOUT_SECONDS, render_page
 from .storage import Store
 from .text_quality import local_content_empty
 
@@ -71,45 +69,6 @@ def visual_quality_flags(metrics: dict, local: dict, model_text: str) -> list[st
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-RENDER_TIMEOUT_SECONDS = 180
-
-
-def render_page(pdf: Path, page_number: int, output_dir: Path, dpi: int) -> Path:
-    lit = Path(sys.executable).with_name("lit")
-    if not lit.exists():
-        found = shutil.which("lit")
-        if not found:
-            raise RuntimeError("LiteParse `lit` executable was not found")
-        lit = Path(found)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        subprocess.run(
-            [
-                str(lit), "screenshot", str(pdf), "--output-dir", str(output_dir),
-                "--target-pages", str(page_number), "--dpi", str(dpi), "--quiet",
-            ],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=RENDER_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"LiteParse screenshot timed out after {RENDER_TIMEOUT_SECONDS}s "
-            f"for page {page_number} of {pdf}"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = str(exc.stderr or "").strip()[-500:]
-        raise RuntimeError(
-            f"LiteParse screenshot failed for page {page_number} of {pdf}: {detail}"
-        ) from exc
-    images = sorted(output_dir.glob("*.png")) + sorted(output_dir.glob("*.jpg"))
-    if len(images) != 1:
-        raise RuntimeError(f"expected one rendered page, found {len(images)} in {output_dir}")
-    return images[0]
 
 
 def load_dotenv(path: Path) -> None:

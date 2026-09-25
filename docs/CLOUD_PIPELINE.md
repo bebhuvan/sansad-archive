@@ -842,10 +842,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   had an all-white third page: LiteParse and Tesseract were empty, while Space
   Bunny wrote `Y 1300 . Y 1301 .`. The model text remains stored as evidence
   and is explicitly flagged; canonical local text stays empty. A subsequent
-  verified HF audit covered 4,500 of 4,756 LS 17/15 pages and found 33
-  visually near-white pages, all with nonempty Space Bunny text; none had
-  nonempty local or full-OCR text. The full visual layer was still running at
-  this checkpoint, so these are interim counts, not the session's final total.
+  verified HF audit covered all 4,756 LS 17/15 pages and found 33 visually
+  near-white pages, all with nonempty Space Bunny text; none had nonempty
+  local text. The separate full-OCR sidecar had processed 1,900 pages at that
+  checkpoint, with no OCR text on its measured blank pages.
   The first local end-to-end audit on a 1952 scan selected
   one page from five OCR candidates, completed in 8.2 seconds with no error,
   and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
@@ -960,11 +960,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   counts. The published-layer audit joins these measurements with older OCR
   shards and the separate local/model text; contradictory measurements from
   newer OCR shards fail closed. Neither process rewrites text or original PDFs.
-- The shared LiteParse page screenshot subprocess has a 180-second per-page
-  deadline. A timeout or renderer failure names the affected PDF page and
-  fails the current bounded chunk; earlier immutable HF shards remain
-  resumable. This prevents one hostile PDF render from silently consuming an
-  entire 330-minute Actions job.
+- New image-only OCR and model/visual-evidence runs use the same LiteParse
+  page screenshot subprocess with a 180-second per-page deadline. A timeout
+  or renderer failure names the affected PDF page and fails the current
+  bounded chunk; earlier immutable HF shards remain resumable. This prevents
+  one hostile PDF render from silently consuming an entire 330-minute Actions
+  job. The already-running LS 17/15 OCR job started before this OCR-side
+  change and retains the older in-process screenshot path until it finishes
+  or is resumed from a later commit.
 - LiteParse Python is pinned to `2.14.7`, the latest version shown on its
   [PyPI project page](https://pypi.org/project/liteparse/) on 2026-09-25;
   extraction artifacts record that exact engine version.
@@ -1026,7 +1029,13 @@ checkpoint (22:12 and 22:10 UTC respectively).
   strict near-white blank-page threshold. Image-only OCR and Space Bunny
   disagree on visible numeric tokens on 2,094 of 2,151 comparable pages.
   This is a disagreement count, not a model or OCR error rate. The LS 17/15
-  visual continuation `36090227461` remains in progress.
+  visual continuation `36090227461` completed all 4,756 pages in 48
+  contiguous, verified shards. Cloud audit `36093301405` published the
+  SHA-256-verified report at `audits/full-ocr-model-visual/lok_sabha-p17-s15/`
+  `ocr-pages-00001900-58ec3218bdfd7aca.json`: all pages visually assessed,
+  33 near-white pages with nonempty model text, none with nonempty local text,
+  and 893 numeric disagreements among 1,900 pages with both OCR and model
+  text. The full OCR sidecar remained incomplete at this checkpoint.
 
 ## Provenance and formats
 

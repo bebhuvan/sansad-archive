@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 import tempfile
-from io import BytesIO
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
 from pathlib import Path
@@ -77,12 +76,6 @@ class LiteParseCompletenessTests(unittest.TestCase):
 
     def test_rasterized_ocr_retains_original_page_visual_metrics(self):
         image = Image.new("RGB", (100, 100), "white")
-        picture = BytesIO()
-        image.save(picture, format="PNG")
-        renderer = Mock()
-        renderer.screenshot.return_value = [SimpleNamespace(
-            page_num=2, image_bytes=picture.getvalue(),
-        )]
         page = SimpleNamespace(
             page_num=1, text="Invented text", markdown="Invented text",
             width=100, height=100, complexity=None, text_items=[],
@@ -90,15 +83,30 @@ class LiteParseCompletenessTests(unittest.TestCase):
         )
         parser = Mock()
         parser.parse.return_value = SimpleNamespace(pages=[page], total_pages=1)
-        with patch("sansad_pipeline.liteparse_engine.LiteParse",
-                   side_effect=[renderer, parser]):
-            result = LiteParseEngine(Config(project_root=Path.cwd())).extract(
-                Path("unused.pdf"), ocr=True, target_pages=[2], rasterize=True,
-            )
+        with tempfile.TemporaryDirectory() as directory:
+            picture = Path(directory) / "blank.png"
+            image.save(picture)
+            with patch("sansad_pipeline.liteparse_engine.render_page",
+                       return_value=picture) as render, \
+                 patch("sansad_pipeline.liteparse_engine.LiteParse", return_value=parser):
+                result = LiteParseEngine(Config(project_root=Path.cwd())).extract(
+                    Path("unused.pdf"), ocr=True, target_pages=[2], rasterize=True,
+                )
+            self.assertEqual(render.call_args.args[1], 2)
         self.assertEqual(result[0].page_number, 2)
         self.assertTrue(result[0].visual_quality["visually_blank"])
         self.assertEqual(result[0].visual_quality["image_dark_pixels"], 0)
         parser.close.assert_called_once()
+
+    def test_rasterized_ocr_stops_before_parse_on_render_timeout(self):
+        with patch("sansad_pipeline.liteparse_engine.render_page",
+                   side_effect=RuntimeError("LiteParse screenshot timed out for page 2")), \
+             patch("sansad_pipeline.liteparse_engine.LiteParse") as parser:
+            with self.assertRaisesRegex(RuntimeError, "timed out for page 2"):
+                LiteParseEngine(Config(project_root=Path.cwd())).extract(
+                    Path("unused.pdf"), ocr=True, target_pages=[2], rasterize=True,
+                )
+        parser.assert_not_called()
 
 
 if __name__ == "__main__":
