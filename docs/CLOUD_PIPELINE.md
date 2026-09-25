@@ -466,8 +466,13 @@ succeeded on 2026-09-25. Its HF first-pass shard has 100 pages and 10,000
 normalized records; an independent remote read matched its row count, SHA-256
 and byte size, and confirmed its LFS identity. Continuation run
 [`36079510594`](https://github.com/bebhuvan/sansad-archive/actions/runs/36079510594)
-started from the same scan root on newer code. Neither run yet proves
-second-pass agreement or a replacement snapshot.
+completed its bounded first-pass allocation at page 2,499. Its 25 contiguous
+100-page HF shards were independently rechecked for manifest continuity,
+remote file size and SHA-256; decompressed records will be checked before
+final snapshot publication. Continuation
+[`36094510565`](https://github.com/bebhuvan/sansad-archive/actions/runs/36094510565)
+has started from the same root. Neither run yet proves second-pass agreement
+or a replacement snapshot.
 Refresh run `36047393238` appended exactly 3,500 records to the August base
 and published `state/census/snapshot-2026-09-24T192308Z` (SHA-256
 `9c2efb8cdfb624398b8468faa82e1c5c771a7f28b8e808e056b3a266ad58aeb9`,
@@ -1052,7 +1057,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   The first retry `36094258753` failed during dependency setup because the
   runner image lacks `rg`; no OCR step or HF write occurred. The tessdata
   lookup now uses `awk`, which was verified against the installed package
-  locally, before another bounded continuation.
+  locally. Retry `36094489013` passed installation, credential checks and
+  verified checkpoint restore, then entered the OCR step. Its first new
+  100-page shard was independently audited: 2,100 contiguous OCR rows now
+  match the immutable published page keys and remote shard hashes. The audit
+  still finds 33 model-text conflicts on the 33 near-white pages across the
+  complete visual layer, with zero local/OCR text conflicts; numeric
+  disagreements stand at 1,005 of 2,100 comparable pages. This verifies
+  recovery through page 2,100, not full OCR completion.
 
 ## Provenance and formats
 
