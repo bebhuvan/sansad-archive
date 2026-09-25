@@ -1222,6 +1222,17 @@ checkpoint (22:12 and 22:10 UTC respectively).
   Of the OCR rows, 2,117 reuse selected-local OCR and 1,524 are separate
   executions of the same method. OCR/model visible-number differences on
   3,462 pages remain a source-image review queue, not an error-rate estimate.
+  The run's separate free Tesseract canary sampled 24 pages (12 seeded random
+  baseline, six numeric suspects, six layout suspects). On one checked random
+  page, the exact official 1953 PDF SHA-256
+  `0b50d8d637546aecf73a41a9ee1e718707038425534c96f87cda59008ef24738`
+  was downloaded and visually read: it has two newspaper-style columns with
+  questions 313, 314, 315, 317 and 318. LiteParse Markdown fragmented ordinary
+  prose into false tables; the stored model Markdown preserved the column flow
+  and the visible answers 7955, 571 and about Rs. 20 lakhs much more cleanly.
+  This is a page-specific source-image check, not proof the model is generally
+  right. Tesseract itself can omit or invent numbers, so neither text
+  similarity nor its numeric-agreement score is a ground-truth label.
 
 ## Provenance and formats
 
