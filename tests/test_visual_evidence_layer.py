@@ -13,7 +13,7 @@ from unittest import mock
 
 from scripts.full_ocr_layer import Page, inventory_sha256
 from scripts.visual_evidence_layer import (METHOD, completed_shards, page_row,
-                                           shard_paths, verify_rows)
+                                           publish_shard, shard_paths, verify_rows)
 
 
 class VisualEvidenceLayerTests(unittest.TestCase):
@@ -102,6 +102,16 @@ class VisualEvidenceLayerTests(unittest.TestCase):
                         return_value={**metrics, "image_dark_pixels": 100}):
             with self.assertRaisesRegex(RuntimeError, "invalid rendered image"):
                 page_row(page, 250)
+
+    def test_failed_page_render_does_not_publish_partial_shard(self):
+        page = Page("a" * 64, 1, Path("source.pdf"))
+        with mock.patch("scripts.visual_evidence_layer.page_row",
+                        side_effect=RuntimeError("render timed out")), \
+             mock.patch("scripts.visual_evidence_layer._commit_with_retry") as commit:
+            with self.assertRaisesRegex(RuntimeError, "render timed out"):
+                publish_shard(mock.Mock(), "repo", "layers/test", [(0, page)],
+                              inventory_sha256([page]), 250, "token")
+        commit.assert_not_called()
 
 
 if __name__ == "__main__":
