@@ -57,12 +57,20 @@ def numeric_difference(candidate: str, tesseract: str) -> dict[str, list[str]]:
     }
 
 
+EMPTY_CODE_FENCE = re.compile(r"\A\s*```[^\n]*\n\s*```\s*\Z")
+
+
+def local_content_empty(text: str, markdown: str) -> bool:
+    """An empty LiteParse code block is formatting, not visible page content."""
+    return not text.strip() and (not markdown.strip() or bool(EMPTY_CODE_FENCE.fullmatch(markdown)))
+
+
 def audit_empty_ocr(transcript: str, *, visually_blank: bool,
-                    local: str, model: str | None) -> dict:
+                    local_empty: bool, model: str | None) -> dict:
     """Keep blank-page evidence distinct from failed OCR and model invention."""
     return {
         "empty_tesseract_on_visible_page": not transcript.strip() and not visually_blank,
-        "local_nonempty_on_blank_page": visually_blank and bool(local.strip()),
+        "local_nonempty_on_blank_page": visually_blank and not local_empty,
         "model_nonempty_on_blank_page": visually_blank and bool(model and model.strip()),
     }
 
@@ -96,7 +104,7 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     empty_candidates = [
         row for row in rows
         if row.get("local_markdown") is not None
-        and not row["local_markdown"].strip()
+        and row.get("local_content_empty", not row["local_markdown"].strip())
         and (row["document_sha256"], row["page_number"]) not in chosen
     ]
     for row in rng.sample(
@@ -152,7 +160,9 @@ def page_rows(store: Store, house: str, parliament: str, session: str) -> list[d
         model = (Path(response).with_name("adjudicated.md").read_text(encoding="utf-8")
                  if response else None)
         candidates.append({**dict(row), "separator_rows": separator_rows(page["markdown"]),
-                           "local_markdown": page["markdown"], "model_markdown": model,
+                           "local_text": page["text"], "local_markdown": page["markdown"],
+                           "local_content_empty": local_content_empty(
+                               page["text"], page["markdown"]), "model_markdown": model,
                            "model_numeric_disagreement": model is not None and
                            content_numbers(page["markdown"]) != content_numbers(model),
                            "model_raw_numeric_disagreement": model is not None and
@@ -197,7 +207,7 @@ def main() -> int:
                 "page_number": row["page_number"],
                 "liteparse_route": row["route"],
                 "liteparse_separator_rows": row["separator_rows"],
-                "local_text_empty": not row["local_markdown"].strip(),
+                "local_text_empty": row["local_content_empty"],
                 "selection_stratum": row["selection_stratum"],
                 "model_local_numeric_disagreement": row["model_numeric_disagreement"],
                 "model_local_raw_numeric_disagreement": row["model_raw_numeric_disagreement"],
@@ -218,7 +228,7 @@ def main() -> int:
                 transcript = result.stdout
                 record.update(audit_empty_ocr(
                     transcript, visually_blank=record["visually_blank"],
-                    local=row["local_markdown"], model=model,
+                    local_empty=row["local_content_empty"], model=model,
                 ))
                 if record["empty_tesseract_on_visible_page"]:
                     raise RuntimeError("Tesseract returned empty text on a visible page")

@@ -824,7 +824,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
   source-image review. An empty Tesseract transcript is accepted only when the
   rendered image has at most 25 pixels darker than 250/255; the report records
   the pixel count and flags nonempty local or model text on that visually blank
-  page. Empty OCR on a visible page still fails the audit. In LS 17/15,
+  page. LiteParse's empty Markdown code-fence wrapper does not count as local
+  content when its text field is empty. Empty OCR on a visible page still fails
+  the audit. In LS 17/15,
   official PDF `AU691.pdf` (SHA-256 `8c2e2bc9a131d7cce87c2f60247f6f1329e6615ddc52bd9996389b6825210386`)
   had an all-white third page: LiteParse and Tesseract were empty, while Space
   Bunny wrote `Y 1300 . Y 1301 .`. The model text remains stored as evidence

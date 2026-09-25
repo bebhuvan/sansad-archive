@@ -13,7 +13,8 @@ from sansad_pipeline.db import json_text
 from sansad_pipeline.image_quality import rendered_ink_metrics
 from sansad_pipeline.storage import Store, now
 from scripts.audit_ocr_layout import (
-    audit_empty_ocr, numeric_difference, page_rows, sample_rows, separator_rows, similarity,
+    audit_empty_ocr, local_content_empty, numeric_difference, page_rows,
+    sample_rows, separator_rows, similarity,
 )
 
 
@@ -26,7 +27,7 @@ class LayoutAuditTests(unittest.TestCase):
             self.assertTrue(metrics["visually_blank"])
             self.assertEqual(metrics["image_dark_pixels"], 0)
             audit = audit_empty_ocr("", visually_blank=metrics["visually_blank"],
-                                    local="", model="Y 1300 . Y 1301 .")
+                                    local_empty=True, model="Y 1300 . Y 1301 .")
             self.assertFalse(audit["empty_tesseract_on_visible_page"])
             self.assertTrue(audit["model_nonempty_on_blank_page"])
             self.assertFalse(audit["local_nonempty_on_blank_page"])
@@ -41,8 +42,13 @@ class LayoutAuditTests(unittest.TestCase):
             self.assertFalse(metrics["visually_blank"])
             self.assertGreater(metrics["image_dark_pixels"], 25)
             audit = audit_empty_ocr("", visually_blank=metrics["visually_blank"],
-                                    local="", model=None)
+                                    local_empty=True, model=None)
             self.assertTrue(audit["empty_tesseract_on_visible_page"])
+
+    def test_empty_liteparse_code_fence_is_not_content(self):
+        self.assertTrue(local_content_empty("", "```text\n\n```"))
+        self.assertFalse(local_content_empty("", "```text\nVisible word\n```"))
+        self.assertFalse(local_content_empty("Visible word", "```text\n\n```"))
 
     def test_probability_baseline_is_drawn_before_risk_enrichment(self):
         rows = [
@@ -151,7 +157,8 @@ class LayoutAuditTests(unittest.TestCase):
                 "AND name='idx_adjudications_page_provider'"
             ))
             artifact = root / "page.json"
-            artifact.write_text(json.dumps({"markdown": "| A | B |\n|---|---|"}), encoding="utf-8")
+            artifact.write_text(json.dumps({"text": "A B", "markdown": "| A | B |\n|---|---|"}),
+                                encoding="utf-8")
             run = store.db.execute(
                 """INSERT INTO runs(document_sha256,status,config_json,artifact_dir,started_at)
                    VALUES (?,'complete','{}',?,?)""",
@@ -208,6 +215,11 @@ class LayoutAuditTests(unittest.TestCase):
             rows = page_rows(store, "lok_sabha", "01", "I")
             self.assertFalse(rows[0]["model_numeric_disagreement"])
             self.assertTrue(rows[0]["model_raw_numeric_disagreement"])
+            artifact.write_text(json.dumps({"text": "", "markdown": "```text\n\n```"}),
+                                encoding="utf-8")
+            rows = page_rows(store, "lok_sabha", "01", "I")
+            self.assertTrue(rows[0]["local_content_empty"])
+            self.assertEqual(rows[0]["local_text"], "")
 
 
 if __name__ == "__main__":
