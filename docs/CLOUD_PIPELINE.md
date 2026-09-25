@@ -427,6 +427,23 @@ probe. Timestamp ties, deletions, server reindexing, and metadata edits still
 require page-boundary checks, an end-of-crawl ID/count reconciliation, and
 resumable dated shards before any full-refresh claim. The current incremental
 snapshot remains the active ingestion inventory until such a recrawl exists.
+The new **Reconcile eLibrary Lok Sabha census** workflow implements a bounded
+two-pass recrawl under `state/census/full-scan-2026-09-25/`. The first ascending
+pass writes normalized records in immutable 100-page HF shards, with page
+hashes, accession boundaries and remote byte verification. Repeated scheduled
+jobs resume from contiguous shard manifests. The second pass refetches the
+same fixed prefix and requires every normalized page hash to match, catching
+offset shifts and relevant metadata changes. It tolerates only new accessions
+appended beyond the starting count; an earlier insertion, deletion or edit
+fails closed. Before publication it checks the boundary pages again, verifies
+the complete first-pass file set, compares IDs against the dated base, and
+publishes a separate snapshot plus manifest with new/removed-ID counts.
+The official source does not provide transactionally frozen search results,
+so even two matching passes are evidence for a dated crawl, not a guarantee
+that the live site will never change. The final snapshot is not switched into
+historical ingestion automatically. A 100-record live ascending page probe
+returned 1,158,768 total items with monotonically increasing accession times;
+the 100-page cloud canary and full two-pass run still need to complete.
 Refresh run `36047393238` appended exactly 3,500 records to the August base
 and published `state/census/snapshot-2026-09-24T192308Z` (SHA-256
 `9c2efb8cdfb624398b8468faa82e1c5c771a7f28b8e808e056b3a266ad58aeb9`,
