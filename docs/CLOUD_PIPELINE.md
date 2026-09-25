@@ -1210,7 +1210,18 @@ checkpoint (22:12 and 22:10 UTC respectively).
   tranche `SHA256SUMS` exist on HF, including a 3,479,234,560-byte WebDataset
   tar whose remote LFS hash matches the recorded checksum. Separate all-page
   OCR run `36130084131` was dispatched after publication; its completion and
-  quality review remain pending.
+  quality review remained pending at that checkpoint. That OCR run subsequently
+  completed. An independent replay verified all 3,641 page keys in 37
+  checksum-matching shards, the completion marker and visual measurements on
+  every page. It found zero strictly near-white pages, zero empty OCR or model
+  transcripts on visibly inked pages, and no unprocessed OCR pages. The
+  run-published report is
+  `audits/full-ocr-model-visual/lok_sabha-p01-sIII/`
+  `ocr-pages-00003641-1f3a1261dfd46469.json`; its downloaded SHA-256 is
+  `1f3a1261dfd46469aab6d74913275c8cedb14d1b9cc9742eb2992902cc7202d9`.
+  Of the OCR rows, 2,117 reuse selected-local OCR and 1,524 are separate
+  executions of the same method. OCR/model visible-number differences on
+  3,462 pages remain a source-image review queue, not an error-rate estimate.
 
 ## Provenance and formats
 
