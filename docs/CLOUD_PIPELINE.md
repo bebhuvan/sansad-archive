@@ -1173,6 +1173,24 @@ checkpoint (22:12 and 22:10 UTC respectively).
   source-image review queue, not a model error rate or reason to switch
   canonical text automatically.
 
+- The scheduled full-OCR batch `36109890871` and direct provenance audit
+  `36109137755` exposed a marker-version failure on LS 01/II. Both sidecars
+  had complete, checksum-verified coverage of the same 2,151 published page
+  keys and the same raw-PDF inventory SHA-256, but a later publication had
+  changed the snapshot marker's byte hash. The OCR completion file had been
+  refreshed to the new marker; the immutable visual completion file still
+  named the earlier one. An exact marker-hash check therefore falsely failed
+  the audit. The audit, OCR/visual completion checks and OCR batch planner now
+  compare the stable marker path, checkpoint path and raw-PDF inventory hash,
+  while independently validating the current publication checksum, every
+  sidecar shard and exact page keys. A changed raw inventory still fails.
+  Existing completion files are left immutable when only the publication
+  marker bytes change; reports expose that marker-version difference. A local
+  replay on the actual LS 01/II HF artifacts passed all 2,151 pages and
+  reported `publication_marker_changed_since_sidecar=true` only for the visual
+  layer. Of its 2,151 OCR rows, 1,274 reuse the selected local OCR artifact
+  and 877 are new sidecar executions, so agreement is interpreted by origin.
+
 ## Provenance and formats
 
 Each publication tranche contains:

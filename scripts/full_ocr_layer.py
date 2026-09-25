@@ -151,6 +151,16 @@ def completion_evidence(repo: str, source: str, house: str, parliament: str,
             "checkpoint_path": checkpoint_path, "raw_inventory_sha256": raw_inventory}
 
 
+def same_source_pdf_inventory(saved: dict | None, current: dict) -> bool:
+    """Allow a republished marker only when its original PDF inventory is unchanged."""
+    if not isinstance(saved, dict):
+        return False
+    fields = ("path", "checkpoint_path", "raw_inventory_sha256")
+    return (all(saved.get(field) and saved.get(field) == current.get(field)
+                for field in fields)
+            and bool(re.fullmatch(r"[0-9a-f]{64}", saved["raw_inventory_sha256"])))
+
+
 def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
                       version: str) -> dict[str, int]:
     origins = {"selected-local-rasterized-ocr": 0, "sidecar-rasterized-ocr": 0}
@@ -430,9 +440,9 @@ def run(repo: str, source: str, house: str, parliament: str, session: str, *, ma
                                 if key != "completion_marker"}
                 new_identity = {key: value for key, value in completion.items()
                                 if key != "completion_marker"}
-                if old_identity != new_identity:
+                if (old_identity != new_identity or not same_source_pdf_inventory(
+                        saved.get("completion_marker"), marker)):
                     raise RuntimeError("existing OCR completion marker differs from verified inventory")
-                upload_completion = True
         if upload_completion:
             _commit_with_retry(api, repo=repo, operations=[CommitOperationAdd(
                 path_in_repo=completion_path,

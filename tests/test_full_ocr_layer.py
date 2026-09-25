@@ -12,7 +12,8 @@ from unittest import mock
 
 from sansad_pipeline.config import LiteParseConfig
 from scripts.full_ocr_layer import (Page, completed_shards, inventory_sha256,
-                                    ocr_rows, shard_paths, verify_shard_rows)
+                                    ocr_rows, same_source_pdf_inventory,
+                                    shard_paths, verify_shard_rows)
 from scripts.plan_full_ocr import plan
 
 
@@ -311,10 +312,30 @@ class FullOcrLayerTests(unittest.TestCase):
                     "source": "elibrary", "scope": "lok_sabha-p01-sII", "pages": 2,
                 }))
                 self.assertEqual(plan("repo", "token", house="lok_sabha",
+                                      max_scopes=2, api=FakeApi()), [])
+                complete.write_text(json.dumps({
+                    "completion_marker": {**evidence, "sha256": "old",
+                                          "raw_inventory_sha256": "c" * 64},
+                    "engine": "liteparse", "engine_version": "2.14.7",
+                    "source": "elibrary", "scope": "lok_sabha-p01-sII", "pages": 2,
+                }))
+                self.assertEqual(plan("repo", "token", house="lok_sabha",
                                       max_scopes=2, api=FakeApi()), [{
                     "source": "elibrary", "house": "lok_sabha",
                     "parliament": "01", "session": "II",
                 }])
+
+    def test_marker_republication_requires_same_pdf_inventory(self):
+        evidence = {"path": "marker.json", "sha256": "a" * 64,
+                    "checkpoint_path": "checkpoint.json",
+                    "raw_inventory_sha256": "b" * 64}
+        self.assertTrue(same_source_pdf_inventory(
+            {**evidence, "sha256": "c" * 64}, evidence))
+        self.assertFalse(same_source_pdf_inventory(
+            {**evidence, "raw_inventory_sha256": "d" * 64}, evidence))
+        self.assertFalse(same_source_pdf_inventory(
+            {**evidence, "checkpoint_path": "other.json"}, evidence))
+        self.assertFalse(same_source_pdf_inventory(None, evidence))
 
 
 if __name__ == "__main__":

@@ -23,7 +23,8 @@ from sansad_pipeline.config import load_config
 from sansad_pipeline.image_quality import rendered_ink_metrics, valid_image_metrics
 from sansad_pipeline.openrouter import render_page
 from scripts.cloud_state import _commit_with_retry, sha256_file
-from scripts.full_ocr_layer import Page, completion_evidence, inventory_sha256, scope_pages
+from scripts.full_ocr_layer import (Page, completion_evidence, inventory_sha256,
+                                    same_source_pdf_inventory, scope_pages)
 
 
 SHARD_PAGES = 100
@@ -196,7 +197,13 @@ def run(repo: str, source: str, house: str, parliament: str, session: str,
                 repo, path, repo_type="dataset", token=token,
             )).read_text(encoding="utf-8"))
             if saved != completion:
-                raise RuntimeError("existing visual completion marker differs from verified inventory")
+                old_identity = {field: value for field, value in saved.items()
+                                if field != "completion_marker"}
+                new_identity = {field: value for field, value in completion.items()
+                                if field != "completion_marker"}
+                if (old_identity != new_identity or not same_source_pdf_inventory(
+                        saved.get("completion_marker"), marker)):
+                    raise RuntimeError("existing visual completion marker differs from verified inventory")
         if upload:
             _commit_with_retry(api, repo=repo, operations=[CommitOperationAdd(
                 path_in_repo=path,

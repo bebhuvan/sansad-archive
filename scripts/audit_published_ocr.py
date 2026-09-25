@@ -23,7 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.image_quality import valid_image_metrics  # noqa: E402
 from sansad_pipeline.text_quality import local_content_empty  # noqa: E402
 from sansad_pipeline.validation import content_numbers  # noqa: E402
-from scripts.full_ocr_layer import (Page, completion_marker_path, inventory_sha256,
+from scripts.full_ocr_layer import (Page, completion_evidence, completion_marker_path,
+                                    inventory_sha256, same_source_pdf_inventory,
                                     shard_paths, verify_shard_rows)  # noqa: E402
 from scripts.cloud_state import _commit_with_retry  # noqa: E402
 from scripts.visual_evidence_layer import completed_shards as completed_visual_shards  # noqa: E402
@@ -88,7 +89,7 @@ def source_pages(repo: str, source: str, house: str, parliament: str,
 
 
 def sidecar_rows(repo: str, key: str, pages: list[dict], token: str | None,
-                 api: HfApi, marker_sha256: str) -> tuple[list[dict], dict]:
+                 api: HfApi, marker_evidence: dict) -> tuple[list[dict], dict]:
     identities = [Page(row["document_sha256"], row["page_number"], Path("unused"))
                   for row in pages]
     inventory = inventory_sha256(identities)
@@ -134,6 +135,7 @@ def sidecar_rows(repo: str, key: str, pages: list[dict], token: str | None,
         next_index = end + 1
     completion_path = root + "/complete.json"
     complete = completion_path in all_files
+    marker_changed = False
     if complete:
         completion = json.loads(Path(hf_hub_download(
             repo, completion_path, repo_type="dataset", token=token,
@@ -141,15 +143,19 @@ def sidecar_rows(repo: str, key: str, pages: list[dict], token: str | None,
         if (completion.get("inventory_sha256") != inventory
                 or completion.get("pages") != len(pages)
                 or completion.get("shards") != len(manifests)
-                or (completion.get("completion_marker") or {}).get("sha256") != marker_sha256
+                or not same_source_pdf_inventory(
+                    completion.get("completion_marker"), marker_evidence)
                 or next_index != len(pages)):
             raise RuntimeError("OCR completion marker disagrees with verified shard coverage")
+        marker_changed = (completion["completion_marker"].get("sha256")
+                          != marker_evidence["sha256"])
     return result, {"root": root, "inventory_sha256": inventory,
-                    "shards": len(manifests), "complete": complete}
+                    "shards": len(manifests), "complete": complete,
+                    "publication_marker_changed_since_sidecar": marker_changed}
 
 
 def visual_rows(repo: str, key: str, pages: list[dict], token: str | None,
-                api: HfApi, marker_sha256: str) -> tuple[list[dict], dict]:
+                api: HfApi, marker_evidence: dict) -> tuple[list[dict], dict]:
     identities = [Page(row["document_sha256"], row["page_number"], Path("unused"))
                   for row in pages]
     inventory = inventory_sha256(identities)
@@ -175,6 +181,7 @@ def visual_rows(repo: str, key: str, pages: list[dict], token: str | None,
             result.extend(json.loads(line) for line in handle)
     completion_path = root + "/complete.json"
     complete = completion_path in files
+    marker_changed = False
     if complete:
         completion = json.loads(Path(hf_hub_download(
             repo, completion_path, repo_type="dataset", token=token,
@@ -182,11 +189,15 @@ def visual_rows(repo: str, key: str, pages: list[dict], token: str | None,
         if (completion.get("inventory_sha256") != inventory
                 or completion.get("pages") != len(pages)
                 or completion.get("shards") != len(shards)
-                or (completion.get("completion_marker") or {}).get("sha256") != marker_sha256
+                or not same_source_pdf_inventory(
+                    completion.get("completion_marker"), marker_evidence)
                 or len(result) != len(pages)):
             raise RuntimeError("visual completion marker disagrees with verified page coverage")
+        marker_changed = (completion["completion_marker"].get("sha256")
+                          != marker_evidence["sha256"])
     return result, {"status": "complete" if complete else "checkpointed",
-                    "root": root, "shards": len(shards), "pages": len(result)}
+                    "root": root, "shards": len(shards), "pages": len(result),
+                    "publication_marker_changed_since_sidecar": marker_changed}
 
 
 def audit_layers(pages: list[dict], ocr_rows: list[dict],
@@ -378,11 +389,16 @@ def main() -> int:
         parser.error("--publish requires HF_TOKEN")
     pages, publication = source_pages(args.repo, args.source, args.house,
                                       args.parliament, args.session, token)
+    marker_evidence = completion_evidence(args.repo, args.source, args.house,
+                                          args.parliament, args.session, token,
+                                          HfApi(token=token))
+    if marker_evidence["sha256"] != publication["marker_sha256"]:
+        raise RuntimeError("publication marker changed during audit")
     key = f"{args.house}-p{args.parliament}-s{args.session}"
     ocr, sidecar = sidecar_rows(args.repo, key, pages, token,
-                                HfApi(token=token), publication["marker_sha256"])
+                                HfApi(token=token), marker_evidence)
     visual, visual_sidecar = visual_rows(args.repo, key, pages, token,
-                                         HfApi(token=token), publication["marker_sha256"])
+                                         HfApi(token=token), marker_evidence)
     report = {"scope": key, "source": args.source, "publication": publication,
               "ocr_sidecar": sidecar, "visual_sidecar": visual_sidecar,
               **audit_layers(pages, ocr, visual)}

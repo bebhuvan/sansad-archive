@@ -13,7 +13,7 @@ from huggingface_hub import HfApi, hf_hub_download
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.config import load_config  # noqa: E402
-from scripts.full_ocr_layer import completion_evidence  # noqa: E402
+from scripts.full_ocr_layer import completion_evidence, same_source_pdf_inventory  # noqa: E402
 
 
 MARKER = re.compile(
@@ -46,7 +46,7 @@ def plan(repo: str, token: str, *, house: str, max_scopes: int,
         for complete_path in complete_paths:
             manifest = json.loads(Path(hf_hub_download(
                 repo, complete_path, repo_type="dataset", token=token)).read_text())
-            if (manifest.get("completion_marker") == evidence
+            if (same_source_pdf_inventory(manifest.get("completion_marker"), evidence)
                     and manifest.get("engine") == "liteparse"
                     and manifest.get("engine_version") == version
                     and manifest.get("source") == source
