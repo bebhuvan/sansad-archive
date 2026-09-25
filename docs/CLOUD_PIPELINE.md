@@ -1042,8 +1042,13 @@ checkpoint (22:12 and 22:10 UTC respectively).
   The first LS 17/15 full-OCR continuation `36087115763` safely checkpointed
   2,000 of 4,756 pages; a later 100-page shard took much longer than earlier
   shards but completed. Direct continuation `36093800075` was dispatched from
-  the bounded-renderer commit for the remaining 2,756 pages. No completion
-  claim is made until its remote shards and marker are independently checked.
+  the bounded-renderer commit for the remaining 2,756 pages. It failed before
+  its first new shard: isolated rendering no longer initialized LiteParse's
+  private tessdata cache in the parent process, and the parent OCR library
+  could not find `eng.traineddata`. The workflow now discovers the installed
+  `tesseract-ocr-eng` data file and exports its directory as `TESSDATA_PREFIX`.
+  A local image-only OCR test passed with that explicit setting. No completion
+  claim is made until the resumed cloud run and its remote shards are checked.
 
 ## Provenance and formats
 
