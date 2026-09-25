@@ -15,8 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Config
-from .image_quality import verified_blank_response
+from .image_quality import valid_blank_image_evidence, valid_image_metrics, verified_blank_response
 from .storage import Store
+from .text_quality import local_content_empty
 from .validation import text_flags
 
 
@@ -264,6 +265,7 @@ class PublicationBuilder:
                             "status": page["validation_status"],
                             "flags": list(page["validation_flags"]),
                         }
+                        page["visual_quality"] = None
                         adjudication = self.store.db.one(
                             """SELECT * FROM adjudications
                                WHERE run_id=? AND page_number=?
@@ -279,23 +281,34 @@ class PublicationBuilder:
                                     f"{page['page_number']}: {adjudicated_path}"
                                 )
                             model_markdown = adjudicated_path.read_text(encoding="utf-8")
+                            provenance_path = response_path.with_name("provenance.json")
+                            try:
+                                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+                            except (OSError, ValueError):
+                                provenance = None
+                            visual_quality = (provenance.get("visual_quality")
+                                              if isinstance(provenance, dict) else None)
+                            if visual_quality is not None and not valid_image_metrics(visual_quality):
+                                raise RuntimeError(
+                                    f"invalid model visual evidence for {digest} page "
+                                    f"{page['page_number']}: {provenance_path}"
+                                )
+                            page["visual_quality"] = visual_quality
                             if not model_markdown.strip():
-                                provenance_path = response_path.with_name("provenance.json")
-                                try:
-                                    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-                                except (OSError, ValueError):
-                                    provenance = None
                                 if not verified_blank_response(provenance):
                                     raise RuntimeError(
                                         f"model transcript empty without verified blank-page "
                                         f"evidence for {digest} page {page['page_number']}: "
                                         f"{adjudicated_path}"
                                     )
-                            flags = text_flags(
+                            flags = list(text_flags(
                                 model_markdown,
                                 reference=page["local_markdown"],
                                 config=self.config.validation,
-                            )
+                            ))
+                            if (valid_blank_image_evidence(visual_quality)
+                                    and model_markdown.strip()):
+                                flags.append("model-nonempty-on-visually-blank-page")
                             page["adjudicated_text"] = model_markdown
                             page["adjudicated_markdown"] = model_markdown
                             if canonical_policy == "model":
@@ -319,6 +332,18 @@ class PublicationBuilder:
                                 "created_at": adjudication["created_at"],
                                 "validation_flags": list(flags),
                             }
+                            if valid_blank_image_evidence(visual_quality):
+                                blank_flags = list(flags)
+                                if not local_content_empty(page["local_text"],
+                                                           page["local_markdown"]):
+                                    blank_flags.append("local-nonempty-on-visually-blank-page")
+                                page["markdown"] = ""
+                                page["text"] = ""
+                                page["canonical_source"] = "visual:verified-blank"
+                                page["canonical_validation"] = {
+                                    "status": "review" if blank_flags else "accepted",
+                                    "flags": blank_flags,
+                                }
                         publication_pages.append(page)
                     markdown = "\n\n".join(page["markdown"] for page in publication_pages)
                     plain_text = "\n\n".join(page["text"] for page in publication_pages)
@@ -539,6 +564,7 @@ class PublicationBuilder:
                                     page["adjudication"]["validation_flags"]
                                     if page["adjudication"] else []
                                 ),
+                                "visual_quality": page["visual_quality"],
                                 "canonical_source": page["canonical_source"],
                                 "canonical_status": page["canonical_validation"]["status"],
                                 "canonical_flags": page["canonical_validation"]["flags"],

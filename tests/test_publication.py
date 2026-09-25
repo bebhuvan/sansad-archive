@@ -230,6 +230,40 @@ class PublicationTests(unittest.TestCase):
                 canonical = archive.extractfile(f"{item.sha256}.md").read().decode("utf-8")
             self.assertEqual(canonical, "# Reviewed text")
 
+            provenance = review_dir / "provenance.json"
+            provenance.write_text(json.dumps({
+                "visual_quality": {"visually_blank": True, "image_pixels": 10000,
+                                   "image_dark_pixels": 0, "image_dark_pixel_cutoff": 250},
+            }), encoding="utf-8")
+            for policy in ("local", "model"):
+                blank_output = root / f"bundle-blank-hallucination-{policy}"
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), blank_output,
+                    minimum_pdf_saving_percent=100, canonical_policy=policy,
+                )
+                with tarfile.open(blank_output / "webdataset" / "shard-00000.tar") as archive:
+                    self.assertEqual(archive.extractfile(f"{item.sha256}.md").read(), b"")
+                    self.assertEqual(archive.extractfile(
+                        f"{item.sha256}.adjudicated.md").read(), b"# Reviewed text")
+                    saved_page = json.load(archive.extractfile(f"{item.sha256}.json"))["pages"][0]
+                self.assertEqual(saved_page["canonical_source"], "visual:verified-blank")
+                self.assertEqual(saved_page["canonical_validation"]["status"], "review")
+                self.assertIn("model-nonempty-on-visually-blank-page",
+                              saved_page["adjudication"]["validation_flags"])
+                self.assertIn("local-nonempty-on-visually-blank-page",
+                              saved_page["canonical_validation"]["flags"])
+                self.assertTrue(PublicationBuilder.verify(blank_output)["valid"])
+            provenance.write_text(json.dumps({
+                "visual_quality": {"visually_blank": True, "image_pixels": 10000,
+                                   "image_dark_pixels": 100, "image_dark_pixel_cutoff": 250},
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "invalid model visual evidence"):
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), root / "bundle-invalid-visual",
+                    minimum_pdf_saving_percent=100, canonical_policy="model",
+                )
+            provenance.unlink()
+
             compact_output = root / "bundle-compact"
             PublicationBuilder(config).build(
                 Scope("lok_sabha", "18", "8"), compact_output,

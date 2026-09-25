@@ -769,7 +769,13 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `text`/`markdown`. The canonical policy defaults to `local`, so the model
   layer can be compared against the parser/OCR layer across the whole corpus
   before anyone promotes it; set `canonical_policy=model` to make the stored
-  adjudication canonical. Space Bunny sees the local candidate as a prompt
+  adjudication canonical. A verified near-white page is an exception under
+  either policy: publication now emits empty canonical text, retains the raw
+  local and model layers, records the measured image metrics, and flags any
+  nonempty transcript for review. Invalid visual metrics fail publication.
+  This guard applies to newly built tranches; existing immutable tranches
+  remain unchanged and need an explicit corrected publication to gain it.
+  Space Bunny sees the local candidate as a prompt
   hint, so these are separate outputs but **not independent witnesses**.
   Independence requires source-image review or the optional separate-model
   audit; disagreement flags alone cannot decide which is correct.
@@ -833,7 +839,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   official PDF `AU691.pdf` (SHA-256 `8c2e2bc9a131d7cce87c2f60247f6f1329e6615ddc52bd9996389b6825210386`)
   had an all-white third page: LiteParse and Tesseract were empty, while Space
   Bunny wrote `Y 1300 . Y 1301 .`. The model text remains stored as evidence
-  and is explicitly flagged; canonical local text stays empty.
+  and is explicitly flagged; canonical local text stays empty. A subsequent
+  verified HF audit covered 4,500 of 4,756 LS 17/15 pages and found 33
+  visually near-white pages, all with nonempty Space Bunny text; none had
+  nonempty local or full-OCR text. The full visual layer was still running at
+  this checkpoint, so these are interim counts, not the session's final total.
   The first local end-to-end audit on a 1952 scan selected
   one page from five OCR candidates, completed in 8.2 seconds with no error,
   and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
