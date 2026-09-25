@@ -388,6 +388,9 @@ page. When the selected local artifact already came from the same rasterized
 OCR method and identical LiteParse settings, its identity is checked and its
 transcript reused. All other pages get fresh image-only OCR. Every new row
 records its origin; reused rows also carry the selected artifact's SHA-256.
+An empty OCR transcript is stored only when a fresh render is verified as
+visually blank, with ink-pixel evidence in the row; empty OCR on a visible
+page still stops the shard.
 It writes immutable 100-page shards under `layers/full-ocr/<scope>/` on
 Hugging Face, verifies their page keys and hashes on resume, and never changes
 the selected local or Space Bunny text. Dispatch it only after acquisition and
