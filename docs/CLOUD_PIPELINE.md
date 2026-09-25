@@ -841,8 +841,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
   rendered image has at most 25 pixels darker than 250/255; the report records
   the pixel count and flags nonempty local or model text on that visually blank
   page. LiteParse's empty Markdown code-fence wrapper does not count as local
-  content when its text field is empty. Empty OCR on a visible page still fails
-  the audit. In LS 17/15,
+  content when its text field is empty. This sampled canary fails on empty OCR
+  from a visibly inked page; the full sidecar retains such a row with a
+  page-keyed review flag so one OCR miss cannot block the corpus. In LS 17/15,
   official PDF `AU691.pdf` (SHA-256 `8c2e2bc9a131d7cce87c2f60247f6f1329e6615ddc52bd9996389b6825210386`)
   had an all-white third page: LiteParse and Tesseract were empty, while Space
   Bunny wrote `Y 1300 . Y 1301 .`. The model text remains stored as evidence
@@ -944,7 +945,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
 - Full image-only LiteParse OCR shards produced by the updated extractor record
   rendered-image ink metrics for every page, including nonempty OCR output.
   `ocr-nonempty-on-visually-blank-page` flags possible OCR invention without
-  rewriting the transcript. The screenshot used for image-only OCR supplies
+  rewriting the transcript. `ocr-empty-on-visibly-nonblank-page` records an OCR
+  omission while preserving the empty text and the independent local/model
+  layers. Neither flag adjudicates what the page says. The screenshot used for image-only OCR supplies
   the metrics; reused selected-local OCR is rendered independently. Existing
   shards remain immutable and resumable, so an in-flight sidecar can contain
   older shards without all-page metrics. Absence of that evidence is not a
@@ -955,7 +958,7 @@ checkpoint (22:12 and 22:10 UTC respectively).
   under `audits/full-ocr-model-visual/<scope>/`. The report distinguishes OCR
   pages not yet processed, older OCR rows without image metrics, visually
   assessed pages, blank-page conflicts for each text layer, and empty model
-  transcripts on visibly inked pages as a separate review queue. The latter
+  transcripts and empty OCR on visibly inked pages as separate review queues. These
   does not call OCR or the image heuristic transcription ground truth. These
   counts are evidence from the measured subset, never a corpus-wide accuracy
   rate.
@@ -1099,6 +1102,19 @@ checkpoint (22:12 and 22:10 UTC respectively).
   local/model equal only, 323 local/OCR equal only, 34 model/OCR equal only,
   and 300 all different. Blank-page and empty-model-on-visible findings
   remained 33 and zero respectively.
+  The OCR continuation `36094489013` later stopped at LS 17/15 original
+  `AU951.pdf`, page 2 (SHA-256
+  `bf29f96793d0d058b8c50ad4facd5579eaeb13920f0d4b3341083fe387990a44`).
+  The 250-dpi render contains a small centred `*****` mark (531 dark pixels)
+  and the PDF text layer contains `*****`, but LiteParse returned empty text and
+  an empty fenced Markdown block. Alternate Tesseract page-segmentation modes
+  misread the mark as letters, so substituting them would manufacture text.
+  The sidecar now permits an empty OCR transcript only with measured image
+  evidence and the exact `ocr-empty-on-visibly-nonblank-page` review flag;
+  shard replay validates both. This is a general omission policy, not an
+  exception keyed to that PDF. Its original, local extraction and model text
+  remain untouched. The audit excludes the empty fenced block from numeric
+  comparisons and reports this class separately.
 
 ## Provenance and formats
 

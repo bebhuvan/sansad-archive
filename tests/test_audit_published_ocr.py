@@ -78,6 +78,21 @@ class PublishedOcrAuditTests(unittest.TestCase):
         self.assertEqual(result["published_pages_without_visual_metrics"], 1)
         self.assertEqual(result["visually_blank_pages_among_assessed"], 0)
 
+    def test_empty_ocr_wrapper_on_visible_page_is_reviewed_not_numeric_witness(self):
+        digest = "a" * 64
+        pages = [{"document_sha256": digest, "page_number": 1,
+                  "local_text": "*****", "local_markdown": "*****",
+                  "adjudicated_markdown": "*****"}]
+        ocr = [{"document_sha256": digest, "page_number": 1,
+                "text": "", "markdown": "```text\n\n```",
+                "quality_flags": ["ocr-empty-on-visibly-nonblank-page"],
+                "image_pixels": 10000, "image_dark_pixels": 531,
+                "image_dark_pixel_cutoff": 250, "visually_blank": False}]
+        result = audit_layers(pages, ocr)
+        self.assertEqual(result["ocr_empty_on_visible_pages"], 1)
+        self.assertEqual(result["ocr_model_numeric_pages_compared"], 0)
+        self.assertEqual(result["numeric_triad_pages_compared"], 0)
+
     def test_disagreeing_ocr_and_backfill_pixels_fail_closed(self):
         digest = "a" * 64
         pages = [{"document_sha256": digest, "page_number": 1,

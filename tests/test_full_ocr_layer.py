@@ -182,7 +182,7 @@ class FullOcrLayerTests(unittest.TestCase):
         )])
         metrics = {"image_pixels": 10000, "image_dark_pixels": 0,
                    "image_dark_pixel_cutoff": 250, "visually_blank": True}
-        with mock.patch("scripts.full_ocr_layer.blank_page_metrics", return_value=metrics):
+        with mock.patch("scripts.full_ocr_layer.page_image_metrics", return_value=metrics):
             rows = ocr_rows(engine, [page])
         self.assertEqual(rows[0]["text"], "")
         self.assertTrue(rows[0]["visually_blank"])
@@ -233,7 +233,7 @@ class FullOcrLayerTests(unittest.TestCase):
                 "selected-local-rasterized-ocr": 0, "sidecar-rasterized-ocr": 1,
             })
 
-    def test_empty_ocr_on_visible_page_still_fails(self):
+    def test_empty_ocr_on_visible_page_is_flagged_and_verifiable(self):
         page = Page("a" * 64, 1, Path("visible.pdf"))
         engine = FakeEngine()
         engine.extract = mock.Mock(return_value=[SimpleNamespace(
@@ -245,8 +245,19 @@ class FullOcrLayerTests(unittest.TestCase):
                  "image_dark_pixel_cutoff": 250, "visually_blank": False,
              }):
             render.return_value = Path("unused.png")
-            with self.assertRaisesRegex(RuntimeError, "visible page"):
-                ocr_rows(engine, [page])
+            row = ocr_rows(engine, [page])[0]
+        self.assertFalse(row["visually_blank"])
+        self.assertEqual(row["quality_flags"], ["ocr-empty-on-visibly-nonblank-page"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "part.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            verify_shard_rows(path, [page], 0, 0, engine.version)
+            row["quality_flags"] = []
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            with self.assertRaisesRegex(RuntimeError, "invalid page"):
+                verify_shard_rows(path, [page], 0, 0, engine.version)
 
     def test_reused_blank_image_ocr_keeps_artifact_provenance(self):
         digest = "a" * 64
@@ -262,7 +273,7 @@ class FullOcrLayerTests(unittest.TestCase):
                         json.dumps({"liteparse": asdict(engine.config.liteparse)}))
             metrics = {"image_pixels": 10000, "image_dark_pixels": 0,
                        "image_dark_pixel_cutoff": 250, "visually_blank": True}
-            with mock.patch("scripts.full_ocr_layer.blank_page_metrics", return_value=metrics):
+            with mock.patch("scripts.full_ocr_layer.page_image_metrics", return_value=metrics):
                 row = ocr_rows(engine, [page])[0]
             self.assertEqual(engine.calls, [])
             self.assertEqual(row["origin"], "selected-local-rasterized-ocr")

@@ -198,6 +198,7 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
         raise RuntimeError("visual rows exceed published page inventory")
     flags: list[dict] = []
     model_empty_visible: list[dict] = []
+    ocr_empty_visible: list[dict] = []
     numeric_disagreements: list[dict] = []
     numeric_compared = 0
     triad_counts = {name: 0 for name in (
@@ -217,7 +218,10 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
         if visual is not None and key != (visual["document_sha256"], visual["page_number"]):
             raise RuntimeError(f"visual/published page identity mismatch at index {index}")
         model_text = str(published["adjudicated_markdown"] or "")
-        ocr_text = str((ocr or {}).get("markdown") or (ocr or {}).get("text") or "")
+        ocr_plain = str((ocr or {}).get("text") or "")
+        ocr_markdown = str((ocr or {}).get("markdown") or "")
+        ocr_text = ("" if local_content_empty(ocr_plain, ocr_markdown)
+                    else ocr_markdown or ocr_plain)
         if ocr is not None and ocr_text.strip() and model_text.strip():
             numeric_compared += 1
             ocr_numbers = content_numbers(ocr_text)
@@ -270,6 +274,12 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             continue
         measured += 1
         if not metrics["visually_blank"]:
+            if ocr is not None and not ocr_text.strip():
+                ocr_empty_visible.append({
+                    "document_sha256": key[0], "page_number": key[1],
+                    "image_dark_pixels": metrics["image_dark_pixels"],
+                    "image_pixels": metrics["image_pixels"],
+                })
             if not model_text.strip():
                 model_empty_visible.append({
                     "document_sha256": key[0], "page_number": key[1],
@@ -302,6 +312,8 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             "conflict_counts": counts, "conflicts": flags,
             "model_empty_on_visible_pages": len(model_empty_visible),
             "model_empty_on_visible": model_empty_visible,
+            "ocr_empty_on_visible_pages": len(ocr_empty_visible),
+            "ocr_empty_on_visible": ocr_empty_visible,
             "ocr_model_numeric_pages_compared": numeric_compared,
             "ocr_model_numeric_disagreement_pages": len(numeric_disagreements),
             "ocr_model_numeric_disagreements": numeric_disagreements,
@@ -367,6 +379,7 @@ def main() -> int:
         "ocr_pages_without_visual_metrics", "published_pages_without_visual_metrics",
         "visually_blank_pages_among_assessed", "conflict_counts",
         "model_empty_on_visible_pages",
+        "ocr_empty_on_visible_pages",
         "ocr_model_numeric_pages_compared", "ocr_model_numeric_disagreement_pages",
         "numeric_triad_pages_compared", "numeric_triad_pattern_counts",
     )} | {"report_path": published}))

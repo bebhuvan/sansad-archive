@@ -164,14 +164,16 @@ def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
             blank = not str(row.get("text") or "").strip()
             has_visual_metrics = "visually_blank" in row
             blank_evidence = valid_blank_image_evidence(row)
-            expected_flags = (["ocr-nonempty-on-visually-blank-page"]
-                              if row.get("visually_blank") is True and not blank else [])
+            expected_flags = visual_flags(row, str(row.get("text") or "")) if has_visual_metrics else []
+            empty_visible_evidence = (has_visual_metrics and valid_image_metrics(row)
+                                      and row["visually_blank"] is False
+                                      and row.get("quality_flags") == expected_flags)
             if (row.get("document_sha256") != page.document_sha256
                     or row.get("page_number") != page.page_number
                     or row.get("engine") != "liteparse"
                     or row.get("engine_version") != version
                     or row.get("method") != "image-only-rasterized-ocr"
-                    or (blank and not blank_evidence)
+                    or (blank and not (blank_evidence or empty_visible_evidence))
                     or (has_visual_metrics and not valid_image_metrics(row))
                     or ("quality_flags" in row and row["quality_flags"] != expected_flags)
                     or row.get("origin", "sidecar-rasterized-ocr") not in
@@ -242,16 +244,12 @@ def page_image_metrics(page: Page, dpi: int) -> dict:
     return metrics
 
 
-def blank_page_metrics(page: Page, dpi: int) -> dict:
-    metrics = page_image_metrics(page, dpi)
-    if not metrics["visually_blank"]:
-        raise RuntimeError(f"LiteParse OCR returned empty text on a visible page: {page.key}")
-    return metrics
-
-
 def visual_flags(metrics: dict, text: str) -> list[str]:
-    return (["ocr-nonempty-on-visually-blank-page"]
-            if metrics["visually_blank"] and text.strip() else [])
+    if metrics["visually_blank"] and text.strip():
+        return ["ocr-nonempty-on-visually-blank-page"]
+    if not metrics["visually_blank"] and not text.strip():
+        return ["ocr-empty-on-visibly-nonblank-page"]
+    return []
 
 
 def reusable_ocr_row(engine: LiteParseEngine, page: Page) -> dict | None:
@@ -280,9 +278,7 @@ def reusable_ocr_row(engine: LiteParseEngine, page: Page) -> dict | None:
     if "full-page-image" not in artifact.get("route_reasons", []):
         return None
     text = str(artifact.get("text") or "")
-    metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
-               if not text.strip() else
-               page_image_metrics(page, engine.config.liteparse.full_page_image_dpi))
+    metrics = page_image_metrics(page, engine.config.liteparse.full_page_image_dpi)
     return {
         "document_sha256": page.document_sha256,
         "page_number": page.page_number,
@@ -321,13 +317,9 @@ def ocr_rows(engine: LiteParseEngine, pages: list[Page]) -> list[dict]:
             item = by_number[page.page_number]
             metrics = getattr(item, "visual_quality", None)
             if metrics is None:
-                metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
-                           if not item.text.strip() else
-                           page_image_metrics(page, engine.config.liteparse.full_page_image_dpi))
+                metrics = page_image_metrics(page, engine.config.liteparse.full_page_image_dpi)
             elif not valid_image_metrics(metrics):
                 raise RuntimeError(f"invalid LiteParse screenshot metrics for {page.key}")
-            if not item.text.strip() and not valid_blank_image_evidence(metrics):
-                raise RuntimeError(f"LiteParse OCR returned empty text on a visible page: {page.key}")
             rows.append({
                 "document_sha256": page.document_sha256,
                 "page_number": page.page_number,
