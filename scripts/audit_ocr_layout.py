@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sansad_pipeline.config import load_config  # noqa: E402
+from sansad_pipeline.image_quality import rendered_ink_metrics  # noqa: E402
 from sansad_pipeline.openrouter import render_page  # noqa: E402
 from sansad_pipeline.storage import Store  # noqa: E402
 from sansad_pipeline.validation import content_numbers, numbers  # noqa: E402
@@ -53,6 +54,16 @@ def numeric_difference(candidate: str, tesseract: str) -> dict[str, list[str]]:
     return {
         "candidate_only": sorted((candidate_numbers - tesseract_numbers).elements()),
         "tesseract_only": sorted((tesseract_numbers - candidate_numbers).elements()),
+    }
+
+
+def audit_empty_ocr(transcript: str, *, visually_blank: bool,
+                    local: str, model: str | None) -> dict:
+    """Keep blank-page evidence distinct from failed OCR and model invention."""
+    return {
+        "empty_tesseract_on_visible_page": not transcript.strip() and not visually_blank,
+        "local_nonempty_on_blank_page": visually_blank and bool(local.strip()),
+        "model_nonempty_on_blank_page": visually_blank and bool(model and model.strip()),
     }
 
 
@@ -175,6 +186,8 @@ def main() -> int:
     report = args.output / "tesseract-layout-audit.jsonl"
     failures = 0
     model_pages = 0
+    blank_pages = 0
+    model_nonempty_on_blank_pages = 0
     with report.open("w", encoding="utf-8") as handle:
         for row in selected:
             model = row["model_markdown"]
@@ -197,13 +210,20 @@ def main() -> int:
                 with tempfile.TemporaryDirectory() as directory:
                     image = render_page(Path(row["raw_path"]), row["page_number"],
                                         Path(directory), config.liteparse.full_page_image_dpi)
+                    record.update(rendered_ink_metrics(image))
                     result = subprocess.run(
                         [executable, str(image), "stdout", "-l", "eng", "--psm", "3"],
                         capture_output=True, text=True, timeout=180, check=True,
                     )
                 transcript = result.stdout
-                if not transcript.strip():
-                    raise RuntimeError("Tesseract returned empty text")
+                record.update(audit_empty_ocr(
+                    transcript, visually_blank=record["visually_blank"],
+                    local=row["local_markdown"], model=model,
+                ))
+                if record["empty_tesseract_on_visible_page"]:
+                    raise RuntimeError("Tesseract returned empty text on a visible page")
+                if record["local_nonempty_on_blank_page"]:
+                    raise RuntimeError("selected local text is nonempty on a visually blank page")
                 record.update({
                     "tesseract_text": transcript,
                     "tesseract_sha256": hashlib.sha256(transcript.encode("utf-8")).hexdigest(),
@@ -219,6 +239,8 @@ def main() -> int:
             except (OSError, subprocess.SubprocessError, RuntimeError) as error:
                 failures += 1
                 record["error"] = f"{type(error).__name__}: {error}"
+            blank_pages += bool(record.get("visually_blank"))
+            model_nonempty_on_blank_pages += bool(record.get("model_nonempty_on_blank_page"))
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     summary = {
         "scope": {"house": args.house, "parliament": args.parliament, "session": args.session},
@@ -227,6 +249,8 @@ def main() -> int:
                                 for route in sorted({row["route"] for row in candidates})},
         "sampled": len(selected),
         "model_pages": model_pages, "failures": failures,
+        "visually_blank_pages": blank_pages,
+        "model_nonempty_on_blank_pages": model_nonempty_on_blank_pages,
         "selection_strata": {reason: sum(row["selection_stratum"] == reason for row in selected)
                              for reason in sorted({row["selection_stratum"] for row in selected})},
         "report": report.name, "tesseract_version": version,

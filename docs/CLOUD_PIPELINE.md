@@ -821,7 +821,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   disagreement under the run's `verification/`
   path. This is non-mutating evidence, not an automatic canonical-text switch;
   OCR and Space Bunny can both make errors, so disputed pages still require
-  source-image review. The first local end-to-end audit on a 1952 scan selected
+  source-image review. An empty Tesseract transcript is accepted only when the
+  rendered image has at most 25 pixels darker than 250/255; the report records
+  the pixel count and flags nonempty local or model text on that visually blank
+  page. Empty OCR on a visible page still fails the audit. In LS 17/15,
+  official PDF `AU691.pdf` (SHA-256 `8c2e2bc9a131d7cce87c2f60247f6f1329e6615ddc52bd9996389b6825210386`)
+  had an all-white third page: LiteParse and Tesseract were empty, while Space
+  Bunny wrote `Y 1300 . Y 1301 .`. The model text remains stored as evidence
+  and is explicitly flagged; canonical local text stays empty.
+  The first local end-to-end audit on a 1952 scan selected
   one page from five OCR candidates, completed in 8.2 seconds with no error,
   and reported text similarity 0.3625 to LiteParse Markdown versus 0.9429 to
   the stored model transcription. Both numeric comparisons disagreed with

@@ -6,17 +6,44 @@ import random
 import tempfile
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from sansad_pipeline.config import Config, StorageConfig
 from sansad_pipeline.db import json_text
+from sansad_pipeline.image_quality import rendered_ink_metrics
 from sansad_pipeline.storage import Store, now
 from scripts.audit_ocr_layout import (
-    numeric_difference, page_rows, sample_rows, separator_rows, similarity,
+    audit_empty_ocr, numeric_difference, page_rows, sample_rows, separator_rows, similarity,
 )
 
 
 class LayoutAuditTests(unittest.TestCase):
+    def test_blank_image_and_spurious_model_text_are_recorded_without_ocr_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "page.png"
+            Image.new("RGB", (100, 100), "white").save(path)
+            metrics = rendered_ink_metrics(path)
+            self.assertTrue(metrics["visually_blank"])
+            self.assertEqual(metrics["image_dark_pixels"], 0)
+            audit = audit_empty_ocr("", visually_blank=metrics["visually_blank"],
+                                    local="", model="Y 1300 . Y 1301 .")
+            self.assertFalse(audit["empty_tesseract_on_visible_page"])
+            self.assertTrue(audit["model_nonempty_on_blank_page"])
+            self.assertFalse(audit["local_nonempty_on_blank_page"])
+
+    def test_empty_ocr_on_visible_or_faint_image_is_a_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "page.png"
+            image = Image.new("RGB", (100, 100), "white")
+            ImageDraw.Draw(image).rectangle((10, 10, 20, 20), fill=(245, 245, 245))
+            image.save(path)
+            metrics = rendered_ink_metrics(path)
+            self.assertFalse(metrics["visually_blank"])
+            self.assertGreater(metrics["image_dark_pixels"], 25)
+            audit = audit_empty_ocr("", visually_blank=metrics["visually_blank"],
+                                    local="", model=None)
+            self.assertTrue(audit["empty_tesseract_on_visible_page"])
+
     def test_probability_baseline_is_drawn_before_risk_enrichment(self):
         rows = [
             {"document_sha256": f"{number:064x}", "page_number": 1,
