@@ -12,6 +12,20 @@ from scripts import cloud_state
 
 
 class CloudStateTests(unittest.TestCase):
+    def test_save_log_summary_excludes_large_raw_index(self):
+        manifest = {
+            "version": 3, "created_at": "now", "files": 10,
+            "archive_bytes": 1234, "raw_shards": [{"path": "raw.tar.zst"}],
+            "raw_index": {f"file-{number}.pdf": {"sha256": "x" * 64}
+                          for number in range(1000)},
+            "commit_url": "https://example.test/commit",
+        }
+        summary = cloud_state.save_log_summary(manifest)
+        self.assertEqual(summary["raw_pdfs"], 1000)
+        self.assertEqual(summary["raw_shards"], 1)
+        self.assertNotIn("raw_index", summary)
+        self.assertLess(len(json.dumps(summary)), 300)
+
     def test_v2_raw_archive_migrates_to_incremental_shards_without_reupload(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

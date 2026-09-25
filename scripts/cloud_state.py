@@ -357,6 +357,19 @@ def upload_run(repo: str, path_in_repo: str, *, token: str | None) -> dict:
     return {"files": len(operations), "commit_url": str(commit.commit_url)}
 
 
+def save_log_summary(manifest: dict) -> dict:
+    """Keep Actions logs useful without echoing the per-PDF raw index."""
+    return {
+        "version": manifest.get("version"),
+        "created_at": manifest.get("created_at"),
+        "files": manifest.get("files"),
+        "archive_bytes": manifest.get("archive_bytes"),
+        "raw_shards": len(manifest.get("raw_shards") or []),
+        "raw_pdfs": len(manifest.get("raw_index") or {}),
+        "commit_url": manifest.get("commit_url"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -390,7 +403,7 @@ def main() -> int:
 
     token = os.environ.get("HF_TOKEN") or None
     if args.command == "save":
-        print(json.dumps(save(args.repo, args.path_in_repo, token=token), indent=2))
+        print(json.dumps(save_log_summary(save(args.repo, args.path_in_repo, token=token))))
     elif args.command == "restore":
         print(json.dumps(restore(args.repo, args.path_in_repo, token=token), indent=2))
     elif args.command == "upload-dir":

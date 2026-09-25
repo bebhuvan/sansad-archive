@@ -23,6 +23,10 @@ The published WebDataset shard stores each selected official PDF as
 Publication verification rehashes the embedded PDF and requires its SHA-256 to
 match the manifest key; the remote verifier checks uploaded file identities.
 The HF checkpoint also retains immutable raw-PDF shards for resumability.
+The on-Hub checkpoint manifest keeps the full per-PDF hash index. The Actions
+save command prints only its counts, archive size, shard count and commit URL;
+dumping thousands of raw-index entries into each model-chunk log made failure
+triage unnecessarily noisy.
 
 **eLibrary attachment completeness is a separate question from item coverage.**
 At 22:52 UTC on 2026-09-24, live item
