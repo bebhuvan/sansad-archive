@@ -805,16 +805,16 @@ checkpoint (22:12 and 22:10 UTC respectively).
   is a promising independent QA signal, not yet a validated corpus-wide
   replacement. Preserve the originals and both existing text layers while
   evaluating that signal on more layouts, including genuine tables.
-- Each future cloud pass samples up to twelve pages across native and OCR
-  routes for a separate, free Tesseract `--psm 3` image audit. When both routes
-  exist, it reserves one page from each before sampling LiteParse layout
-  suspects (three or more Markdown table separators), LiteParse/Space Bunny
-  visible-number disagreements, and a random remainder. Newer passes also
-  reserve up to two pages whose local Markdown is empty, then keep at least two
-  ordinary random pages when the twelve-page budget permits. Overlap and small
-  strata are filled from remaining pages.
-  The report records each page's selection stratum, so this deliberately
-  enriched sample is not mistaken for a representative error-rate estimate.
+- Each future cloud pass samples up to 24 pages for a separate, free
+  Tesseract `--psm 3` image audit. At least half are selected first by a
+  fixed-seed uniform random draw from all extracted pages and labelled
+  `random_baseline`. The remaining places cover a missing native/OCR route,
+  empty local text, LiteParse layout suspects (three or more Markdown table
+  separators), and LiteParse/Space Bunny visible-number disagreements. Any
+  unused places are labelled `random_fill`, not mixed into the probability
+  sample. The report records every selection stratum. Only the random baseline
+  is suitable for a prevalence estimate, and its small size still warrants
+  wide uncertainty; the enriched cases are for failure discovery.
   It uploads the independent transcript plus
   similarity/numeric-agreement diagnostics and both sides of each numeric
   disagreement under the run's `verification/`

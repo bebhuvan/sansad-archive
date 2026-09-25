@@ -290,7 +290,7 @@ jobs:
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           python scripts/audit_ocr_layout.py \
             --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
-            --sample 12 --output "results/verification/tesseract-$STAMP"
+            --sample 24 --output "results/verification/tesseract-$STAMP"
 
       - name: Scope status
         run: |

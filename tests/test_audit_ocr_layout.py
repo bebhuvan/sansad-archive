@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 import json
+import random
 import tempfile
 from pathlib import Path
 
@@ -16,6 +17,24 @@ from scripts.audit_ocr_layout import (
 
 
 class LayoutAuditTests(unittest.TestCase):
+    def test_probability_baseline_is_drawn_before_risk_enrichment(self):
+        rows = [
+            {"document_sha256": f"{number:064x}", "page_number": 1,
+             "route": "ocr" if number % 10 == 0 else "native",
+             "separator_rows": 4 if number < 20 else 0,
+             "model_numeric_disagreement": 20 <= number < 40,
+             "local_markdown": "" if number >= 95 else "Visible words"}
+            for number in range(100)
+        ]
+        selected = sample_rows(rows, 24, 42)
+        expected = {row["document_sha256"] for row in random.Random(42).sample(rows, 12)}
+        baseline = {row["document_sha256"] for row in selected
+                    if row["selection_stratum"] == "random_baseline"}
+        self.assertEqual(baseline, expected)
+        self.assertEqual(len(selected), 24)
+        self.assertEqual(len({(row["document_sha256"], row["page_number"])
+                              for row in selected}), 24)
+
     def test_separator_rows_do_not_count_prose_or_single_hyphens(self):
         markdown = "Prose with a hyphen\n| A | B |\n|---|:---:|\n| text | more |\n---"
         self.assertEqual(separator_rows(markdown), 1)
@@ -45,11 +64,13 @@ class LayoutAuditTests(unittest.TestCase):
         selected = sample_rows(rows, 9, 17)
         self.assertEqual(len(selected), 9)
         self.assertEqual(len({row["document_sha256"] for row in selected}), 9)
-        self.assertEqual(
-            {reason: sum(row["selection_stratum"] == reason for row in selected)
-             for reason in ("layout", "numeric", "random")},
-            {"layout": 3, "numeric": 3, "random": 3},
-        )
+        baseline = {row["document_sha256"] for row in random.Random(17).sample(rows, 4)}
+        self.assertEqual(baseline, {row["document_sha256"] for row in selected
+                                    if row["selection_stratum"] == "random_baseline"})
+        self.assertGreaterEqual(sum(row["selection_stratum"] == "layout"
+                                    for row in selected), 1)
+        self.assertGreaterEqual(sum(row["selection_stratum"] == "numeric"
+                                    for row in selected), 1)
         self.assertEqual(len(sample_rows(rows, 1, 17)), 1)
 
     def test_sample_includes_both_native_and_ocr_routes(self):
@@ -60,8 +81,8 @@ class LayoutAuditTests(unittest.TestCase):
         ]
         selected = sample_rows(rows, 12, 17)
         self.assertEqual({row["route"] for row in selected}, {"ocr", "native"})
-        self.assertEqual(sum(row["selection_stratum"] == "route_baseline"
-                             for row in selected), 2)
+        self.assertGreaterEqual(sum(row["selection_stratum"] == "random_baseline"
+                                    for row in selected), 6)
         self.assertEqual(len(selected), 12)
 
     def test_sample_checks_empty_local_text_without_losing_random_baseline(self):
@@ -77,8 +98,8 @@ class LayoutAuditTests(unittest.TestCase):
         self.assertEqual(len(selected), 12)
         self.assertEqual(sum(row["selection_stratum"] == "empty_local_text"
                              for row in selected), 2)
-        self.assertGreaterEqual(sum(row["selection_stratum"] == "random"
-                                    for row in selected), 2)
+        self.assertGreaterEqual(sum(row["selection_stratum"] == "random_baseline"
+                                    for row in selected), 6)
         self.assertEqual({row["route"] for row in selected}, {"ocr", "native"})
 
     def test_similarity_is_format_tolerant_but_not_a_truth_claim(self):

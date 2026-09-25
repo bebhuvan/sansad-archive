@@ -62,12 +62,23 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     rng = random.Random(seed)
     selected: list[dict] = []
     chosen: set[tuple[str, int]] = set()
+    # Keep an interpretable probability sample separate from deliberately
+    # enriched error cases. Aggregate scores across both strata are biased.
+    baseline = rng.sample(rows, min(len(rows), max(1, count // 2)))
+    for row in baseline:
+        selected.append({**row, "selection_stratum": "random_baseline"})
+        chosen.add((row["document_sha256"], row["page_number"]))
     routes = sorted({row.get("route") for row in rows if row.get("route")})
     if len(routes) > 1:
         for route in rng.sample(routes, len(routes)):
             if len(selected) >= count:
                 break
-            candidates = [row for row in rows if row.get("route") == route]
+            if any(row.get("route") == route for row in selected):
+                continue
+            candidates = [row for row in rows if row.get("route") == route
+                          and (row["document_sha256"], row["page_number"]) not in chosen]
+            if not candidates:
+                continue
             row = rng.choice(candidates)
             selected.append({**row, "selection_stratum": "route_baseline"})
             chosen.add((row["document_sha256"], row["page_number"]))
@@ -82,12 +93,11 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
     ):
         selected.append({**row, "selection_stratum": "empty_local_text"})
         chosen.add((row["document_sha256"], row["page_number"]))
-    # Reserve two ordinary pages for a baseline after selecting error suspects.
-    quota = max(1, (count - len(selected) - 2) // 2)
-    for reason, candidates in (
+    for index, (reason, candidates) in enumerate((
         ("layout", [row for row in rows if row["separator_rows"] >= 3]),
         ("numeric", [row for row in rows if row.get("model_numeric_disagreement")]),
-    ):
+    )):
+        quota = (count - len(selected) + (1 - index)) // (2 - index)
         remaining = [row for row in candidates
                      if (row["document_sha256"], row["page_number"]) not in chosen]
         for row in rng.sample(remaining, min(len(remaining), quota, count - len(selected))):
@@ -95,7 +105,7 @@ def sample_rows(rows: list[dict], count: int, seed: int) -> list[dict]:
             chosen.add((row["document_sha256"], row["page_number"]))
     remaining = [row for row in rows
                  if (row["document_sha256"], row["page_number"]) not in chosen]
-    selected.extend({**row, "selection_stratum": "random"}
+    selected.extend({**row, "selection_stratum": "random_fill"}
                     for row in rng.sample(remaining, min(len(remaining), count - len(selected))))
     return sorted(selected, key=lambda row: (row["document_sha256"], row["page_number"]))
 
