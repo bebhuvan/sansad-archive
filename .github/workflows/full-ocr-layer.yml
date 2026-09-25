@@ -93,3 +93,8 @@ jobs:
             --source "$SOURCE" --house "$HOUSE" \
             --parliament "$PARLIAMENT" --session "$SESSION" \
             --max-pages "$MAX_PAGES"
+      - name: Audit published local and Space Bunny layers against OCR visual evidence
+        run: |
+          python scripts/audit_published_ocr.py --repo "$HF_REPO" \
+            --source "$SOURCE" --house "$HOUSE" \
+            --parliament "$PARLIAMENT" --session "$SESSION" --publish

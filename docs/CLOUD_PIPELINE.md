@@ -929,6 +929,13 @@ checkpoint (22:12 and 22:10 UTC respectively).
   shards remain immutable and resumable, so an in-flight sidecar can contain
   older shards without all-page metrics. Absence of that evidence is not a
   clean-page finding; retrospective all-page audits remain necessary.
+- After each bounded full-OCR continuation, `scripts/audit_published_ocr.py`
+  checks the published `pages.parquet` SHA-256, OCR shard SHA-256s, exact page
+  identities and separate local/model text. It publishes an immutable report
+  under `audits/full-ocr-model-visual/<scope>/`. The report distinguishes OCR
+  pages not yet processed, older OCR rows without image metrics, visually
+  assessed pages, and blank-page conflicts for each text layer. These counts
+  are evidence from the measured subset, never a corpus-wide accuracy rate.
 
 ### Verified 2026-09-25 milestones
 
@@ -942,6 +949,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   canonical local text is empty. This run predates the per-page visual flags;
   the sampled audit report identifies the five cases, not every such page in
   the scope. Completion is coverage evidence, not an accuracy certificate.
+- A read-only join against the first 800 LS 17/15 full-OCR sidecar rows verified
+  six OCR-empty, visually blank pages; Space Bunny text was nonempty on all
+  six. The other 794 older rows lacked image metrics, and 3,956 pages had no
+  OCR sidecar yet. This is a confirmed conflict list, not a prevalence estimate.
 - LS 01/II's separate full image-only LiteParse OCR sidecar completed in run
   `36085913818`: 2,151 unique page keys in 22 contiguous shards. All remote
   shard sizes and SHA-256 hashes were independently rechecked, as were the

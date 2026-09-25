@@ -1,0 +1,52 @@
+name: Audit published OCR and Space Bunny layers
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Published source family
+        type: choice
+        options: [current, elibrary]
+        required: true
+      house:
+        description: House
+        type: choice
+        options: [lok_sabha, rajya_sabha]
+        required: true
+      parliament:
+        description: Parliament label
+        type: string
+        required: true
+      session:
+        description: Session label
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_REPO: ${{ vars.HF_DATASET_REPO }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SOURCE: ${{ inputs.source }}
+      HOUSE: ${{ inputs.house }}
+      PARLIAMENT: ${{ inputs.parliament }}
+      SESSION: ${{ inputs.session }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install audit dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Audit and publish immutable report
+        run: |
+          test -n "$HF_REPO"
+          test -n "$HF_TOKEN"
+          python scripts/audit_published_ocr.py --repo "$HF_REPO" \
+            --source "$SOURCE" --house "$HOUSE" \
+            --parliament "$PARLIAMENT" --session "$SESSION" --publish
