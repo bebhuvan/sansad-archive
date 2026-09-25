@@ -28,7 +28,9 @@ blocks; do not translate them.
 Preserve reading order, headings, question/answer labels, table rows and columns,
 punctuation, decimal points, signs, and footnotes. Never calculate, normalize,
 summarize, or silently repair a number. If a character or cell is illegible, use
-[ILLEGIBLE] instead of guessing. Return only the transcription Markdown.
+[ILLEGIBLE] instead of guessing. If the page is blank, return an empty response:
+do not write [ILLEGIBLE], "blank page", a heading, or any explanation.
+Return only the transcription Markdown.
 
 The local parser produced the following candidate. Use the page image as the
 authority and correct the candidate where necessary:
@@ -45,7 +47,9 @@ blocks; do not translate them.
 Preserve reading order, headings, question/answer labels, table rows and columns,
 punctuation, decimal points, signs, and footnotes. Never calculate, normalize,
 summarize, or silently repair a number. If a character or cell is illegible, use
-[ILLEGIBLE] instead of guessing. Return only the transcription Markdown."""
+[ILLEGIBLE] instead of guessing. If the page is blank, return an empty response:
+do not write [ILLEGIBLE], "blank page", a heading, or any explanation.
+Return only the transcription Markdown."""
 
 
 def local_candidate(local: dict) -> str:

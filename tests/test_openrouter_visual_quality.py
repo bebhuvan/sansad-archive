@@ -10,11 +10,17 @@ from unittest.mock import patch
 from PIL import Image
 
 from sansad_pipeline.config import Config, OpenRouterConfig, StorageConfig
-from sansad_pipeline.openrouter import (OpenRouterAdjudicator, local_candidate,
+from sansad_pipeline.openrouter import (BASE_PROMPT, PROMPT, OpenRouterAdjudicator,
+                                        local_candidate,
                                         visual_quality_flags)
 
 
 class OpenRouterVisualQualityTests(unittest.TestCase):
+    def test_both_prompts_treat_blank_as_empty_not_illegible(self):
+        for prompt in (BASE_PROMPT, PROMPT):
+            self.assertIn("If the page is blank, return an empty response", prompt)
+            self.assertIn("do not write [ILLEGIBLE]", prompt)
+
     def test_adjudication_persists_blank_image_flag_without_editing_model_response(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

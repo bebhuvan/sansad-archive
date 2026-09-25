@@ -1035,7 +1035,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `ocr-pages-00001900-58ec3218bdfd7aca.json`: all pages visually assessed,
   33 near-white pages with nonempty model text, none with nonempty local text,
   and 893 numeric disagreements among 1,900 pages with both OCR and model
-  text. The full OCR sidecar remained incomplete at this checkpoint.
+  text. Of the 33 blank-page model responses, 22 were exactly `[ILLEGIBLE]`;
+  both model prompt variants now explicitly require an empty response for a
+  blank image. The image-based guard still checks the result independently.
+  The full OCR sidecar remained incomplete at this checkpoint.
   The first LS 17/15 full-OCR continuation `36087115763` safely checkpointed
   2,000 of 4,756 pages; a later 100-page shard took much longer than earlier
   shards but completed. Direct continuation `36093800075` was dispatched from
