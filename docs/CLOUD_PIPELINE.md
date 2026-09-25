@@ -1115,6 +1115,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   exception keyed to that PDF. Its original, local extraction and model text
   remain untouched. The audit excludes the empty fenced block from numeric
   comparisons and reports this class separately.
+  Commit `96f1057` resumed the cloud OCR workflow as run `36096755991`.
+  An independent read-only replay after its first shard verified 3,500
+  contiguous OCR pages against the published page inventory, every shard
+  checksum and page identity, and the complete 4,756-page visual sidecar.
+  The audit reported exactly one empty-OCR-on-visible review item, matching
+  `AU951.pdf` page 2 and its 531 dark pixels; 1,256 OCR pages remained at
+  that checkpoint. The job was still processing, so this does not establish
+  sidecar completion.
 
 ## Provenance and formats
 
