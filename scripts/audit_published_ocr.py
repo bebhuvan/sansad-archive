@@ -25,6 +25,7 @@ from sansad_pipeline.text_quality import local_content_empty  # noqa: E402
 from scripts.full_ocr_layer import (Page, completion_marker_path, inventory_sha256,
                                     shard_paths, verify_shard_rows)  # noqa: E402
 from scripts.cloud_state import _commit_with_retry  # noqa: E402
+from scripts.visual_evidence_layer import completed_shards as completed_visual_shards  # noqa: E402
 
 
 def sha256_file(path: Path) -> str:
@@ -146,27 +147,87 @@ def sidecar_rows(repo: str, key: str, pages: list[dict], token: str | None,
                     "shards": len(manifests), "complete": complete}
 
 
-def audit_layers(pages: list[dict], ocr_rows: list[dict]) -> dict:
+def visual_rows(repo: str, key: str, pages: list[dict], token: str | None,
+                api: HfApi, marker_sha256: str) -> tuple[list[dict], dict]:
+    identities = [Page(row["document_sha256"], row["page_number"], Path("unused"))
+                  for row in pages]
+    inventory = inventory_sha256(identities)
+    prefix = f"layers/visual-evidence/{key}/inventory-{inventory[:16]}/"
+    files = set(api.list_repo_files(repo, repo_type="dataset"))
+    roots = {path.rsplit("/part-", 1)[0] for path in files
+             if path.startswith(prefix) and "/part-" in path and path.endswith(".json")}
+    if not roots:
+        return [], {"status": "not_found"}
+    if len(roots) != 1:
+        raise RuntimeError(f"expected one visual-evidence root for {key}: {sorted(roots)}")
+    root = roots.pop()
+    match = re.search(r"/render-(\d+)dpi-v1$", root)
+    if not match:
+        raise RuntimeError(f"unsupported visual-evidence method: {root}")
+    dpi = int(match.group(1))
+    shards = completed_visual_shards(api, repo, root, identities, inventory, dpi, token)
+    result = []
+    for manifest in shards:
+        archive = Path(hf_hub_download(repo, manifest["path"],
+                                       repo_type="dataset", token=token))
+        with gzip.open(archive, "rt", encoding="utf-8") as handle:
+            result.extend(json.loads(line) for line in handle)
+    completion_path = root + "/complete.json"
+    complete = completion_path in files
+    if complete:
+        completion = json.loads(Path(hf_hub_download(
+            repo, completion_path, repo_type="dataset", token=token,
+        )).read_text(encoding="utf-8"))
+        if (completion.get("inventory_sha256") != inventory
+                or completion.get("pages") != len(pages)
+                or completion.get("shards") != len(shards)
+                or (completion.get("completion_marker") or {}).get("sha256") != marker_sha256
+                or len(result) != len(pages)):
+            raise RuntimeError("visual completion marker disagrees with verified page coverage")
+    return result, {"status": "complete" if complete else "checkpointed",
+                    "root": root, "shards": len(shards), "pages": len(result)}
+
+
+def audit_layers(pages: list[dict], ocr_rows: list[dict],
+                 visual_rows: list[dict] | None = None) -> dict:
+    visual_rows = visual_rows or []
     if len(ocr_rows) > len(pages):
         raise RuntimeError("OCR rows exceed published page inventory")
+    if len(visual_rows) > len(pages):
+        raise RuntimeError("visual rows exceed published page inventory")
     flags: list[dict] = []
     measured = 0
     blank = 0
-    for index, ocr in enumerate(ocr_rows):
-        published = pages[index]
+    ocr_unmeasured = 0
+    for index, published in enumerate(pages):
         key = (published["document_sha256"], published["page_number"])
-        if key != (ocr["document_sha256"], ocr["page_number"]):
+        ocr = ocr_rows[index] if index < len(ocr_rows) else None
+        visual = visual_rows[index] if index < len(visual_rows) else None
+        if ocr is not None and key != (ocr["document_sha256"], ocr["page_number"]):
             raise RuntimeError(f"OCR/published page identity mismatch at index {index}")
-        if "visually_blank" not in ocr:
-            continue
-        if not valid_image_metrics(ocr):
+        if visual is not None and key != (visual["document_sha256"], visual["page_number"]):
+            raise RuntimeError(f"visual/published page identity mismatch at index {index}")
+        ocr_metrics = ocr if ocr is not None and "visually_blank" in ocr else None
+        if ocr_metrics is not None and not valid_image_metrics(ocr_metrics):
             raise RuntimeError(f"invalid OCR visual evidence for {key}")
+        if visual is not None and not valid_image_metrics(visual):
+            raise RuntimeError(f"invalid backfilled visual evidence for {key}")
+        if ocr_metrics is not None and visual is not None and any(
+            ocr_metrics[field] != visual[field] for field in (
+                "image_pixels", "image_dark_pixels", "image_dark_pixel_cutoff", "visually_blank"
+            )
+        ):
+            raise RuntimeError(f"OCR/backfill visual evidence disagrees for {key}")
+        metrics = visual or ocr_metrics
+        if metrics is None:
+            ocr_unmeasured += ocr is not None
+            continue
         measured += 1
-        if not ocr["visually_blank"]:
+        if not metrics["visually_blank"]:
             continue
         blank += 1
         reasons = []
-        if str(ocr.get("text") or "").strip():
+        if ocr is not None and str(ocr.get("text") or "").strip():
             reasons.append("ocr-nonempty-on-blank")
         if not local_content_empty(published["local_text"], published["local_markdown"]):
             reasons.append("local-nonempty-on-blank")
@@ -174,15 +235,17 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict]) -> dict:
             reasons.append("model-nonempty-on-blank")
         if reasons:
             flags.append({"document_sha256": key[0], "page_number": key[1],
-                          "reasons": reasons, "image_dark_pixels": ocr["image_dark_pixels"],
-                          "image_pixels": ocr["image_pixels"]})
+                          "reasons": reasons, "image_dark_pixels": metrics["image_dark_pixels"],
+                          "image_pixels": metrics["image_pixels"]})
     counts = {reason: sum(reason in item["reasons"] for item in flags)
               for reason in ("ocr-nonempty-on-blank", "local-nonempty-on-blank",
                              "model-nonempty-on-blank")}
     return {"published_pages": len(pages), "ocr_pages": len(ocr_rows),
+            "visual_sidecar_pages": len(visual_rows),
             "unprocessed_ocr_pages": len(pages) - len(ocr_rows),
             "visually_assessed_pages": measured,
-            "ocr_pages_without_visual_metrics": len(ocr_rows) - measured,
+            "ocr_pages_without_visual_metrics": ocr_unmeasured,
+            "published_pages_without_visual_metrics": len(pages) - measured,
             "visually_blank_pages_among_assessed": blank,
             "conflict_counts": counts, "conflicts": flags}
 
@@ -227,8 +290,11 @@ def main() -> int:
     key = f"{args.house}-p{args.parliament}-s{args.session}"
     ocr, sidecar = sidecar_rows(args.repo, key, pages, token,
                                 HfApi(token=token), publication["marker_sha256"])
+    visual, visual_sidecar = visual_rows(args.repo, key, pages, token,
+                                         HfApi(token=token), publication["marker_sha256"])
     report = {"scope": key, "source": args.source, "publication": publication,
-              "ocr_sidecar": sidecar, **audit_layers(pages, ocr)}
+              "ocr_sidecar": sidecar, "visual_sidecar": visual_sidecar,
+              **audit_layers(pages, ocr, visual)}
     value = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -237,7 +303,8 @@ def main() -> int:
                                 token, HfApi(token=token)) if args.publish else None)
     print(json.dumps({key: report[key] for key in (
         "scope", "published_pages", "ocr_pages", "unprocessed_ocr_pages",
-        "visually_assessed_pages", "ocr_pages_without_visual_metrics",
+        "visual_sidecar_pages", "visually_assessed_pages",
+        "ocr_pages_without_visual_metrics", "published_pages_without_visual_metrics",
         "visually_blank_pages_among_assessed", "conflict_counts",
     )} | {"report_path": published}))
     return 0

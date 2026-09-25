@@ -1,0 +1,77 @@
+name: Backfill all-page PDF visual evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Published source family
+        type: choice
+        options: [current, elibrary]
+        required: true
+      house:
+        description: House
+        type: choice
+        options: [lok_sabha, rajya_sabha]
+        required: true
+      parliament:
+        description: Parliament label
+        type: string
+        required: true
+      session:
+        description: Session label
+        type: string
+        required: true
+      max_pages:
+        description: Pages per run in complete 100-page shards
+        type: string
+        default: "2000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-evidence-${{ inputs.house }}-p${{ inputs.parliament }}-s${{ inputs.session }}
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      HF_REPO: ${{ vars.HF_DATASET_REPO }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SOURCE: ${{ inputs.source }}
+      HOUSE: ${{ inputs.house }}
+      PARLIAMENT: ${{ inputs.parliament }}
+      SESSION: ${{ inputs.session }}
+      MAX_PAGES: ${{ inputs.max_pages }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          df -h .
+      - name: Install PDF rendering dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Restore verified originals and page inventory
+        run: |
+          test -n "$HF_REPO"
+          test -n "$HF_TOKEN"
+          PREFIX=""
+          if [ "$SOURCE" = "elibrary" ]; then PREFIX="elibrary-"; fi
+          python scripts/cloud_state.py restore --repo "$HF_REPO" \
+            --path-in-repo "state/checkpoints/$PREFIX$HOUSE-p$PARLIAMENT-s$SESSION"
+      - name: Render bounded visual evidence shards
+        run: |
+          python scripts/visual_evidence_layer.py --repo "$HF_REPO" \
+            --source "$SOURCE" --house "$HOUSE" \
+            --parliament "$PARLIAMENT" --session "$SESSION" \
+            --max-pages "$MAX_PAGES"
+      - name: Re-audit published OCR and Space Bunny layers
+        run: |
+          python scripts/audit_published_ocr.py --repo "$HF_REPO" \
+            --source "$SOURCE" --house "$HOUSE" \
+            --parliament "$PARLIAMENT" --session "$SESSION" --publish

@@ -37,6 +37,44 @@ class PublishedOcrAuditTests(unittest.TestCase):
         self.assertEqual(result["visually_assessed_pages"], 0)
         self.assertEqual(result["conflict_counts"]["model-nonempty-on-blank"], 0)
 
+    def test_backfill_assesses_legacy_ocr_and_pages_not_yet_ocr_processed(self):
+        digest = "a" * 64
+        pages = [
+            {"document_sha256": digest, "page_number": number,
+             "local_text": "", "local_markdown": "",
+             "adjudicated_markdown": "Invented model text"}
+            for number in (1, 2)
+        ]
+        ocr = [{"document_sha256": digest, "page_number": 1,
+                "text": "Invented OCR text"}]
+        visual = [
+            {"document_sha256": digest, "page_number": number,
+             "image_pixels": 10000, "image_dark_pixels": 0,
+             "image_dark_pixel_cutoff": 250, "visually_blank": True}
+            for number in (1, 2)
+        ]
+        result = audit_layers(pages, ocr, visual)
+        self.assertEqual(result["visually_assessed_pages"], 2)
+        self.assertEqual(result["ocr_pages_without_visual_metrics"], 0)
+        self.assertEqual(result["conflict_counts"], {
+            "ocr-nonempty-on-blank": 1, "local-nonempty-on-blank": 0,
+            "model-nonempty-on-blank": 2,
+        })
+
+    def test_disagreeing_ocr_and_backfill_pixels_fail_closed(self):
+        digest = "a" * 64
+        pages = [{"document_sha256": digest, "page_number": 1,
+                  "local_text": "", "local_markdown": "",
+                  "adjudicated_markdown": ""}]
+        ocr = [{"document_sha256": digest, "page_number": 1, "text": "",
+                "image_pixels": 10000, "image_dark_pixels": 0,
+                "image_dark_pixel_cutoff": 250, "visually_blank": True}]
+        visual = [{"document_sha256": digest, "page_number": 1,
+                   "image_pixels": 10000, "image_dark_pixels": 1,
+                   "image_dark_pixel_cutoff": 250, "visually_blank": True}]
+        with self.assertRaisesRegex(RuntimeError, "disagrees"):
+            audit_layers(pages, ocr, visual)
+
     def test_mismatched_identity_and_bad_metrics_fail_closed(self):
         pages = [{"document_sha256": "a" * 64, "page_number": 1,
                   "local_text": "", "local_markdown": "",

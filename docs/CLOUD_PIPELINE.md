@@ -936,6 +936,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   pages not yet processed, older OCR rows without image metrics, visually
   assessed pages, and blank-page conflicts for each text layer. These counts
   are evidence from the measured subset, never a corpus-wide accuracy rate.
+- Older sidecars receive a separate bounded visual-evidence backfill through
+  `visual-evidence-layer.yml`. It restores the verified original PDFs from the
+  HF checkpoint, renders every page at the configured 250 dpi, and stores
+  exact page-keyed pixel measurements in immutable 100-page HF shards under
+  `layers/visual-evidence/<scope>/`. It resumes only after validating every
+  earlier shard's checksum, contiguous inventory, page identity and visual
+  counts. The published-layer audit joins these measurements with older OCR
+  shards and the separate local/model text; contradictory measurements from
+  newer OCR shards fail closed. Neither process rewrites text or original PDFs.
 
 ### Verified 2026-09-25 milestones
 

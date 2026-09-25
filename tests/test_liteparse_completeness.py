@@ -12,7 +12,9 @@ from unittest.mock import Mock, patch
 from PIL import Image, ImageDraw
 
 from sansad_pipeline.config import Config
+from sansad_pipeline.image_quality import rendered_ink_metrics
 from sansad_pipeline.liteparse_engine import LiteParseEngine
+from sansad_pipeline.openrouter import render_page
 
 
 def _parse_in_spawned_worker(path: str) -> tuple[int, bool]:
@@ -60,6 +62,8 @@ class LiteParseCompletenessTests(unittest.TestCase):
             self.assertTrue(page.text.strip())
             self.assertFalse(page.visual_quality["visually_blank"])
             self.assertGreater(page.visual_quality["image_dark_pixels"], 25)
+            screenshot = render_page(pdf, 1, Path(directory) / "render", 250)
+            self.assertEqual(page.visual_quality, rendered_ink_metrics(screenshot))
 
     def test_parser_worker_closes_after_parse_failure(self):
         parser = Mock()
