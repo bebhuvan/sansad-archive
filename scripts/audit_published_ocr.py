@@ -205,6 +205,11 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
         "all_equal", "local_model_equal", "local_ocr_equal",
         "model_ocr_equal", "all_different",
     )}
+    origins = ("selected-local-rasterized-ocr", "sidecar-rasterized-ocr")
+    origin_counts = {origin: 0 for origin in origins}
+    numeric_by_origin = {origin: {"pages_compared": 0,
+                                  "disagreement_pages": 0} for origin in origins}
+    triad_by_origin = {origin: {name: 0 for name in triad_counts} for origin in origins}
     triad_disagreements: list[dict] = []
     measured = 0
     blank = 0
@@ -215,6 +220,12 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
         visual = visual_rows[index] if index < len(visual_rows) else None
         if ocr is not None and key != (ocr["document_sha256"], ocr["page_number"]):
             raise RuntimeError(f"OCR/published page identity mismatch at index {index}")
+        origin = (ocr.get("origin", "sidecar-rasterized-ocr")
+                  if ocr is not None else None)
+        if origin is not None:
+            if origin not in origin_counts:
+                raise RuntimeError(f"unknown OCR provenance for {key}: {origin}")
+            origin_counts[origin] += 1
         if visual is not None and key != (visual["document_sha256"], visual["page_number"]):
             raise RuntimeError(f"visual/published page identity mismatch at index {index}")
         model_text = str(published["adjudicated_markdown"] or "")
@@ -224,13 +235,16 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
                     else ocr_markdown or ocr_plain)
         if ocr is not None and ocr_text.strip() and model_text.strip():
             numeric_compared += 1
+            numeric_by_origin[origin]["pages_compared"] += 1
             ocr_numbers = content_numbers(ocr_text)
             model_numbers = content_numbers(model_text)
             if ocr_numbers != model_numbers:
+                numeric_by_origin[origin]["disagreement_pages"] += 1
                 ocr_only = sorted((ocr_numbers - model_numbers).elements())
                 model_only = sorted((model_numbers - ocr_numbers).elements())
                 numeric_disagreements.append({
                     "document_sha256": key[0], "page_number": key[1],
+                    "ocr_origin": origin,
                     "ocr_only_count": len(ocr_only), "model_only_count": len(model_only),
                     "ocr_only_sample": ocr_only[:20], "model_only_sample": model_only[:20],
                 })
@@ -249,10 +263,12 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
                     else:
                         pattern = "all_different"
                     triad_counts[pattern] += 1
+                    triad_by_origin[origin][pattern] += 1
                     if pattern != "all_equal":
                         triad_disagreements.append({
                             "document_sha256": key[0], "page_number": key[1],
-                            "route": published.get("route"), "pattern": pattern,
+                            "route": published.get("route"), "ocr_origin": origin,
+                            "pattern": pattern,
                             "local_sample": sorted(local_numbers.elements())[:20],
                             "ocr_sample": sorted(ocr_numbers.elements())[:20],
                             "model_sample": sorted(model_numbers.elements())[:20],
@@ -317,8 +333,11 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             "ocr_model_numeric_pages_compared": numeric_compared,
             "ocr_model_numeric_disagreement_pages": len(numeric_disagreements),
             "ocr_model_numeric_disagreements": numeric_disagreements,
+            "ocr_origin_counts": origin_counts,
+            "ocr_model_numeric_by_origin": numeric_by_origin,
             "numeric_triad_pages_compared": sum(triad_counts.values()),
             "numeric_triad_pattern_counts": triad_counts,
+            "numeric_triad_pattern_counts_by_origin": triad_by_origin,
             "numeric_triad_disagreements": triad_disagreements}
 
 
@@ -381,7 +400,9 @@ def main() -> int:
         "model_empty_on_visible_pages",
         "ocr_empty_on_visible_pages",
         "ocr_model_numeric_pages_compared", "ocr_model_numeric_disagreement_pages",
+        "ocr_origin_counts", "ocr_model_numeric_by_origin",
         "numeric_triad_pages_compared", "numeric_triad_pattern_counts",
+        "numeric_triad_pattern_counts_by_origin",
     )} | {"report_path": published}))
     return 0
 

@@ -158,6 +158,39 @@ class PublishedOcrAuditTests(unittest.TestCase):
         self.assertEqual(report["numeric_triad_disagreements"][-1]["route"],
                          "native")
 
+    def test_numeric_agreement_is_stratified_by_ocr_provenance(self):
+        digest = "a" * 64
+        pages = [
+            {"document_sha256": digest, "page_number": 1,
+             "route": "ocr", "local_text": "Amount 1", "local_markdown": "Amount 1",
+             "adjudicated_markdown": "Amount 2"},
+            {"document_sha256": digest, "page_number": 2,
+             "route": "native", "local_text": "Amount 1", "local_markdown": "Amount 1",
+             "adjudicated_markdown": "Amount 2"},
+        ]
+        ocr = [
+            {"document_sha256": digest, "page_number": 1, "text": "Amount 1",
+             "origin": "selected-local-rasterized-ocr"},
+            {"document_sha256": digest, "page_number": 2, "text": "Amount 3",
+             "origin": "sidecar-rasterized-ocr"},
+        ]
+        report = audit_layers(pages, ocr)
+        self.assertEqual(report["ocr_origin_counts"], {
+            "selected-local-rasterized-ocr": 1, "sidecar-rasterized-ocr": 1,
+        })
+        self.assertEqual(report["ocr_model_numeric_by_origin"], {
+            "selected-local-rasterized-ocr": {"pages_compared": 1, "disagreement_pages": 1},
+            "sidecar-rasterized-ocr": {"pages_compared": 1, "disagreement_pages": 1},
+        })
+        self.assertEqual(report["numeric_triad_pattern_counts_by_origin"]
+                         ["selected-local-rasterized-ocr"]["local_ocr_equal"], 1)
+        self.assertEqual(report["numeric_triad_pattern_counts_by_origin"]
+                         ["sidecar-rasterized-ocr"]["all_different"], 1)
+        self.assertEqual([row["ocr_origin"] for row in report["numeric_triad_disagreements"]],
+                         ["selected-local-rasterized-ocr", "sidecar-rasterized-ocr"])
+        with self.assertRaisesRegex(RuntimeError, "unknown OCR provenance"):
+            audit_layers(pages, [{**ocr[0], "origin": "unknown"}, ocr[1]])
+
     def test_mismatched_identity_and_bad_metrics_fail_closed(self):
         pages = [{"document_sha256": "a" * 64, "page_number": 1,
                   "local_text": "", "local_markdown": "",

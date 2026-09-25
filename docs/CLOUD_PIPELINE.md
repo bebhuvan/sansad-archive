@@ -946,11 +946,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   rendered-image ink metrics for every page, including nonempty OCR output.
   `ocr-nonempty-on-visually-blank-page` flags possible OCR invention without
   rewriting the transcript. `ocr-empty-on-visibly-nonblank-page` records an OCR
-  omission while preserving the empty text and the independent local/model
-  layers. Neither flag adjudicates what the page says. The screenshot used for image-only OCR supplies
-  the metrics; reused selected-local OCR is rendered independently. Existing
-  shards remain immutable and resumable, so an in-flight sidecar can contain
-  older shards without all-page metrics. Absence of that evidence is not a
+  omission while preserving the empty text and the separate local/model
+  layers. Neither flag adjudicates what the page says. The screenshot used for
+  image-only OCR supplies the metrics; reused selected-local OCR is rendered
+  independently for visual evidence, but its transcript is the same artifact.
+  Existing shards remain immutable and resumable, so an in-flight sidecar can
+  contain older shards without all-page metrics. Absence of that evidence is not a
   clean-page finding; retrospective all-page audits remain necessary.
 - After each bounded full-OCR continuation, `scripts/audit_published_ocr.py`
   checks the published `pages.parquet` SHA-256, OCR shard SHA-256s, exact page
@@ -958,10 +959,16 @@ checkpoint (22:12 and 22:10 UTC respectively).
   under `audits/full-ocr-model-visual/<scope>/`. The report distinguishes OCR
   pages not yet processed, older OCR rows without image metrics, visually
   assessed pages, blank-page conflicts for each text layer, and empty model
-  transcripts and empty OCR on visibly inked pages as separate review queues. These
-  does not call OCR or the image heuristic transcription ground truth. These
-  counts are evidence from the measured subset, never a corpus-wide accuracy
-  rate.
+  transcripts and empty OCR on visibly inked pages as separate review queues.
+  It does not call OCR or the image heuristic transcription ground truth. The
+  report stratifies numerical comparisons by OCR origin. A
+  `selected-local-rasterized-ocr` row reuses the local OCR transcript exactly;
+  its agreement with local text is not a second vote. A
+  `sidecar-rasterized-ocr` row is a separate execution of the same OCR method,
+  not an independent ground truth either. Space Bunny received the local
+  candidate on nonempty pages, so model/local agreement also is not an
+  independent vote. These counts are review queues, never a corpus-wide
+  accuracy rate.
 - Older sidecars receive a separate bounded visual-evidence backfill through
   `visual-evidence-layer.yml`. It restores the verified original PDFs from the
   HF checkpoint, renders every page at the configured 250 dpi, and stores
@@ -1151,8 +1158,20 @@ checkpoint (22:12 and 22:10 UTC respectively).
   unique page keys across 1,807 PDFs, every page with a model layer. All nine
   files named in the tranche `SHA256SUMS` exist on HF; the remote LFS hash of
   the 741,416,960-byte WebDataset tar matches its recorded checksum. This
-  proves the completed local/model/original publication, not yet a separate
-  full-page OCR or visual-evidence sidecar for this historical scope.
+  proves the completed local/model/original publication. Direct full-OCR run
+  `36103343026` subsequently completed a 29-shard sidecar. An independent
+  replay verified all 2,826 OCR page identities, shard hashes, completion
+  marker and image measurements; it found zero visually blank pages and zero
+  empty OCR or model transcripts on visibly inked pages. The preliminary
+  unstratified numeric report showed 1,922 local/OCR matches where the model
+  differed. A provenance-aware replay showed that 1,919 of these used the
+  exact selected-local OCR artifact, leaving only three from separate
+  sidecar executions. Of 2,826 OCR rows, 2,019 are reused selected-local OCR
+  and 807 were newly run by the sidecar. The latter are still the same OCR
+  method, so these agreement counts cannot adjudicate model accuracy. The
+  model and OCR disagree on visible numbers on 2,639 pages; this is a
+  source-image review queue, not a model error rate or reason to switch
+  canonical text automatically.
 
 ## Provenance and formats
 
