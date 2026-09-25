@@ -413,6 +413,15 @@ size for small inventories. This remains an incremental inventory of newly
 accessioned items, **not** a full recrawl: deletions and
 metadata changes among older items require separate reconciliation. A failed
 boundary check publishes nothing.
+For that full reconciliation, a read-only 2026-09-25 probe found that the
+official DSpace endpoint accepts `sort=dc.date.accessioned,asc`: two pages of
+three items were accession-ascending, and two immediate reads of the first
+100 IDs matched exactly. Ascending accessions would normally keep older page
+offsets stable when new items arrive at the end, but this is only a small
+probe. Timestamp ties, deletions, server reindexing, and metadata edits still
+require page-boundary checks, an end-of-crawl ID/count reconciliation, and
+resumable dated shards before any full-refresh claim. The current incremental
+snapshot remains the active ingestion inventory until such a recrawl exists.
 Refresh run `36047393238` appended exactly 3,500 records to the August base
 and published `state/census/snapshot-2026-09-24T192308Z` (SHA-256
 `9c2efb8cdfb624398b8468faa82e1c5c771a7f28b8e808e056b3a266ad58aeb9`,
