@@ -16,7 +16,7 @@ class ElibrarySourceTests(unittest.TestCase):
         ]
         bundles = {"_embedded": {"bundles": [
             {"name": "ORIGINAL", "_links": {"bitstreams": {"href": "https://example.test/bitstreams"}}}
-        ]}}
+        ]}, "page": {"number": 0, "totalElements": 1}}
         listing = {"page": {"number": 0, "totalElements": 2},
                    "_embedded": {"bitstreams": pdfs}}
         with patch("sansad_pipeline.sources.elibrary.request_json", side_effect=[bundles, listing]):
@@ -31,7 +31,7 @@ class ElibrarySourceTests(unittest.TestCase):
     def test_includes_pdf_bitstream_even_without_pdf_filename_suffix(self):
         bundles = {"_embedded": {"bundles": [
             {"name": "ORIGINAL", "_links": {"bitstreams": {"href": "https://example.test/bitstreams"}}}
-        ]}}
+        ]}, "page": {"number": 0, "totalElements": 1}}
         listing = {"page": {"number": 0, "totalElements": 1},
                    "_embedded": {"bitstreams": [{
                        "uuid": "bitstream", "name": "question scan",
@@ -44,6 +44,23 @@ class ElibrarySourceTests(unittest.TestCase):
                    side_effect=[bundles, listing, {"mimetype": "application/pdf"}]):
             resolved = list_original_pdfs("item")
         self.assertEqual([pdf["uuid"] for _, pdf in resolved], ["bitstream"])
+
+    def test_rejects_unverified_or_ambiguous_original_bundle_inventory(self):
+        original = {"name": "ORIGINAL", "_links": {
+            "bitstreams": {"href": "https://example.test/bitstreams"}}}
+        cases = [
+            ({"_embedded": {"bundles": [original]}}, "incomplete"),
+            ({"_embedded": {"bundles": [original]},
+              "page": {"number": 0, "totalElements": 2}}, "incomplete"),
+            ({"_embedded": {"bundles": [original, original]},
+              "page": {"number": 0, "totalElements": 2}}, "multiple ORIGINAL"),
+        ]
+        for response, message in cases:
+            with self.subTest(message=message), patch(
+                "sansad_pipeline.sources.elibrary.request_json", return_value=response
+            ):
+                with self.assertRaisesRegex(RuntimeError, message):
+                    list_original_pdfs("item")
 
     def test_unlabelled_or_original_language_is_not_assumed_english(self):
         self.assertEqual(classify_language(["English"]), "en")

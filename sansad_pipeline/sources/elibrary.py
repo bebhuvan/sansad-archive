@@ -197,12 +197,17 @@ def list_original_pdfs(item_id: str) -> list[tuple[str, dict[str, Any]]]:
     )
     bundles = bundles_response.get("_embedded", {}).get("bundles", [])
     bundle_page = bundles_response.get("page") or {}
-    if bundle_page and (int(bundle_page.get("number", -1)) != 0
-                        or int(bundle_page.get("totalElements", -1)) != len(bundles)):
+    if not isinstance(bundles, list) or not bundle_page or (
+        int(bundle_page.get("number", -1)) != 0
+        or int(bundle_page.get("totalElements", -1)) != len(bundles)
+    ):
         raise RuntimeError(f"eLibrary item {item_id} bundle listing is incomplete")
-    original = next((bundle for bundle in bundles if bundle.get("name") == "ORIGINAL"), None)
-    if original is None:
+    originals = [bundle for bundle in bundles if bundle.get("name") == "ORIGINAL"]
+    if not originals:
         raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bundle")
+    if len(originals) != 1:
+        raise RuntimeError(f"eLibrary item {item_id} has multiple ORIGINAL bundles")
+    original = originals[0]
     bitstreams_url = original.get("_links", {}).get("bitstreams", {}).get("href")
     if not bitstreams_url:
         raise RuntimeError(f"eLibrary item {item_id} has no ORIGINAL bitstream link")

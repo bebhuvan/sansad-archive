@@ -74,6 +74,10 @@ the immutable raw checkpoint, records each bitstream-to-SHA mapping in SQLite,
 and leaves the item retryable if an attachment fails. Only the first PDF enters
 the present text pipeline; Hindi extraction remains a later phase. The listing
 rejects truncation rather than silently treating the first page as complete.
+It also requires a complete bundle-page count and exactly one `ORIGINAL`
+bundle; ambiguous source inventory fails acquisition instead of silently
+omitting PDFs. A live two-PDF eLibrary item still resolves both originals
+with this stricter check, and the full test suite passes.
 On a new-code continuation, the acquisition step revisits older downloaded
 items without an attachment ledger, reuses a selected PDF only when its source
 URL matches, downloads the other PDFs, and checkpoints every 100 completed
@@ -86,8 +90,9 @@ each attachment. The resolver also checks the official bitstream format link
 when a filename lacks `.pdf`, so an extensionless `application/pdf` attachment
 is included. Existing older publications and complete markers remain
 selected-PDF-only evidence until their scopes are replayed and republished;
-do not delete or replace them based solely on this discovery. A full cloud
-backfill and remote publication proof are still pending.
+do not delete or replace them based solely on this discovery. The first full
+cloud backfill and remote publication proof are recorded below; it does not
+establish attachment completeness for every older scope.
 
 The first full historical backfill finished in GitHub run
 [`36072353217`](https://github.com/bebhuvan/sansad-archive/actions/runs/36072353217)
