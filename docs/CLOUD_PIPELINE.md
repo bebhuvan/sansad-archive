@@ -31,6 +31,13 @@ prove the runner is making progress, so the job remains under monitoring.
 The older pending historical batch `36074837899` was replaced by pending
 batch `36076235170` on commit `e6495fe`, carrying the 250-item acquisition
 checkpoint default. The active batch and its runner were not cancelled.
+At 00:16 UTC, a fresh HF read finally exposed that active job's next
+checkpoint, created at 00:07 UTC: 3,000 of 3,677 items downloaded, 1,902
+distinct selected PDF bytes retained, and 677 still discovered. The job
+remained live in acquisition. The older checkpoint observed at 00:13 UTC
+was therefore an incomplete observation of a chunk still becoming durable,
+not proof of a stalled runner. The interval from one visible remote checkpoint
+to the next was about 47 minutes; future 250-item chunks reduce that exposure.
 
 The published WebDataset shard stores each selected official PDF as
 `<sha256>.original.pdf` beside its local, OCR/model, and canonical text layers.
