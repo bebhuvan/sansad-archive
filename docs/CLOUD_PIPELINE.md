@@ -41,6 +41,14 @@ The on-Hub checkpoint manifest keeps the full per-PDF hash index. The Actions
 save command prints only its counts, archive size, shard count and commit URL;
 dumping thousands of raw-index entries into each model-chunk log made failure
 triage unnecessarily noisy.
+LiteParse 2.14.7's process pool now enforces a 300-second hard limit on each
+native or OCR parse call. Its worker is closed after success or error. A rogue
+parse is recorded as a failed document and cannot hold an extraction chunk
+indefinitely in that parser call; the next resumable pass can retry it. A local
+integration test ran the pool inside the same spawned-process shape used by
+cloud extraction.
+This safeguard does not impose a hard timeout on the separate screenshot step
+used for full-page-image OCR routing.
 
 **eLibrary attachment completeness is a separate question from item coverage.**
 At 22:52 UTC on 2026-09-24, live item

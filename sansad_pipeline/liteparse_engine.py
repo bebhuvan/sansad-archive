@@ -12,6 +12,9 @@ from PIL import Image
 from .config import Config
 
 
+PARSE_TIMEOUT_SECONDS = 300
+
+
 @dataclass
 class ExtractedPage:
     page_number: int
@@ -113,9 +116,14 @@ class LiteParseEngine:
             extract_content_bounds=True,
             extract_text_metadata=True,
             extract_vector_graphics=True,
+            pool_size=1,
+            parse_timeout=PARSE_TIMEOUT_SECONDS,
             quiet=True,
         )
-        result = parser.parse(parse_input)
+        try:
+            result = parser.parse(parse_input)
+        finally:
+            parser.close()
         pages: list[ExtractedPage] = []
         for page in result.pages:
             confidences = [
