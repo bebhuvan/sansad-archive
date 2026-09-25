@@ -926,10 +926,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   documents, 4,756 unique pages, 4,756 stored Space Bunny layers, and original
   PDFs in the compact WebDataset. The required tranche files exist; downloaded
   `manifest.jsonl`, `metadata.json`, and `pages.parquet` match `SHA256SUMS`.
-  The canonical policy remains `local`. One visually blank page retains a
-  spurious nonempty model layer, identified in the independent audit report;
-  the page's canonical text is empty. Completion is coverage evidence, not a
-  blanket transcription-accuracy claim.
+  The canonical policy remains `local`. The independent 24-page audit found
+  five visually blank pages, all with spurious nonempty model text. Their
+  canonical local text is empty. This run predates the per-page visual flags;
+  the sampled audit report identifies the five cases, not every such page in
+  the scope. Completion is coverage evidence, not an accuracy certificate.
 - LS 01/II's separate full image-only LiteParse OCR sidecar completed in run
   `36085913818`: 2,151 unique page keys in 22 contiguous shards. All remote
   shard sizes and SHA-256 hashes were independently rechecked, as were the
