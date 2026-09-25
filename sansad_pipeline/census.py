@@ -25,6 +25,7 @@ from .sources.elibrary import (
     lok_sabha_question_count as elibrary_question_count,
     records_from_search_response,
     list_original_pdfs,
+    primary_pdf_index,
     resolve_original_pdf,
     search_page as elibrary_search_page,
     normalize_session_label,
@@ -588,12 +589,12 @@ class Census:
                 raw = json.loads(row["raw_json"])
                 extra_metadata = {}
                 pdfs = []
+                primary_index = 0
                 if raw.get("_source_system") == "sansad_elibrary_dspace":
                     item_id = str(raw.get("uuid") or raw.get("id") or "")
                     pdfs = list_original_pdfs(item_id)
-                    source_url, bitstream = pdfs[0]
-                    extra_metadata["elibrary_bitstream"] = bitstream
-                    extra_metadata["elibrary_primary_pdf"] = True
+                    primary_index = primary_pdf_index(pdfs)
+                    source_url, _ = pdfs[primary_index]
                     extra_metadata["elibrary_original_pdf_inventory"] = [
                         {
                             "uuid": str(pdf.get("uuid") or pdf.get("id")),
@@ -606,26 +607,17 @@ class Census:
                 source_metadata = {
                     key: row[key] for key in row.keys() if key not in {"raw_json"}
                 }
-                document = self.store.download(
-                    source_url,
-                    metadata={
-                        **source_metadata,
-                        **extra_metadata,
-                    },
-                )
-                documents = [document]
-                for attachment_url, attachment in pdfs[1:]:
-                    documents.append(self.store.download(
+                if pdfs:
+                    documents = [self.store.download(
                         attachment_url,
-                        metadata={
-                            **source_metadata,
-                            "elibrary_bitstream": attachment,
-                            "elibrary_original_pdf_inventory": extra_metadata[
-                                "elibrary_original_pdf_inventory"
-                            ],
-                            "elibrary_primary_pdf": False,
-                        },
-                    ))
+                        metadata={**source_metadata, **extra_metadata,
+                                  "elibrary_bitstream": attachment,
+                                  "elibrary_primary_pdf": index == primary_index},
+                    ) for index, (attachment_url, attachment) in enumerate(pdfs)]
+                    document = documents[primary_index]
+                else:
+                    document = self.store.download(source_url, metadata=source_metadata)
+                    documents = [document]
                 return "downloaded", (document, documents, pdfs)
             except Exception as error:
                 return "failed", error

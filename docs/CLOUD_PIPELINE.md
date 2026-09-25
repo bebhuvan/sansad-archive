@@ -68,16 +68,22 @@ in model adjudication; neither active job was interrupted.
 At 22:52 UTC on 2026-09-24, live item
 `49d60eef-b8d0-4c19-83bf-2804f0a8c3d0` (LS 17/IX) exposed two ORIGINAL
 bitstreams, `AU3055.pdf` and `AU3055_hindi.pdf`. The acquisition path from
-commit `ea3186f` onward was English-first and selected only one PDF. The
+commit `ea3186f` onward intended English-first processing but selected only
+the first listed PDF, regardless of its language label. The
 subsequent acquisition change downloads every PDF in the ORIGINAL bundle into
 the immutable raw checkpoint, records each bitstream-to-SHA mapping in SQLite,
-and leaves the item retryable if an attachment fails. Only the first PDF enters
+and leaves the item retryable if an attachment fails. One selected PDF enters
 the present text pipeline; Hindi extraction remains a later phase. The listing
 rejects truncation rather than silently treating the first page as complete.
 It also requires a complete bundle-page count and exactly one `ORIGINAL`
 bundle; ambiguous source inventory fails acquisition instead of silently
 omitting PDFs. A live two-PDF eLibrary item still resolves both originals
 with this stricter check, and the full test suite passes.
+New acquisitions prefer an explicitly English-named original, then the first
+PDF without an explicit Hindi label, while preserving official bitstream order
+in the full attachment ledger. An unlabeled bundle remains ambiguous and is
+not asserted to be English. A reversed Hindi-first two-PDF test verifies that
+the English PDF becomes the selected text source and both originals survive.
 On a new-code continuation, the acquisition step revisits older downloaded
 items without an attachment ledger, reuses a selected PDF only when its source
 URL matches, downloads the other PDFs, and checkpoints every 100 completed

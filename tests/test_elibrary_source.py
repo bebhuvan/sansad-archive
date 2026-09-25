@@ -4,7 +4,8 @@ import unittest
 from unittest.mock import patch
 
 from sansad_pipeline.sources.elibrary import (
-    classify_language, list_original_pdfs, records_from_search_response, search_page,
+    classify_language, list_original_pdfs, primary_pdf_index,
+    records_from_search_response, search_page,
 )
 
 
@@ -67,6 +68,21 @@ class ElibrarySourceTests(unittest.TestCase):
         self.assertEqual(classify_language(["Hindi"]), "hi")
         self.assertEqual(classify_language(["Original"]), "und")
         self.assertEqual(classify_language([]), "und")
+
+    def test_primary_pdf_prefers_english_when_hindi_is_listed_first(self):
+        pdfs = [
+            ("https://example.test/hindi", {"name": "AU3055_hindi.pdf"}),
+            ("https://example.test/english", {"name": "AU3055.pdf"}),
+        ]
+        self.assertEqual(primary_pdf_index(pdfs), 1)
+        pdfs.append(("https://example.test/annexure", {"name": "annexure.pdf"}))
+        self.assertEqual(primary_pdf_index(pdfs), 1)
+        pdfs[1][1]["name"] = "AU3055_english.pdf"
+        self.assertEqual(primary_pdf_index(pdfs), 1)
+        self.assertEqual(primary_pdf_index([
+            ("https://example.test/a", {"name": "a.pdf"}),
+            ("https://example.test/b", {"name": "b.pdf"}),
+        ]), 0)
 
     def test_normalizes_item_without_storing_full_hal_payload(self):
         item = {

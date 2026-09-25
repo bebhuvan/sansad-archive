@@ -252,5 +252,42 @@ def list_original_pdfs(item_id: str) -> list[tuple[str, dict[str, Any]]]:
 
 
 def resolve_original_pdf(item_id: str) -> tuple[str, dict[str, Any]]:
-    """Compatibility selector; callers needing completeness must use list_original_pdfs."""
-    return list_original_pdfs(item_id)[0]
+    """Select the English original when the official names identify it."""
+    pdfs = list_original_pdfs(item_id)
+    return pdfs[primary_pdf_index(pdfs)]
+
+
+def primary_pdf_index(pdfs: list[tuple[str, dict[str, Any]]]) -> int:
+    """Prefer an explicitly English PDF, then the sole non-Hindi PDF.
+
+    Ambiguous or unlabelled inventories retain official bundle order. The
+    full bundle is always archived, irrespective of which PDF is selected for
+    the current English-first text pipeline.
+    """
+    if not pdfs:
+        raise ValueError("cannot select a PDF from an empty ORIGINAL inventory")
+
+    def hint(bitstream: dict[str, Any]) -> str:
+        name = str(bitstream.get("name") or "").casefold()
+        tokens = set(re.findall(r"[a-z]+|[\u0900-\u097f]+", name))
+        metadata = bitstream.get("metadata") or {}
+        languages = {str(entry.get("value") or "").strip().casefold()
+                     for entry in metadata.get("dc.language.iso") or []}
+        english = bool(tokens & {"english", "eng", "en"}
+                       or languages & {"english", "eng", "en"})
+        hindi = bool(tokens & {"hindi", "hin", "hi", "हिंदी", "हिन्दी"}
+                     or languages & {"hindi", "hin", "hi"})
+        if english and not hindi:
+            return "en"
+        if hindi and not english:
+            return "hi"
+        return "und"
+
+    hints = [hint(bitstream) for _, bitstream in pdfs]
+    english = [index for index, language in enumerate(hints) if language == "en"]
+    if english:
+        return english[0]
+    non_hindi = [index for index, language in enumerate(hints) if language != "hi"]
+    if non_hindi:
+        return non_hindi[0]
+    return 0
