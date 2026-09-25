@@ -1234,6 +1234,19 @@ checkpoint (22:12 and 22:10 UTC respectively).
   right. Tesseract itself can omit or invent numbers, so neither text
   similarity nor its numeric-agreement score is a ground-truth label.
 
+- Historical LS 01/IV published after continuation in batch `36145853002`.
+  Independent checkpoint replay verified 2,178 attachments, 1,423 distinct
+  original PDFs and all 2,381 model transcripts, with 2,381 zero-cost calls
+  and no missing or invalid artifact. The publication marker and checksummed
+  `pages.parquet` agree on 2,381 unique page keys across the 1,423 PDF hashes.
+  All nine tranche `SHA256SUMS` files exist remotely, including the
+  626,053,120-byte WebDataset tar with a matching LFS checksum. The raw
+  inventory SHA-256 is
+  `ed547d47c9f80486ca70b5891b8ad175f54dbd88cee0e8aee59b80fcff86a96b`.
+  Separate full-page image-only LiteParse OCR run `36158421720` was dispatched
+  on 2026-09-25 for all 2,381 pages; its completion and independent page/visual
+  audit remain pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
