@@ -1036,6 +1036,11 @@ checkpoint (22:12 and 22:10 UTC respectively).
   33 near-white pages with nonempty model text, none with nonempty local text,
   and 893 numeric disagreements among 1,900 pages with both OCR and model
   text. The full OCR sidecar remained incomplete at this checkpoint.
+  The first LS 17/15 full-OCR continuation `36087115763` safely checkpointed
+  2,000 of 4,756 pages; a later 100-page shard took much longer than earlier
+  shards but completed. Direct continuation `36093800075` was dispatched from
+  the bounded-renderer commit for the remaining 2,756 pages. No completion
+  claim is made until its remote shards and marker are independently checked.
 
 ## Provenance and formats
 
