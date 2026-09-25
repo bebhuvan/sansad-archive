@@ -29,6 +29,8 @@ class FakeEngine:
         return [type("Extracted", (), {
             "page_number": number, "text": f"OCR page {number}",
             "markdown": f"OCR page {number}", "mean_confidence": 0.9,
+            "visual_quality": {"image_pixels": 10000, "image_dark_pixels": 100,
+                               "image_dark_pixel_cutoff": 250, "visually_blank": False},
         })() for number in target_pages]
 
 
@@ -135,7 +137,11 @@ class FullOcrLayerTests(unittest.TestCase):
                 Page(digest, 2, Path("a.pdf"), "native", artifact_path, config),
                 Page(digest, 3, Path("a.pdf")),
             ]
-            rows = ocr_rows(engine, pages)
+            with mock.patch("scripts.full_ocr_layer.page_image_metrics", return_value={
+                "image_pixels": 10000, "image_dark_pixels": 100,
+                "image_dark_pixel_cutoff": 250, "visually_blank": False,
+            }):
+                rows = ocr_rows(engine, pages)
             self.assertEqual(rows[0]["text"], "Saved image OCR")
             self.assertEqual(rows[0]["origin"], "selected-local-rasterized-ocr")
             self.assertEqual(len(rows[0]["source_artifact_sha256"]), 64)
@@ -190,6 +196,42 @@ class FullOcrLayerTests(unittest.TestCase):
                 handle.write(json.dumps(rows[0]) + "\n")
             with self.assertRaisesRegex(RuntimeError, "invalid page"):
                 verify_shard_rows(path, [page], 0, 0, engine.version)
+
+    def test_nonempty_ocr_on_visually_blank_page_is_flagged_and_verified(self):
+        page = Page("a" * 64, 1, Path("blank.pdf"))
+        engine = FakeEngine()
+        engine.extract = mock.Mock(return_value=[SimpleNamespace(
+            page_number=1, text="Invented words", markdown="Invented words",
+            mean_confidence=0.9,
+            visual_quality={"image_pixels": 10000, "image_dark_pixels": 0,
+                            "image_dark_pixel_cutoff": 250, "visually_blank": True},
+        )])
+        row = ocr_rows(engine, [page])[0]
+        self.assertEqual(row["quality_flags"], ["ocr-nonempty-on-visually-blank-page"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "part.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            verify_shard_rows(path, [page], 0, 0, engine.version)
+            row["quality_flags"] = []
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            with self.assertRaisesRegex(RuntimeError, "invalid page"):
+                verify_shard_rows(path, [page], 0, 0, engine.version)
+
+    def test_legacy_shard_without_all_page_metrics_remains_resumable(self):
+        page = Page("a" * 64, 1, Path("original.pdf"))
+        row = ocr_rows(FakeEngine(), [page])[0]
+        for key in ("image_pixels", "image_dark_pixels", "image_dark_pixel_cutoff",
+                    "visually_blank", "quality_flags", "origin"):
+            row.pop(key)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                handle.write(json.dumps(row) + "\n")
+            self.assertEqual(verify_shard_rows(path, [page], 0, 0, "2.14.7"), {
+                "selected-local-rasterized-ocr": 0, "sidecar-rasterized-ocr": 1,
+            })
 
     def test_empty_ocr_on_visible_page_still_fails(self):
         page = Page("a" * 64, 1, Path("visible.pdf"))

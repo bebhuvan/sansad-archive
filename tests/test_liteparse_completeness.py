@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+from io import BytesIO
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
 from pathlib import Path
@@ -47,6 +48,19 @@ class LiteParseCompletenessTests(unittest.TestCase):
                 self.assertEqual(pool.submit(_parse_in_spawned_worker, str(pdf)).result(timeout=30),
                                  (1, True))
 
+    def test_real_rasterized_ocr_exposes_page_ink_metrics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pdf = Path(directory) / "page.pdf"
+            image = Image.new("RGB", (600, 800), "white")
+            ImageDraw.Draw(image).text((40, 40), "QUESTION 42: Test record", fill="black")
+            image.save(pdf, "PDF")
+            page = LiteParseEngine(Config(project_root=Path.cwd())).extract(
+                pdf, ocr=True, target_pages=[1], rasterize=True,
+            )[0]
+            self.assertTrue(page.text.strip())
+            self.assertFalse(page.visual_quality["visually_blank"])
+            self.assertGreater(page.visual_quality["image_dark_pixels"], 25)
+
     def test_parser_worker_closes_after_parse_failure(self):
         parser = Mock()
         parser.parse.side_effect = RuntimeError("parser failed")
@@ -55,6 +69,31 @@ class LiteParseCompletenessTests(unittest.TestCase):
                 LiteParseEngine(Config(project_root=Path.cwd())).extract(
                     Path("unused.pdf"), ocr=False
                 )
+        parser.close.assert_called_once()
+
+    def test_rasterized_ocr_retains_original_page_visual_metrics(self):
+        image = Image.new("RGB", (100, 100), "white")
+        picture = BytesIO()
+        image.save(picture, format="PNG")
+        renderer = Mock()
+        renderer.screenshot.return_value = [SimpleNamespace(
+            page_num=2, image_bytes=picture.getvalue(),
+        )]
+        page = SimpleNamespace(
+            page_num=1, text="Invented text", markdown="Invented text",
+            width=100, height=100, complexity=None, text_items=[],
+            vector_graphics=None,
+        )
+        parser = Mock()
+        parser.parse.return_value = SimpleNamespace(pages=[page], total_pages=1)
+        with patch("sansad_pipeline.liteparse_engine.LiteParse",
+                   side_effect=[renderer, parser]):
+            result = LiteParseEngine(Config(project_root=Path.cwd())).extract(
+                Path("unused.pdf"), ocr=True, target_pages=[2], rasterize=True,
+            )
+        self.assertEqual(result[0].page_number, 2)
+        self.assertTrue(result[0].visual_quality["visually_blank"])
+        self.assertEqual(result[0].visual_quality["image_dark_pixels"], 0)
         parser.close.assert_called_once()
 
 

@@ -921,6 +921,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   near-white image evidence; its empty transcript remains a distinct model
   layer in the checkpoint and WebDataset. Publication and the checkpoint
   inspector reject empty responses without that evidence.
+- Full image-only LiteParse OCR shards produced by the updated extractor record
+  rendered-image ink metrics for every page, including nonempty OCR output.
+  `ocr-nonempty-on-visually-blank-page` flags possible OCR invention without
+  rewriting the transcript. The screenshot used for image-only OCR supplies
+  the metrics; reused selected-local OCR is rendered independently. Existing
+  shards remain immutable and resumable, so an in-flight sidecar can contain
+  older shards without all-page metrics. Absence of that evidence is not a
+  clean-page finding; retrospective all-page audits remain necessary.
 
 ### Verified 2026-09-25 milestones
 

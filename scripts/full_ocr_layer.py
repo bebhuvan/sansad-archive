@@ -27,8 +27,8 @@ from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.config import load_config  # noqa: E402
-from sansad_pipeline.image_quality import (DARK_PIXEL_CUTOFF, MAX_BLANK_DARK_PIXELS,
-                                           rendered_ink_metrics)  # noqa: E402
+from sansad_pipeline.image_quality import (rendered_ink_metrics, valid_blank_image_evidence,
+                                           valid_image_metrics)  # noqa: E402
 from sansad_pipeline.liteparse_engine import LiteParseEngine  # noqa: E402
 from sansad_pipeline.openrouter import render_page  # noqa: E402
 from scripts.cloud_state import _commit_with_retry, sha256_file  # noqa: E402
@@ -162,18 +162,18 @@ def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
             row = json.loads(line)
             page = pages[index]
             blank = not str(row.get("text") or "").strip()
-            blank_evidence = (row.get("visually_blank") is True
-                              and row.get("image_dark_pixel_cutoff") == DARK_PIXEL_CUTOFF
-                              and isinstance(row.get("image_dark_pixels"), int)
-                              and 0 <= row["image_dark_pixels"] <= MAX_BLANK_DARK_PIXELS
-                              and isinstance(row.get("image_pixels"), int)
-                              and row["image_pixels"] > 0)
+            has_visual_metrics = "visually_blank" in row
+            blank_evidence = valid_blank_image_evidence(row)
+            expected_flags = (["ocr-nonempty-on-visually-blank-page"]
+                              if row.get("visually_blank") is True and not blank else [])
             if (row.get("document_sha256") != page.document_sha256
                     or row.get("page_number") != page.page_number
                     or row.get("engine") != "liteparse"
                     or row.get("engine_version") != version
                     or row.get("method") != "image-only-rasterized-ocr"
                     or (blank and not blank_evidence)
+                    or (has_visual_metrics and not valid_image_metrics(row))
+                    or ("quality_flags" in row and row["quality_flags"] != expected_flags)
                     or row.get("origin", "sidecar-rasterized-ocr") not in
                     {"sidecar-rasterized-ocr", "selected-local-rasterized-ocr"}):
                 raise RuntimeError(f"OCR shard has invalid page {page.key}: {archive}")
@@ -233,13 +233,25 @@ def completed_shards(api: HfApi, repo: str, root: str, pages: list[Page],
     return result
 
 
-def blank_page_metrics(page: Page, dpi: int) -> dict:
+def page_image_metrics(page: Page, dpi: int) -> dict:
     with tempfile.TemporaryDirectory() as directory:
         image = render_page(page.raw_path, page.page_number, Path(directory), dpi)
         metrics = rendered_ink_metrics(image)
+    if not valid_image_metrics(metrics):
+        raise RuntimeError(f"invalid rendered page metrics for {page.key}")
+    return metrics
+
+
+def blank_page_metrics(page: Page, dpi: int) -> dict:
+    metrics = page_image_metrics(page, dpi)
     if not metrics["visually_blank"]:
         raise RuntimeError(f"LiteParse OCR returned empty text on a visible page: {page.key}")
     return metrics
+
+
+def visual_flags(metrics: dict, text: str) -> list[str]:
+    return (["ocr-nonempty-on-visually-blank-page"]
+            if metrics["visually_blank"] and text.strip() else [])
 
 
 def reusable_ocr_row(engine: LiteParseEngine, page: Page) -> dict | None:
@@ -267,18 +279,20 @@ def reusable_ocr_row(engine: LiteParseEngine, page: Page) -> dict | None:
         raise RuntimeError(f"selected OCR artifact identity mismatch for {page.key}")
     if "full-page-image" not in artifact.get("route_reasons", []):
         return None
-    blank_metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
-                     if not str(artifact.get("text") or "").strip() else {})
+    text = str(artifact.get("text") or "")
+    metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
+               if not text.strip() else
+               page_image_metrics(page, engine.config.liteparse.full_page_image_dpi))
     return {
         "document_sha256": page.document_sha256,
         "page_number": page.page_number,
         "engine": "liteparse", "engine_version": engine.version,
         "method": "image-only-rasterized-ocr",
         "origin": "selected-local-rasterized-ocr",
-        "text": artifact.get("text") or "", "markdown": artifact.get("markdown") or "",
+        "text": text, "markdown": artifact.get("markdown") or "",
         "mean_confidence": artifact.get("mean_confidence"),
         "source_artifact_sha256": hashlib.sha256(artifact_bytes).hexdigest(),
-        **blank_metrics,
+        "quality_flags": visual_flags(metrics, text), **metrics,
     }
 
 
@@ -305,8 +319,15 @@ def ocr_rows(engine: LiteParseEngine, pages: list[Page]) -> list[dict]:
             raise RuntimeError(f"LiteParse OCR page count mismatch for {first.document_sha256}")
         for page in same_pdf:
             item = by_number[page.page_number]
-            blank_metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
-                             if not item.text.strip() else {})
+            metrics = getattr(item, "visual_quality", None)
+            if metrics is None:
+                metrics = (blank_page_metrics(page, engine.config.liteparse.full_page_image_dpi)
+                           if not item.text.strip() else
+                           page_image_metrics(page, engine.config.liteparse.full_page_image_dpi))
+            elif not valid_image_metrics(metrics):
+                raise RuntimeError(f"invalid LiteParse screenshot metrics for {page.key}")
+            if not item.text.strip() and not valid_blank_image_evidence(metrics):
+                raise RuntimeError(f"LiteParse OCR returned empty text on a visible page: {page.key}")
             rows.append({
                 "document_sha256": page.document_sha256,
                 "page_number": page.page_number,
@@ -315,7 +336,7 @@ def ocr_rows(engine: LiteParseEngine, pages: list[Page]) -> list[dict]:
                 "origin": "sidecar-rasterized-ocr",
                 "text": item.text, "markdown": item.markdown,
                 "mean_confidence": item.mean_confidence,
-                **blank_metrics,
+                "quality_flags": visual_flags(metrics, item.text), **metrics,
             })
         index += len(same_pdf)
     if len(rows) != len(pages):

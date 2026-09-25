@@ -10,6 +10,7 @@ from liteparse import LiteParse
 from PIL import Image
 
 from .config import Config
+from .image_quality import image_ink_metrics
 
 
 PARSE_TIMEOUT_SECONDS = 300
@@ -27,6 +28,7 @@ class ExtractedPage:
     text_items: int
     vector_lines: int
     vector_shapes: int
+    visual_quality: dict[str, int | bool] | None = None
 
 
 def serializable(value: Any) -> Any:
@@ -68,6 +70,7 @@ class LiteParseEngine:
         cfg = self.config.liteparse
         parse_input: Path | bytes = pdf
         page_number_map: dict[int, int] = {}
+        visual_quality_by_page: dict[int, dict[str, int | bool]] = {}
         parser_target_pages = target_pages
         effective_dpi = cfg.full_page_image_dpi if rasterize else cfg.dpi
         if ocr and target_pages and rasterize:
@@ -79,6 +82,10 @@ class LiteParseEngine:
             if not screenshots:
                 raise RuntimeError("LiteParse returned no screenshots for routed OCR pages")
             images = [Image.open(BytesIO(item.image_bytes)).convert("RGB") for item in screenshots]
+            visual_quality_by_page = {
+                screenshot.page_num: image_ink_metrics(image)
+                for screenshot, image in zip(screenshots, images, strict=True)
+            }
             raster_pdf = BytesIO()
             images[0].save(
                 raster_pdf,
@@ -144,6 +151,9 @@ class LiteParseEngine:
                     text_items=len(page.text_items or []),
                     vector_lines=len(vectors.lines) if vectors else 0,
                     vector_shapes=len(vectors.shapes) if vectors else 0,
+                    visual_quality=visual_quality_by_page.get(
+                        page_number_map.get(int(page.page_num), int(page.page_num))
+                    ),
                 )
             )
         expected = (
