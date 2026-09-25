@@ -773,6 +773,8 @@ checkpoint (22:12 and 22:10 UTC respectively).
   either policy: publication now emits empty canonical text, retains the raw
   local and model layers, records the measured image metrics, and flags any
   nonempty transcript for review. Invalid visual metrics fail publication.
+  Promoting OpenRouter text to canonical also requires valid per-page visual
+  metrics; an older unmeasured model artifact cannot bypass the blank guard.
   This guard applies to newly built tranches; existing immutable tranches
   remain unchanged and need an explicit corrected publication to gain it.
   Space Bunny sees the local candidate as a prompt

@@ -293,6 +293,13 @@ class PublicationBuilder:
                                     f"invalid model visual evidence for {digest} page "
                                     f"{page['page_number']}: {provenance_path}"
                                 )
+                            if (canonical_policy == "model"
+                                    and adjudication["provider"] == "openrouter"
+                                    and visual_quality is None):
+                                raise RuntimeError(
+                                    f"model canonical policy requires measured image evidence "
+                                    f"for {digest} page {page['page_number']}: {provenance_path}"
+                                )
                             page["visual_quality"] = visual_quality
                             if not model_markdown.strip():
                                 if not verified_blank_response(provenance):

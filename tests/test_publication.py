@@ -263,6 +263,13 @@ class PublicationTests(unittest.TestCase):
                     minimum_pdf_saving_percent=100, canonical_policy="model",
                 )
             provenance.unlink()
+            store.db.execute("UPDATE adjudications SET provider='openrouter' WHERE run_id=1")
+            with self.assertRaisesRegex(RuntimeError, "requires measured image evidence"):
+                PublicationBuilder(config).build(
+                    Scope("lok_sabha", "18", "8"), root / "bundle-unmeasured-model",
+                    minimum_pdf_saving_percent=100, canonical_policy="model",
+                )
+            store.db.execute("UPDATE adjudications SET provider='nvidia' WHERE run_id=1")
 
             compact_output = root / "bundle-compact"
             PublicationBuilder(config).build(
