@@ -11,12 +11,14 @@ import gzip
 import json
 import os
 import re
+import sys
 import tempfile
 import time
 from pathlib import Path
 
 from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.config import load_config
 from sansad_pipeline.image_quality import rendered_ink_metrics, valid_image_metrics
 from sansad_pipeline.openrouter import render_page

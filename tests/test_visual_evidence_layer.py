@@ -3,6 +3,8 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +17,13 @@ from scripts.visual_evidence_layer import (METHOD, completed_shards, page_row,
 
 
 class VisualEvidenceLayerTests(unittest.TestCase):
+    def test_script_entry_point_imports_from_outside_checkout(self):
+        script = Path(__file__).resolve().parents[1] / "scripts/visual_evidence_layer.py"
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run([sys.executable, str(script), "--help"],
+                                    cwd=directory, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_rows_require_exact_page_identity_and_consistent_pixels(self):
         pages = [Page("a" * 64, 1, Path("a.pdf")), Page("b" * 64, 2, Path("b.pdf"))]
         rows = [{"document_sha256": page.document_sha256,
