@@ -915,6 +915,25 @@ checkpoint (22:12 and 22:10 UTC respectively).
   model snapshot, token counts, reported cost, and timestamps under the run
   artifact directory.
 
+### Verified 2026-09-25 milestones
+
+- LS 17/15 completed in cloud run `36086340826`. Its Hugging Face completion
+  marker points to `tranche-snapshot-local-7b6e50b4a7bc30622853`: 1,499
+  documents, 4,756 unique pages, 4,756 stored Space Bunny layers, and original
+  PDFs in the compact WebDataset. The required tranche files exist; downloaded
+  `manifest.jsonl`, `metadata.json`, and `pages.parquet` match `SHA256SUMS`.
+  The canonical policy remains `local`. One visually blank page retains a
+  spurious nonempty model layer, identified in the independent audit report;
+  the page's canonical text is empty. Completion is coverage evidence, not a
+  blanket transcription-accuracy claim.
+- LS 01/II's separate full image-only LiteParse OCR sidecar completed in run
+  `36085913818`: 2,151 unique page keys in 22 contiguous shards. All remote
+  shard sizes and SHA-256 hashes were independently rechecked, as were the
+  source completion marker and original-PDF inventory hash. The first 600
+  pages use the original shard schema without an origin field; later shards
+  disclose 1,274 provenance-checked reuses of selected image OCR and 277 fresh
+  sidecar OCR results. No page in these shards needed blank-page evidence.
+
 ## Provenance and formats
 
 Each publication tranche contains:
