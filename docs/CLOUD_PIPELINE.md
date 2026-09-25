@@ -23,6 +23,14 @@ while the old job was still actively acquiring; a runner loss in that window
 would have repeated those downloads. Smaller chunks trade a few more HF state
 commits for a shorter uncheckpointed interval. A chunk already running on an
 older commit is not changed or cancelled by this default.
+At 00:09 UTC on 2026-09-25, LS 01/III was still live in the older run's
+acquisition step, with its last HF checkpoint at 23:29 UTC and 2,000 of
+3,677 records downloaded. A read-only probe of the next listed eLibrary
+item's official ORIGINAL bundle returned in 0.56 seconds; that does not
+prove the runner is making progress, so the job remains under monitoring.
+The older pending historical batch `36074837899` was replaced by pending
+batch `36076235170` on commit `e6495fe`, carrying the 250-item acquisition
+checkpoint default. The active batch and its runner were not cancelled.
 
 The published WebDataset shard stores each selected official PDF as
 `<sha256>.original.pdf` beside its local, OCR/model, and canonical text layers.
