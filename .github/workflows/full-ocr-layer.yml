@@ -76,7 +76,7 @@ jobs:
           python -m pip install -r requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
-          TESSDATA_FILE="$(dpkg -L tesseract-ocr-eng | rg -m 1 '/eng\.traineddata$')"
+          TESSDATA_FILE="$(dpkg -L tesseract-ocr-eng | awk '/\/eng\.traineddata$/ { print; exit }')"
           test -f "$TESSDATA_FILE"
           echo "TESSDATA_PREFIX=$(dirname "$TESSDATA_FILE")" >> "$GITHUB_ENV"
       - name: Validate cloud credentials

@@ -1049,6 +1049,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `tesseract-ocr-eng` data file and exports its directory as `TESSDATA_PREFIX`.
   A local image-only OCR test passed with that explicit setting. No completion
   claim is made until the resumed cloud run and its remote shards are checked.
+  The first retry `36094258753` failed during dependency setup because the
+  runner image lacks `rg`; no OCR step or HF write occurred. The tessdata
+  lookup now uses `awk`, which was verified against the installed package
+  locally, before another bounded continuation.
 
 ## Provenance and formats
 
