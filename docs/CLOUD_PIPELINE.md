@@ -1291,8 +1291,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   Space Bunny transcript artifacts, with every call reporting zero cost.
   The publication marker and checksummed `pages.parquet` agree on 2,070 unique
   page keys across those 1,378 PDFs. Separate all-page LiteParse OCR/visual
-  run `36192104655` was dispatched; its completion and independent audit are
-  pending.
+  run `36192104655` completed. Independent replay verified all 2,070 OCR page
+  keys and visual measurements, with zero unprocessed pages, strictly
+  near-white-page conflicts or empty text on visibly marked pages. The cloud
+  report is `audits/full-ocr-model-visual/lok_sabha-p01-sV/`
+  `ocr-pages-00002070-9fbff7b0c2a26aad.json`, downloaded SHA-256
+  `9fbff7b0c2a26aad19290be44b56f85dcf3734bc1762ab3b51e08b995cc97056`.
+  Of the OCR rows, 2,060 reuse selected-local OCR and ten are separate
+  same-method sidecar executions. OCR/model visible-number differences on
+  1,864 pages remain a review queue, not an error-rate estimate.
 
 ## Provenance and formats
 
