@@ -17,6 +17,12 @@ Nothing is committed to Git. Raw PDFs and derived artifacts live in the
 Hugging Face dataset repository under `data/<house>/parliament-<n>/session-<s>/`.
 A checkpoint under `state/checkpoints/...` makes an interrupted run resumable
 without repeating model calls.
+Acquisition saves after each 250-record chunk by default. The former
+1,000-record chunk left LS 01/III with a checkpoint gap exceeding 36 minutes
+while the old job was still actively acquiring; a runner loss in that window
+would have repeated those downloads. Smaller chunks trade a few more HF state
+commits for a shorter uncheckpointed interval. A chunk already running on an
+older commit is not changed or cancelled by this default.
 
 The published WebDataset shard stores each selected official PDF as
 `<sha256>.original.pdf` beside its local, OCR/model, and canonical text layers.

@@ -11,12 +11,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cloud_state import save  # noqa: E402
+from scripts.cloud_state import save  # noqa: E402
 from sansad_pipeline.census import Census  # noqa: E402
 from sansad_pipeline.config import load_config  # noqa: E402
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--house", required=True)
     parser.add_argument("--parliament", default="")
@@ -25,8 +25,13 @@ def main() -> int:
     parser.add_argument("--repo", required=True)
     parser.add_argument("--checkpoint-path", required=True)
     parser.add_argument("--source", choices=("current", "elibrary"), default="current")
-    parser.add_argument("--chunk", type=int, default=1000)
+    parser.add_argument("--chunk", type=int, default=250)
     parser.add_argument("--budget-seconds", type=int, default=7200)
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
     if args.limit < 0 or args.chunk < 1 or args.budget_seconds < 1:
         parser.error("limit must be non-negative; chunk and budget must be positive")
