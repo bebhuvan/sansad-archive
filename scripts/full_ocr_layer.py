@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Publish a resumable, image-only LiteParse OCR layer for every scope page.
 
-This is deliberately independent of the selected local and Space Bunny layers.
+This is stored separately from the selected local and Space Bunny layers. When
+selected local OCR already used the same image-only LiteParse method, its
+verified page artifact can be reused without repeating that expensive OCR.
 Run only after a scope's PDF inventory is stable; changing the inventory fails
 closed rather than silently aligning old OCR rows to new page positions.
 """
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import gzip
 import hashlib
 import json
@@ -37,6 +40,9 @@ class Page:
     document_sha256: str
     page_number: int
     raw_path: Path
+    route: str | None = None
+    artifact_json: Path | None = None
+    run_config_json: str | None = None
 
     @property
     def key(self) -> str:
@@ -66,7 +72,8 @@ def scope_pages(database: Path, house: str, parliament: str, session: str) -> li
                    AND parliament_number=? AND session=?
                    AND document_sha256 IS NOT NULL
                )
-               SELECT r.document_sha256,p.page_number,d.raw_path
+               SELECT r.document_sha256,p.page_number,d.raw_path,p.route,
+                      p.artifact_json,r.config_json
                FROM scope_docs s JOIN runs r ON r.document_sha256=s.document_sha256
                JOIN pages p ON p.run_id=r.id
                JOIN documents d ON d.sha256=r.document_sha256
@@ -80,7 +87,8 @@ def scope_pages(database: Path, house: str, parliament: str, session: str) -> li
     finally:
         connection.close()
     pages = [Page(str(row["document_sha256"]), int(row["page_number"]),
-                  Path(row["raw_path"])) for row in rows]
+                  Path(row["raw_path"]), str(row["route"]),
+                  Path(row["artifact_json"]), str(row["config_json"])) for row in rows]
     if not pages:
         raise RuntimeError("scope has no completed extracted pages")
     if len({page.key for page in pages}) != len(pages):
@@ -154,7 +162,9 @@ def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
                     or row.get("engine") != "liteparse"
                     or row.get("engine_version") != version
                     or row.get("method") != "image-only-rasterized-ocr"
-                    or not str(row.get("text") or "").strip()):
+                    or not str(row.get("text") or "").strip()
+                    or row.get("origin", "sidecar-rasterized-ocr") not in
+                    {"sidecar-rasterized-ocr", "selected-local-rasterized-ocr"}):
                 raise RuntimeError(f"OCR shard has invalid page {page.key}: {archive}")
         if handle.readline():
             raise RuntimeError(f"OCR shard has extra rows: {archive}")
@@ -204,17 +214,60 @@ def completed_shards(api: HfApi, repo: str, root: str, pages: list[Page],
     return result
 
 
+def reusable_ocr_row(engine: LiteParseEngine, page: Page) -> dict | None:
+    if page.route != "ocr" or page.artifact_json is None or page.run_config_json is None:
+        return None
+    try:
+        run_config = json.loads(page.run_config_json)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"invalid extraction config for {page.key}") from exc
+    if not isinstance(run_config, dict):
+        raise RuntimeError(f"invalid extraction config for {page.key}")
+    if run_config.get("liteparse") != asdict(engine.config.liteparse):
+        return None
+    try:
+        artifact_bytes = page.artifact_json.read_bytes()
+        artifact = json.loads(artifact_bytes)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"selected OCR artifact is unavailable or invalid for {page.key}") from exc
+    if (not isinstance(artifact, dict)
+            or artifact.get("document_sha256") != page.document_sha256
+            or artifact.get("page_number") != page.page_number
+            or artifact.get("route") != "ocr"
+            or artifact.get("engine") != engine.name
+            or artifact.get("engine_version") != engine.version):
+        raise RuntimeError(f"selected OCR artifact identity mismatch for {page.key}")
+    if "full-page-image" not in artifact.get("route_reasons", []):
+        return None
+    if not str(artifact.get("text") or "").strip():
+        raise RuntimeError(f"selected image OCR is blank for {page.key}")
+    return {
+        "document_sha256": page.document_sha256,
+        "page_number": page.page_number,
+        "engine": "liteparse", "engine_version": engine.version,
+        "method": "image-only-rasterized-ocr",
+        "origin": "selected-local-rasterized-ocr",
+        "text": artifact["text"], "markdown": artifact.get("markdown", ""),
+        "mean_confidence": artifact.get("mean_confidence"),
+        "source_artifact_sha256": hashlib.sha256(artifact_bytes).hexdigest(),
+    }
+
+
 def ocr_rows(engine: LiteParseEngine, pages: list[Page]) -> list[dict]:
     rows: list[dict] = []
-    for offset in range(0, len(pages), BATCH_PAGES):
-        batch = pages[offset:offset + BATCH_PAGES]
-        # Keep the image-only PDF small and never mix two original PDFs.
-        first = batch[0]
+    reusable = [reusable_ocr_row(engine, page) for page in pages]
+    index = 0
+    while index < len(pages):
+        if reusable[index] is not None:
+            rows.append(reusable[index])
+            index += 1
+            continue
+        first = pages[index]
         same_pdf = [first]
-        for page in batch[1:]:
-            if page.document_sha256 != first.document_sha256:
-                break
-            same_pdf.append(page)
+        while (index + len(same_pdf) < len(pages) and len(same_pdf) < BATCH_PAGES
+               and pages[index + len(same_pdf)].document_sha256 == first.document_sha256
+               and reusable[index + len(same_pdf)] is None):
+            same_pdf.append(pages[index + len(same_pdf)])
         extracted = engine.extract(first.raw_path, ocr=True,
                                    target_pages=[page.page_number for page in same_pdf],
                                    rasterize=True)
@@ -230,12 +283,11 @@ def ocr_rows(engine: LiteParseEngine, pages: list[Page]) -> list[dict]:
                 "page_number": page.page_number,
                 "engine": "liteparse", "engine_version": engine.version,
                 "method": "image-only-rasterized-ocr",
+                "origin": "sidecar-rasterized-ocr",
                 "text": item.text, "markdown": item.markdown,
                 "mean_confidence": item.mean_confidence,
             })
-        # A batch can cross a PDF boundary. Process its remainder next.
-        if len(same_pdf) != len(batch):
-            rows.extend(ocr_rows(engine, batch[len(same_pdf):]))
+        index += len(same_pdf)
     if len(rows) != len(pages):
         raise RuntimeError("OCR shard did not cover every requested PDF/page")
     return rows
@@ -260,6 +312,10 @@ def publish_shard(api: HfApi, repo: str, root: str, pages: list[tuple[int, Page]
             "record_count": len(rows), "inventory_sha256": inventory,
             "engine": "liteparse", "engine_version": engine.version,
             "method": "image-only-rasterized-ocr",
+            "origin_counts": {
+                origin: sum(row["origin"] == origin for row in rows)
+                for origin in ("selected-local-rasterized-ocr", "sidecar-rasterized-ocr")
+            },
             "sha256": sha256_file(archive), "bytes": archive.stat().st_size,
         }
         manifest_file.write_text(json.dumps(manifest, ensure_ascii=False, indent=2),

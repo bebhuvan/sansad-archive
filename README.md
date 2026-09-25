@@ -383,13 +383,18 @@ prerequisites, resume semantics, and limits.
 The selected LiteParse local layer is route-dependent: strong native pages do
 not receive image OCR during ordinary extraction. For a separate OCR transcript
 of **every** page, `.github/workflows/full-ocr-layer.yml` restores a stable
-scope checkpoint and runs LiteParse on an image-only rasterization of each
-page. It writes immutable 100-page shards under `layers/full-ocr/<scope>/` on
+scope checkpoint and ensures an image-only LiteParse OCR transcript for each
+page. When the selected local artifact already came from the same rasterized
+OCR method and identical LiteParse settings, its identity is checked and its
+transcript reused. All other pages get fresh image-only OCR. Every new row
+records its origin; reused rows also carry the selected artifact's SHA-256.
+It writes immutable 100-page shards under `layers/full-ocr/<scope>/` on
 Hugging Face, verifies their page keys and hashes on resume, and never changes
 the selected local or Space Bunny text. Dispatch it only after acquisition and
 extraction for the scope are complete; if the inventory changes, a new
-inventory-addressed sidecar is created. This sidecar is an independent
-comparison layer, not a correction or accuracy certificate.
+inventory-addressed sidecar is created. This is a separately stored comparison
+layer, not an independent second OCR reading of reused pages, a correction,
+or an accuracy certificate.
 `.github/workflows/full-ocr-batch.yml` checks published completion markers
 every two hours and resumes up to two eligible Lok Sabha scopes. It verifies
 the matching published tranche and original-PDF checkpoint inventory before

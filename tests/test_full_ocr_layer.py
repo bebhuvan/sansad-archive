@@ -4,18 +4,22 @@ import gzip
 import json
 import tempfile
 import unittest
+from dataclasses import asdict
 from pathlib import Path
 from unittest import mock
 
+from sansad_pipeline.config import LiteParseConfig
 from scripts.full_ocr_layer import Page, inventory_sha256, ocr_rows, verify_shard_rows
 from scripts.plan_full_ocr import plan
 
 
 class FakeEngine:
     version = "2.14.7"
+    name = "liteparse"
 
     def __init__(self):
         self.calls = []
+        self.config = type("Config", (), {"liteparse": LiteParseConfig()})()
 
     def extract(self, pdf, *, ocr, target_pages, rasterize):
         self.calls.append((pdf, ocr, target_pages, rasterize))
@@ -36,8 +40,7 @@ class FullOcrLayerTests(unittest.TestCase):
         self.assertEqual([(row["document_sha256"], row["page_number"]) for row in rows],
                          [(page.document_sha256, page.page_number) for page in pages])
         self.assertTrue(all(call[1] and call[3] for call in engine.calls))
-        self.assertEqual([call[2] for call in engine.calls], [[1, 2, 3], [1, 2, 3, 4, 5],
-                                                            [6, 7, 8]])
+        self.assertEqual([call[2] for call in engine.calls], [[1, 2, 3], list(range(1, 9))])
 
     def test_shard_verifier_detects_missing_or_wrong_page(self):
         pages = [Page("a" * 64, number, Path("a.pdf")) for number in (1, 2)]
@@ -57,6 +60,56 @@ class FullOcrLayerTests(unittest.TestCase):
         first = [Page("a" * 64, 1, Path("a.pdf"))]
         second = [Page("a" * 64, 2, Path("a.pdf"))]
         self.assertNotEqual(inventory_sha256(first), inventory_sha256(second))
+
+    def test_verified_selected_image_ocr_is_reused_but_native_and_other_ocr_are_fresh(self):
+        digest = "a" * 64
+        engine = FakeEngine()
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_path = Path(directory) / "page.json"
+            artifact_path.write_text(json.dumps({
+                "document_sha256": digest, "page_number": 1, "route": "ocr",
+                "route_reasons": ["full-page-image"], "engine": "liteparse",
+                "engine_version": engine.version, "text": "Saved image OCR",
+                "markdown": "Saved image OCR", "mean_confidence": 0.95,
+            }))
+            config = json.dumps({"liteparse": asdict(engine.config.liteparse)})
+            pages = [
+                Page(digest, 1, Path("a.pdf"), "ocr", artifact_path, config),
+                Page(digest, 2, Path("a.pdf"), "native", artifact_path, config),
+                Page(digest, 3, Path("a.pdf")),
+            ]
+            rows = ocr_rows(engine, pages)
+            self.assertEqual(rows[0]["text"], "Saved image OCR")
+            self.assertEqual(rows[0]["origin"], "selected-local-rasterized-ocr")
+            self.assertEqual(len(rows[0]["source_artifact_sha256"]), 64)
+            self.assertEqual([call[2] for call in engine.calls], [[2, 3]])
+            self.assertEqual([row["origin"] for row in rows[1:]],
+                             ["sidecar-rasterized-ocr"] * 2)
+
+    def test_reuse_fails_closed_on_mismatch_and_reocr_on_config_change(self):
+        digest = "a" * 64
+        engine = FakeEngine()
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_path = Path(directory) / "page.json"
+            artifact = {
+                "document_sha256": digest, "page_number": 2, "route": "ocr",
+                "route_reasons": ["full-page-image"], "engine": "liteparse",
+                "engine_version": engine.version, "text": "Saved image OCR",
+            }
+            artifact_path.write_text(json.dumps(artifact))
+            config = json.dumps({"liteparse": asdict(engine.config.liteparse)})
+            page = Page(digest, 1, Path("a.pdf"), "ocr", artifact_path, config)
+            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+                ocr_rows(engine, [page])
+            artifact["page_number"] = 1
+            artifact_path.write_text(json.dumps(artifact))
+            changed = asdict(engine.config.liteparse)
+            changed["full_page_image_dpi"] = 200
+            page = Page(digest, 1, Path("a.pdf"), "ocr", artifact_path,
+                        json.dumps({"liteparse": changed}))
+            self.assertEqual(ocr_rows(engine, [page])[0]["origin"],
+                             "sidecar-rasterized-ocr")
+            self.assertEqual(len(engine.calls), 1)
 
     def test_planner_selects_only_completed_scope_without_matching_ocr_marker(self):
         marker_path = "state/snapshot-complete/snapshot-complete-lok_sabha-p01-sII.json"
