@@ -953,6 +953,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   six OCR-empty, visually blank pages; Space Bunny text was nonempty on all
   six. The other 794 older rows lacked image metrics, and 3,956 pages had no
   OCR sidecar yet. This is a confirmed conflict list, not a prevalence estimate.
+- Cloud audit run `36089041568` published the immutable 900-page LS 17/15
+  comparison report at `audits/full-ocr-model-visual/lok_sabha-p17-s15/`
+  `ocr-pages-00000900-3fae467394b25156.json`. Its downloaded SHA-256 matches
+  the filename prefix; it records six visually blank pages with nonempty model
+  text, 894 older OCR rows without image metrics, and 3,856 pages awaiting the
+  full-OCR sidecar. The report is evidence for those six pages only.
 - LS 01/II's separate full image-only LiteParse OCR sidecar completed in run
   `36085913818`: 2,151 unique page keys in 22 contiguous shards. All remote
   shard sizes and SHA-256 hashes were independently rechecked, as were the
@@ -960,6 +966,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
   pages use the original shard schema without an origin field; later shards
   disclose 1,274 provenance-checked reuses of selected image OCR and 277 fresh
   sidecar OCR results. No page in these shards needed blank-page evidence.
+  A separate published-layer audit joined all 2,151 pages but found that none
+  of these older OCR rows had all-page image metrics, so it cannot establish
+  a zero blank-page-conflict rate; a visual backfill is required.
 
 ## Provenance and formats
 
