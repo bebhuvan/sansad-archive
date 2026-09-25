@@ -945,6 +945,9 @@ checkpoint (22:12 and 22:10 UTC respectively).
   counts. The published-layer audit joins these measurements with older OCR
   shards and the separate local/model text; contradictory measurements from
   newer OCR shards fail closed. Neither process rewrites text or original PDFs.
+- LiteParse Python is pinned to `2.14.7`, the latest version shown on its
+  [PyPI project page](https://pypi.org/project/liteparse/) on 2026-09-25;
+  extraction artifacts record that exact engine version.
 - The published-layer report also compares visible numeric tokens in the
   separate full-image OCR and Space Bunny Markdown when both are nonempty.
   Standalone page-count footers and Markdown link destinations do not create
@@ -985,15 +988,25 @@ checkpoint (22:12 and 22:10 UTC respectively).
   SHA-256-verified report at `audits/full-ocr-model-visual/lok_sabha-p01-sII/`
   `ocr-pages-00002151-1ee82743e0aa1f8b.json`. None of these older OCR rows
   had all-page image metrics, so this cannot establish a zero blank-page-
-  conflict rate; a visual backfill is required.
+  conflict rate; the separate completed visual backfill below supplies that
+  missing evidence without changing the OCR shards.
 - The first visual-backfill canary (`36089735977`) failed before rendering on
   a standalone-script import path; no HF shard was written. Commit `128e8a5`
   fixed the entry point and added an outside-checkout CLI test. The corrected
   100-page LS 01/II canary (`36089996509`) published and independently
   verified one visual shard and an updated comparison report: 100 measured
   pages, zero visually blank among those 100, and 2,051 still unmeasured.
-  Full resumable continuations `36090217938` (LS 01/II) and `36090227461`
-  (LS 17/15) were dispatched; their completion remains to be verified.
+- LS 01/II continuation `36090217938` completed all 2,151 visual pages in
+  22 contiguous HF shards. An independent local replay verified every OCR
+  and visual shard checksum, page identity, inventory and completion marker.
+  The updated cloud report from run `36090800082` is at
+  `audits/full-ocr-model-visual/lok_sabha-p01-sII/`
+  `ocr-pages-00002151-01e9f03e2cf61252.json`; its downloaded SHA-256 matches
+  the filename prefix. All 2,151 pages have visual measurements; none met the
+  strict near-white blank-page threshold. Image-only OCR and Space Bunny
+  disagree on visible numeric tokens on 2,094 of 2,151 comparable pages.
+  This is a disagreement count, not a model or OCR error rate. The LS 17/15
+  visual continuation `36090227461` remains in progress.
 
 ## Provenance and formats
 
