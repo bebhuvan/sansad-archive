@@ -980,6 +980,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `ocr-pages-00002151-1ee82743e0aa1f8b.json`. None of these older OCR rows
   had all-page image metrics, so this cannot establish a zero blank-page-
   conflict rate; a visual backfill is required.
+- The first visual-backfill canary (`36089735977`) failed before rendering on
+  a standalone-script import path; no HF shard was written. Commit `128e8a5`
+  fixed the entry point and added an outside-checkout CLI test. The corrected
+  100-page LS 01/II canary (`36089996509`) published and independently
+  verified one visual shard and an updated comparison report: 100 measured
+  pages, zero visually blank among those 100, and 2,051 still unmeasured.
+  Full resumable continuations `36090217938` (LS 01/II) and `36090227461`
+  (LS 17/15) were dispatched; their completion remains to be verified.
 
 ## Provenance and formats
 
