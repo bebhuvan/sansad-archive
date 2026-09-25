@@ -1190,6 +1190,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   reported `publication_marker_changed_since_sidecar=true` only for the visual
   layer. Of its 2,151 OCR rows, 1,274 reuse the selected local OCR artifact
   and 877 are new sidecar executions, so agreement is interpreted by origin.
+  Cloud audit retry `36111463131` succeeded and published
+  `audits/full-ocr-model-visual/lok_sabha-p01-sII/`
+  `ocr-pages-00002151-935343a339298bfb.json`; a fresh download matched its
+  SHA-256 `935343a339298bfba720331601603921fecb3141a72490bf10d98273dd205fe5`.
+  The report records the visual marker-version difference and the same OCR
+  provenance split. Full-OCR batch retry `36111467808` also succeeded: its
+  planner found no completed Lok Sabha scope lacking full OCR, so no redundant
+  OCR job was launched.
 
 ## Provenance and formats
 
