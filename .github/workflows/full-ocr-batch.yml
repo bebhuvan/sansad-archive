@@ -1,0 +1,56 @@
+name: Continue full LiteParse OCR for completed scopes
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 0,2,4,6,8,10,12,14,16,18,20,22 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_work: ${{ steps.plan.outputs.has_work }}
+    env:
+      HF_REPO: ${{ vars.HF_DATASET_REPO }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install planner dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Select completed scopes with missing full OCR
+        id: plan
+        run: |
+          test -n "$HF_REPO"
+          test -n "$HF_TOKEN"
+          python scripts/plan_full_ocr.py --repo "$HF_REPO" \
+            --house lok_sabha --max-scopes 2 > /tmp/full-ocr-matrix.json
+          python -c 'import json; d=json.load(open("/tmp/full-ocr-matrix.json")); print(d)' 
+          echo "matrix=$(cat /tmp/full-ocr-matrix.json)" >> "$GITHUB_OUTPUT"
+          if python -c 'import json; assert json.load(open("/tmp/full-ocr-matrix.json"))["include"]'; then
+            echo "has_work=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_work=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ocr:
+    needs: plan
+    if: needs.plan.outputs.has_work == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    uses: ./.github/workflows/full-ocr-layer.yml
+    with:
+      source: ${{ matrix.source }}
+      house: ${{ matrix.house }}
+      parliament: ${{ matrix.parliament }}
+      session: ${{ matrix.session }}
+      max_pages: "500"
+    secrets: inherit

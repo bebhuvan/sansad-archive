@@ -390,6 +390,11 @@ the selected local or Space Bunny text. Dispatch it only after acquisition and
 extraction for the scope are complete; if the inventory changes, a new
 inventory-addressed sidecar is created. This sidecar is an independent
 comparison layer, not a correction or accuracy certificate.
+`.github/workflows/full-ocr-batch.yml` checks published completion markers
+every two hours and resumes up to two eligible Lok Sabha scopes. It verifies
+the matching published tranche and original-PDF checkpoint inventory before
+planning work, and skips a scope only after the OCR sidecar has its own
+completion marker for that same source state.
 
 ## Tests and benchmark
 

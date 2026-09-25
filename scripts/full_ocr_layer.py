@@ -103,6 +103,43 @@ def shard_paths(root: str, start: int, end: int) -> tuple[str, str]:
     return stem + ".jsonl.gz", stem + ".json"
 
 
+def completion_marker_path(source: str, key: str) -> str:
+    if source == "elibrary":
+        return f"state/snapshot-complete/snapshot-complete-{key}.json"
+    if source == "current":
+        return f"state/complete/session-complete-{key}.json"
+    raise ValueError(f"unsupported source: {source}")
+
+
+def completion_evidence(repo: str, source: str, house: str, parliament: str,
+                        session: str, token: str, api: HfApi) -> dict:
+    key = f"{house}-p{parliament}-s{session}"
+    path = completion_marker_path(source, key)
+    raw = Path(hf_hub_download(repo, path, repo_type="dataset", token=token)).read_bytes()
+    marker = json.loads(raw)
+    inputs = marker.get("inputs") or {}
+    complete_field = "snapshot_complete" if source == "elibrary" else "session_complete"
+    if (marker.get(complete_field) is not True or inputs.get("source") != source
+            or inputs.get("house") != house or inputs.get("parliament") != parliament
+            or inputs.get("session") != session or not marker.get("tranche_path")):
+        raise RuntimeError(f"scope completion marker lacks matching evidence: {path}")
+    tranche = marker["tranche_path"].strip("/")
+    required = [f"{tranche}/{name}" for name in
+                ("manifest.jsonl", "metadata.json", "SHA256SUMS", "webdataset/shard-00000.tar")]
+    found = list(api.get_paths_info(repo, required, repo_type="dataset", expand=False))
+    if {item.path for item in found} != set(required):
+        raise RuntimeError(f"scope completion marker points to missing tranche files: {path}")
+    checkpoint_path = (f"state/checkpoints/{'elibrary-' if source == 'elibrary' else ''}"
+                       f"{key}/checkpoint.json")
+    checkpoint = json.loads(Path(hf_hub_download(
+        repo, checkpoint_path, repo_type="dataset", token=token)).read_text())
+    raw_inventory = checkpoint.get("raw_inventory_sha256")
+    if checkpoint.get("version") != 3 or not raw_inventory:
+        raise RuntimeError(f"scope checkpoint lacks verified PDF inventory: {checkpoint_path}")
+    return {"path": path, "sha256": hashlib.sha256(raw).hexdigest(),
+            "checkpoint_path": checkpoint_path, "raw_inventory_sha256": raw_inventory}
+
+
 def verify_shard_rows(archive: Path, pages: list[Page], start: int, end: int,
                       version: str) -> None:
     with gzip.open(archive, "rt", encoding="utf-8") as handle:
@@ -247,7 +284,7 @@ def publish_shard(api: HfApi, repo: str, root: str, pages: list[tuple[int, Page]
         return manifest
 
 
-def run(repo: str, house: str, parliament: str, session: str, *, max_pages: int,
+def run(repo: str, source: str, house: str, parliament: str, session: str, *, max_pages: int,
         max_seconds: int, token: str, database: Path = Path("data/pipeline.sqlite3"),
         api: HfApi | None = None) -> dict:
     config = load_config(Path("pipeline.toml"))
@@ -258,6 +295,7 @@ def run(repo: str, house: str, parliament: str, session: str, *, max_pages: int,
     root = (f"layers/full-ocr/{key}/inventory-{inventory[:16]}/liteparse-{engine.version}-"
             f"{config.liteparse.language}-{config.liteparse.full_page_image_dpi}dpi")
     api = api or HfApi(token=token)
+    marker = completion_evidence(repo, source, house, parliament, session, token, api)
     shards = completed_shards(api, repo, root, pages, inventory, engine.version, token)
     next_index = shards[-1]["end_index"] + 1 if shards else 0
     started = time.monotonic()
@@ -267,12 +305,47 @@ def run(repo: str, house: str, parliament: str, session: str, *, max_pages: int,
         if processed + end - next_index > max_pages or time.monotonic() - started >= max_seconds:
             break
         indexed = list(enumerate(pages[next_index:end], next_index))
-        publish_shard(api, repo, root, indexed, inventory, engine, token)
+        shards.append(publish_shard(api, repo, root, indexed, inventory, engine, token))
         processed += len(indexed)
         next_index = end
         print(json.dumps({"ocr_pages_complete": next_index, "scope_pages": len(pages)}),
               flush=True)
     status = "complete" if next_index == len(pages) else "checkpointed"
+    if status == "complete":
+        if (not shards or shards[-1]["end_index"] + 1 != len(pages)):
+            raise RuntimeError("OCR coverage is incomplete despite reaching the last page")
+        completion = {
+            "root": root, "source": source, "scope": key,
+            "pages": len(pages), "inventory_sha256": inventory,
+            "engine": "liteparse", "engine_version": engine.version,
+            "method": "image-only-rasterized-ocr",
+            "completion_marker": marker,
+            "shards": len(shards),
+        }
+        completion_path = root + "/complete.json"
+        existing = set(api.list_repo_files(repo, repo_type="dataset"))
+        upload_completion = completion_path not in existing
+        if completion_path in existing:
+            saved = json.loads(Path(hf_hub_download(
+                repo, completion_path, repo_type="dataset", token=token)).read_text())
+            if saved != completion:
+                old_identity = {key: value for key, value in saved.items()
+                                if key != "completion_marker"}
+                new_identity = {key: value for key, value in completion.items()
+                                if key != "completion_marker"}
+                if old_identity != new_identity:
+                    raise RuntimeError("existing OCR completion marker differs from verified inventory")
+                upload_completion = True
+        if upload_completion:
+            _commit_with_retry(api, repo=repo, operations=[CommitOperationAdd(
+                path_in_repo=completion_path,
+                path_or_fileobj=json.dumps(completion, ensure_ascii=False, indent=2).encode("utf-8"),
+            )], message=f"Complete full LiteParse OCR {key}")
+            saved = json.loads(Path(hf_hub_download(
+                repo, completion_path, repo_type="dataset", token=token,
+                force_download=True)).read_text())
+            if saved != completion:
+                raise RuntimeError("OCR completion marker failed remote verification")
     return {"status": status, "root": root, "pages": len(pages),
             "ocr_pages_complete": next_index, "pages_this_run": processed,
             "inventory_sha256": inventory}
@@ -281,6 +354,7 @@ def run(repo: str, house: str, parliament: str, session: str, *, max_pages: int,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", required=True)
+    parser.add_argument("--source", choices=("current", "elibrary"), required=True)
     parser.add_argument("--house", required=True)
     parser.add_argument("--parliament", required=True)
     parser.add_argument("--session", required=True)
@@ -296,7 +370,7 @@ def main() -> int:
     token = os.environ.get("HF_TOKEN")
     if not token:
         raise SystemExit("HF_TOKEN is required")
-    print(json.dumps(run(args.repo, args.house, args.parliament, args.session,
+    print(json.dumps(run(args.repo, args.source, args.house, args.parliament, args.session,
                          max_pages=args.max_pages, max_seconds=args.max_seconds,
                          token=token)))
     return 0

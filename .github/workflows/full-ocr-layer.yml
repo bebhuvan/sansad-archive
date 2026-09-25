@@ -1,6 +1,26 @@
 name: Full independent LiteParse OCR layer
 
 on:
+  workflow_call:
+    inputs:
+      source:
+        type: string
+        required: true
+      house:
+        type: string
+        required: true
+      parliament:
+        type: string
+        required: true
+      session:
+        type: string
+        required: true
+      max_pages:
+        type: string
+        default: "500"
+    secrets:
+      HF_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       source:
@@ -62,6 +82,7 @@ jobs:
           test -n "$HF_TOKEN"
       - name: Restore immutable originals and page inventory
         run: |
+          case "$SOURCE" in elibrary|current) ;; *) exit 2 ;; esac
           PREFIX=""
           if [ "$SOURCE" = "elibrary" ]; then PREFIX="elibrary-"; fi
           python scripts/cloud_state.py restore --repo "$HF_REPO" \
@@ -69,5 +90,6 @@ jobs:
       - name: OCR all pages in bounded, durable shards
         run: |
           python scripts/full_ocr_layer.py --repo "$HF_REPO" \
-            --house "$HOUSE" --parliament "$PARLIAMENT" --session "$SESSION" \
+            --source "$SOURCE" --house "$HOUSE" \
+            --parliament "$PARLIAMENT" --session "$SESSION" \
             --max-pages "$MAX_PAGES"
