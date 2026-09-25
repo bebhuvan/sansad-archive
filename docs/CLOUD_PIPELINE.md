@@ -1073,6 +1073,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   conflicts, zero empty model transcripts on visibly inked pages, and 1,314
   OCR/model numeric disagreements among 2,700 comparable pages. These are
   review signals, not adjudicated error rates.
+  Cloud audit `36095621559` advanced the verified OCR prefix to 2,900 pages
+  and published `audits/full-ocr-model-visual/lok_sabha-p17-s15/`
+  `ocr-pages-00002900-dab14eb71b0d9a57.json`; an independent download matched
+  its SHA-256 filename prefix. It reports zero empty model transcripts on
+  visibly inked pages, 33 blank-page model-text conflicts, and 1,416
+  OCR/model numeric disagreements among 2,900 comparable pages.
 
 ## Provenance and formats
 
