@@ -1285,6 +1285,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   full-page LiteParse OCR and visual run `36183459175` was dispatched for all
   12,038 pages; completion and independent audit are pending.
 
+- Direct continuation `36180387255` published historical LS 01/V after the
+  earlier runner interruption. Independent checkpoint replay verified all
+  2,114 attachment inventories, 1,378 distinct original PDFs and all 2,070
+  Space Bunny transcript artifacts, with every call reporting zero cost.
+  The publication marker and checksummed `pages.parquet` agree on 2,070 unique
+  page keys across those 1,378 PDFs. Separate all-page LiteParse OCR/visual
+  run `36192104655` was dispatched; its completion and independent audit are
+  pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
