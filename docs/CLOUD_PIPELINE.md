@@ -945,6 +945,12 @@ checkpoint (22:12 and 22:10 UTC respectively).
   counts. The published-layer audit joins these measurements with older OCR
   shards and the separate local/model text; contradictory measurements from
   newer OCR shards fail closed. Neither process rewrites text or original PDFs.
+- The published-layer report also compares visible numeric tokens in the
+  separate full-image OCR and Space Bunny Markdown when both are nonempty.
+  Standalone page-count footers and Markdown link destinations do not create
+  false disagreements. The report records page-keyed OCR-only/model-only
+  counts and bounded token samples as a review queue, distinct from the
+  image-proven blank-page conflicts; neither transcript is ground truth.
 
 ### Verified 2026-09-25 milestones
 

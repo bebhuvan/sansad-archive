@@ -75,6 +75,29 @@ class PublishedOcrAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "disagrees"):
             audit_layers(pages, ocr, visual)
 
+    def test_numeric_comparison_is_separate_from_visual_conflicts(self):
+        digest = "a" * 64
+        pages = [
+            {"document_sha256": digest, "page_number": 1,
+             "local_text": "", "local_markdown": "",
+             "adjudicated_markdown": "Question 42\nPage 1 of 2"},
+            {"document_sha256": digest, "page_number": 2,
+             "local_text": "", "local_markdown": "",
+             "adjudicated_markdown": "Question 43"},
+        ]
+        ocr = [
+            {"document_sha256": digest, "page_number": 1,
+             "text": "Question 42", "markdown": "Question 42"},
+            {"document_sha256": digest, "page_number": 2,
+             "text": "Question 44", "markdown": "Question 44"},
+        ]
+        report = audit_layers(pages, ocr)
+        self.assertEqual(report["ocr_model_numeric_pages_compared"], 2)
+        self.assertEqual(report["ocr_model_numeric_disagreement_pages"], 1)
+        self.assertEqual(report["ocr_model_numeric_disagreements"][0]["ocr_only_sample"], ["44"])
+        self.assertEqual(report["ocr_model_numeric_disagreements"][0]["model_only_sample"], ["43"])
+        self.assertEqual(report["conflicts"], [])
+
     def test_mismatched_identity_and_bad_metrics_fail_closed(self):
         pages = [{"document_sha256": "a" * 64, "page_number": 1,
                   "local_text": "", "local_markdown": "",

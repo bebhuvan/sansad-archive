@@ -22,6 +22,7 @@ from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sansad_pipeline.image_quality import valid_image_metrics  # noqa: E402
 from sansad_pipeline.text_quality import local_content_empty  # noqa: E402
+from sansad_pipeline.validation import content_numbers  # noqa: E402
 from scripts.full_ocr_layer import (Page, completion_marker_path, inventory_sha256,
                                     shard_paths, verify_shard_rows)  # noqa: E402
 from scripts.cloud_state import _commit_with_retry  # noqa: E402
@@ -196,6 +197,8 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
     if len(visual_rows) > len(pages):
         raise RuntimeError("visual rows exceed published page inventory")
     flags: list[dict] = []
+    numeric_disagreements: list[dict] = []
+    numeric_compared = 0
     measured = 0
     blank = 0
     ocr_unmeasured = 0
@@ -207,6 +210,20 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             raise RuntimeError(f"OCR/published page identity mismatch at index {index}")
         if visual is not None and key != (visual["document_sha256"], visual["page_number"]):
             raise RuntimeError(f"visual/published page identity mismatch at index {index}")
+        model_text = str(published["adjudicated_markdown"] or "")
+        ocr_text = str((ocr or {}).get("markdown") or (ocr or {}).get("text") or "")
+        if ocr is not None and ocr_text.strip() and model_text.strip():
+            numeric_compared += 1
+            ocr_numbers = content_numbers(ocr_text)
+            model_numbers = content_numbers(model_text)
+            if ocr_numbers != model_numbers:
+                ocr_only = sorted((ocr_numbers - model_numbers).elements())
+                model_only = sorted((model_numbers - ocr_numbers).elements())
+                numeric_disagreements.append({
+                    "document_sha256": key[0], "page_number": key[1],
+                    "ocr_only_count": len(ocr_only), "model_only_count": len(model_only),
+                    "ocr_only_sample": ocr_only[:20], "model_only_sample": model_only[:20],
+                })
         ocr_metrics = ocr if ocr is not None and "visually_blank" in ocr else None
         if ocr_metrics is not None and not valid_image_metrics(ocr_metrics):
             raise RuntimeError(f"invalid OCR visual evidence for {key}")
@@ -247,7 +264,10 @@ def audit_layers(pages: list[dict], ocr_rows: list[dict],
             "ocr_pages_without_visual_metrics": ocr_unmeasured,
             "published_pages_without_visual_metrics": len(pages) - measured,
             "visually_blank_pages_among_assessed": blank,
-            "conflict_counts": counts, "conflicts": flags}
+            "conflict_counts": counts, "conflicts": flags,
+            "ocr_model_numeric_pages_compared": numeric_compared,
+            "ocr_model_numeric_disagreement_pages": len(numeric_disagreements),
+            "ocr_model_numeric_disagreements": numeric_disagreements}
 
 
 def publish_report(repo: str, scope: str, report_bytes: bytes, ocr_pages: int,
@@ -306,6 +326,7 @@ def main() -> int:
         "visual_sidecar_pages", "visually_assessed_pages",
         "ocr_pages_without_visual_metrics", "published_pages_without_visual_metrics",
         "visually_blank_pages_among_assessed", "conflict_counts",
+        "ocr_model_numeric_pages_compared", "ocr_model_numeric_disagreement_pages",
     )} | {"report_path": published}))
     return 0
 
