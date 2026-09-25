@@ -1199,6 +1199,19 @@ checkpoint (22:12 and 22:10 UTC respectively).
   planner found no completed Lok Sabha scope lacking full OCR, so no redundant
   OCR job was launched.
 
+- Historical LS 01/III reached its per-job work deadline in batch
+  `36098624063` with 3,445/3,641 model pages checkpointed, then direct,
+  scope-locked continuation `36127349327` finished the last pages and
+  published the full session. An independent HF checkpoint replay found all
+  3,677 attachments inventoried, 2,316 distinct original PDFs retained and
+  all 3,641 separate Space Bunny transcripts present; all 3,641 calls reported
+  `0.0` cost. The publication marker and checksummed `pages.parquet` agree on
+  3,641 unique pages across those 2,316 PDFs. All nine files listed in the
+  tranche `SHA256SUMS` exist on HF, including a 3,479,234,560-byte WebDataset
+  tar whose remote LFS hash matches the recorded checksum. Separate all-page
+  OCR run `36130084131` was dispatched after publication; its completion and
+  quality review remain pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
