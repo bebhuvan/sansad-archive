@@ -1140,6 +1140,20 @@ checkpoint (22:12 and 22:10 UTC respectively).
   render show only `*****` (531 dark pixels). These two omissions remain
   review items; their native local and model transcripts were not replaced.
 
+- Historical LS 01/I batch `36080678021` completed on 2026-09-25. The
+  independently inspected HF checkpoint contains all 2,950 attachment
+  records, 1,807 distinct retained PDF bitstreams, 2,826 extracted pages and
+  2,826 separate Space Bunny transcripts; artifact replay found zero missing
+  or invalid transcripts and all 2,826 reported calls cost `0.0`. Its
+  `state/snapshot-complete/snapshot-complete-lok_sabha-p01-sI.json` marker
+  matches the scope and verified raw inventory. A fresh read checked the
+  published `pages.parquet` and `metadata.json` SHA-256s and found 2,826
+  unique page keys across 1,807 PDFs, every page with a model layer. All nine
+  files named in the tranche `SHA256SUMS` exist on HF; the remote LFS hash of
+  the 741,416,960-byte WebDataset tar matches its recorded checksum. This
+  proves the completed local/model/original publication, not yet a separate
+  full-page OCR or visual-evidence sidecar for this historical scope.
+
 ## Provenance and formats
 
 Each publication tranche contains:
