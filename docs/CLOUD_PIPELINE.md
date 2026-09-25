@@ -56,6 +56,13 @@ integration test ran the pool inside the same spawned-process shape used by
 cloud extraction.
 This safeguard does not impose a hard timeout on the separate screenshot step
 used for full-page-image OCR routing.
+At 00:18 UTC on 2026-09-25, GitHub had not emitted the 00:17 scheduled
+current-API batch. The older pending scheduled batch `36071728804` was
+cancelled before starting and replacement batch `36076943330` queued on
+commit `a9ea4af`, with all-pages Space Bunny, OCR, local canonical, four
+scopes, two runners and completion-marker skipping explicitly set. It remains
+pending behind the active modern batch, whose LS 18/5 and 18/6 jobs were both
+in model adjudication; neither active job was interrupted.
 
 **eLibrary attachment completeness is a separate question from item coverage.**
 At 22:52 UTC on 2026-09-24, live item
