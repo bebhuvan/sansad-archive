@@ -91,6 +91,8 @@ def main() -> int:
     attachment_backfill = {"selected": 0, "completed": 0, "failed": 0,
                            "original_pdfs": 0, "new_original_pdfs": 0,
                            "bytes_added": 0, "stopped_low_disk": False}
+    primary_reselection = {"inspected": 0, "changed": 0,
+                           "missing_ledgers": 0, "ambiguous": 0}
     if args.source == "elibrary" and not stopped_low_disk:
         last_record_id = ""
         while time.monotonic() - started < args.budget_seconds:
@@ -110,6 +112,12 @@ def main() -> int:
                 break
             if result["selected"] < 100:
                 break
+
+        primary_reselection = census.reselect_elibrary_primary_from_ledger(
+            house=args.house, parliament=args.parliament, session=args.session,
+        )
+        if primary_reselection["changed"]:
+            save(args.repo, args.checkpoint_path, token=os.environ.get("HF_TOKEN"))
 
     attachments_remaining = 0
     if args.source == "elibrary":
@@ -135,6 +143,7 @@ def main() -> int:
         "selected": selected, "downloaded": downloaded,
         "original_pdfs_downloaded": original_pdfs_downloaded,
         "attachment_backfill": attachment_backfill,
+        "primary_reselection": primary_reselection,
         "attachments_remaining": attachments_remaining,
         "failed": int(remaining["failed"] or 0),
         "discovered": int(remaining["discovered"] or 0),

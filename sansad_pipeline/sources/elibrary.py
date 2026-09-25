@@ -266,24 +266,7 @@ def primary_pdf_index(pdfs: list[tuple[str, dict[str, Any]]]) -> int:
     """
     if not pdfs:
         raise ValueError("cannot select a PDF from an empty ORIGINAL inventory")
-
-    def hint(bitstream: dict[str, Any]) -> str:
-        name = str(bitstream.get("name") or "").casefold()
-        tokens = set(re.findall(r"[a-z]+|[\u0900-\u097f]+", name))
-        metadata = bitstream.get("metadata") or {}
-        languages = {str(entry.get("value") or "").strip().casefold()
-                     for entry in metadata.get("dc.language.iso") or []}
-        english = bool(tokens & {"english", "eng", "en"}
-                       or languages & {"english", "eng", "en"})
-        hindi = bool(tokens & {"hindi", "hin", "hi", "हिंदी", "हिन्दी"}
-                     or languages & {"hindi", "hin", "hi"})
-        if english and not hindi:
-            return "en"
-        if hindi and not english:
-            return "hi"
-        return "und"
-
-    hints = [hint(bitstream) for _, bitstream in pdfs]
+    hints = [bitstream_language_hint(bitstream) for _, bitstream in pdfs]
     english = [index for index, language in enumerate(hints) if language == "en"]
     if english:
         return english[0]
@@ -291,3 +274,21 @@ def primary_pdf_index(pdfs: list[tuple[str, dict[str, Any]]]) -> int:
     if non_hindi:
         return non_hindi[0]
     return 0
+
+
+def bitstream_language_hint(bitstream: dict[str, Any]) -> str:
+    """Return only an explicit language hint, never infer from bundle order."""
+    name = str(bitstream.get("name") or "").casefold()
+    tokens = set(re.findall(r"[a-z]+|[\u0900-\u097f]+", name))
+    metadata = bitstream.get("metadata") or {}
+    languages = {str(entry.get("value") or "").strip().casefold()
+                 for entry in metadata.get("dc.language.iso") or []}
+    english = bool(tokens & {"english", "eng", "en"}
+                   or languages & {"english", "eng", "en"})
+    hindi = bool(tokens & {"hindi", "hin", "hi", "हिंदी", "हिन्दी"}
+                 or languages & {"hindi", "hin", "hi"})
+    if english and not hindi:
+        return "en"
+    if hindi and not english:
+        return "hi"
+    return "und"

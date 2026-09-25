@@ -22,6 +22,7 @@ from .sources.questions import (
     latest_rajya_sabha_session,
 )
 from .sources.elibrary import (
+    bitstream_language_hint,
     lok_sabha_question_count as elibrary_question_count,
     records_from_search_response,
     list_original_pdfs,
@@ -75,6 +76,61 @@ class Census:
                     (record_id, bitstream_id, position,
                      str(bitstream.get("name") or ""), url, digest, utcnow()),
                 )
+
+    def reselect_elibrary_primary_from_ledger(
+        self, *, house: str, parliament: str, session: str,
+    ) -> dict[str, int]:
+        """Repair legacy Hindi-first selections using retained bitstream evidence.
+
+        A change needs a labelled English alternative or an explicitly Hindi
+        current selection. Ambiguous names alone never override the selected
+        PDF; original document bytes and prior text runs remain retained.
+        """
+        rows = self.store.db.all(
+            """SELECT c.record_id,c.document_sha256 AS selected_sha256,
+                      a.name,a.source_url,a.document_sha256 AS attachment_sha256
+               FROM census_records c LEFT JOIN elibrary_pdf_attachments a
+                 ON a.record_id=c.record_id
+               WHERE c.house=? AND COALESCE(c.parliament_number,'')=?
+                 AND c.session=? AND c.record_id LIKE 'elibrary_%'
+                 AND c.acquisition_status='downloaded'
+               ORDER BY c.record_id,a.position""",
+            (house, parliament, session),
+        )
+        grouped: dict[str, list] = {}
+        for row in rows:
+            grouped.setdefault(row["record_id"], []).append(row)
+        inspected = changed = missing_ledgers = ambiguous = 0
+        with self.store.db.connect() as connection:
+            for record_id, attachments in grouped.items():
+                if attachments[0]["attachment_sha256"] is None:
+                    missing_ledgers += 1
+                    continue
+                inspected += 1
+                selected_sha = attachments[0]["selected_sha256"]
+                current = next((row for row in attachments
+                                if row["attachment_sha256"] == selected_sha), None)
+                if current is None:
+                    raise RuntimeError(f"selected PDF absent from attachment ledger: {record_id}")
+                pdfs = [(row["source_url"], {"name": row["name"]}) for row in attachments]
+                candidate = attachments[primary_pdf_index(pdfs)]
+                if candidate["attachment_sha256"] == selected_sha:
+                    continue
+                candidate_hint = bitstream_language_hint({"name": candidate["name"]})
+                current_hint = bitstream_language_hint({"name": current["name"]})
+                if candidate_hint != "en" and current_hint != "hi":
+                    ambiguous += 1
+                    continue
+                update = connection.execute(
+                    """UPDATE census_records SET document_sha256=?,last_error=NULL
+                       WHERE record_id=? AND document_sha256=?""",
+                    (candidate["attachment_sha256"], record_id, selected_sha),
+                )
+                if update.rowcount != 1:
+                    raise RuntimeError(f"selected PDF changed during reselection: {record_id}")
+                changed += 1
+        return {"inspected": inspected, "changed": changed,
+                "missing_ledgers": missing_ledgers, "ambiguous": ambiguous}
 
     def _upsert_many(self, records: list[QuestionRecord]) -> None:
         if not records:

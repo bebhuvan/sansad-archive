@@ -84,6 +84,13 @@ PDF without an explicit Hindi label, while preserving official bitstream order
 in the full attachment ledger. An unlabeled bundle remains ambiguous and is
 not asserted to be English. A reversed Hindi-first two-PDF test verifies that
 the English PDF becomes the selected text source and both originals survive.
+This rule applies to new acquisitions; already-published historical tranches
+are not retroactively relabelled. On replay, the acquisition stage checks the
+retained attachment ledger and reselects only when there is an explicitly
+English alternative or the old selected filename is explicitly Hindi. The
+old raw bytes and text runs remain available; the new selected PDF must pass
+through extraction and Space Bunny before a new tranche can be complete.
+Ambiguous names are counted, left unchanged and not asserted to be English.
 On a new-code continuation, the acquisition step revisits older downloaded
 items without an attachment ledger, reuses a selected PDF only when its source
 URL matches, downloads the other PDFs, and checkpoints every 100 completed
@@ -449,7 +456,14 @@ so even two matching passes are evidence for a dated crawl, not a guarantee
 that the live site will never change. The final snapshot is not switched into
 historical ingestion automatically. A 100-record live ascending page probe
 returned 1,158,768 total items with monotonically increasing accession times;
-the 100-page cloud canary and full two-pass run still need to complete.
+the full two-pass run still needs to complete. The 100-page cloud canary
+[`36078818890`](https://github.com/bebhuvan/sansad-archive/actions/runs/36078818890)
+succeeded on 2026-09-25. Its HF first-pass shard has 100 pages and 10,000
+normalized records; an independent remote read matched its row count, SHA-256
+and byte size, and confirmed its LFS identity. Continuation run
+[`36079510594`](https://github.com/bebhuvan/sansad-archive/actions/runs/36079510594)
+started from the same scan root on newer code. Neither run yet proves
+second-pass agreement or a replacement snapshot.
 Refresh run `36047393238` appended exactly 3,500 records to the August base
 and published `state/census/snapshot-2026-09-24T192308Z` (SHA-256
 `9c2efb8cdfb624398b8468faa82e1c5c771a7f28b8e808e056b3a266ad58aeb9`,
