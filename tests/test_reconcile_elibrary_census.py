@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import gzip
 import hashlib
 import json
 import tempfile
@@ -10,7 +11,8 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 from scripts.reconcile_elibrary_census import (
-    load_shards, normalized_page, scan_shard, verify_first_shard_files,
+    load_shards, normalized_page, page_digest, scan_shard,
+    verified_shard_lines, verify_first_shard_files,
 )
 
 
@@ -131,6 +133,26 @@ class ReconcileElibraryCensusTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "Git-file hash mismatch"):
                     verify_first_shard_files("test/repo", root, [row],
                                              token="token", api=api)
+
+    @patch("scripts.reconcile_elibrary_census.PAGE_SIZE", 2)
+    def test_final_snapshot_rechecks_decompressed_page_hashes(self):
+        lines = ['{"record_id":"a"}\n', '{"record_id":"b"}\n',
+                 '{"record_id":"c"}\n']
+        shard = {"start_page": 0, "end_page": 1, "target_count": 3,
+                 "record_count": 3,
+                 "page_hashes": [page_digest(lines[:2]), page_digest(lines[2:])]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "part.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8") as output:
+                output.writelines(lines)
+            self.assertEqual(list(verified_shard_lines(path, shard)), lines)
+            corrupted = {**shard, "page_hashes": ["0" * 64, shard["page_hashes"][1]]}
+            with self.assertRaisesRegex(RuntimeError, "page hash mismatch"):
+                list(verified_shard_lines(path, corrupted))
+            with gzip.open(path, "wt", encoding="utf-8") as output:
+                output.writelines(lines + ['{"record_id":"extra"}\n'])
+            with self.assertRaisesRegex(RuntimeError, "extra records"):
+                list(verified_shard_lines(path, shard))
 
 
 if __name__ == "__main__":

@@ -449,7 +449,8 @@ same fixed prefix and requires every normalized page hash to match, catching
 offset shifts and relevant metadata changes. It tolerates only new accessions
 appended beyond the starting count; an earlier insertion, deletion or edit
 fails closed. Before publication it checks the boundary pages again, verifies
-the complete first-pass file set, compares IDs against the dated base, and
+the complete first-pass file set, recomputes every decompressed shard page hash
+and row count, compares IDs against the dated base, and
 publishes a separate snapshot plus manifest with new/removed-ID counts.
 The official source does not provide transactionally frozen search results,
 so even two matching passes are evidence for a dated crawl, not a guarantee

@@ -21,6 +21,7 @@ import time
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download
 
@@ -118,6 +119,25 @@ def verify_first_shard_files(repo: str, root: str, shards: list[dict], *,
             local = Path(hf_hub_download(repo, path, repo_type="dataset", token=token))
             if sha256_file(local) != row.get("sha256"):
                 raise RuntimeError(f"HF census shard Git-file hash mismatch: {path}")
+
+
+def verified_shard_lines(path: Path, shard: dict) -> Iterator[str]:
+    """Check decompressed row counts and page hashes before using a shard."""
+    count = 0
+    with gzip.open(path, "rt", encoding="utf-8") as source:
+        for page in range(shard["start_page"], shard["end_page"] + 1):
+            expected = min(PAGE_SIZE, shard["target_count"] - page * PAGE_SIZE)
+            lines = [source.readline() for _ in range(expected)]
+            if any(not line for line in lines):
+                raise RuntimeError(f"census shard is truncated at page {page}: {path}")
+            if page_digest(lines) != shard["page_hashes"][page - shard["start_page"]]:
+                raise RuntimeError(f"census shard page hash mismatch at page {page}: {path}")
+            count += len(lines)
+            yield from lines
+        if source.readline():
+            raise RuntimeError(f"census shard has extra records: {path}")
+    if count != shard["record_count"]:
+        raise RuntimeError(f"census shard row count mismatch: {path}")
 
 
 def scan_shard(fetch, *, kind: str, start: int, end: int, target_count: int,
@@ -244,14 +264,13 @@ def assemble_snapshot(api: HfApi, repo: str, root: str, base_root: str,
                 local = Path(hf_hub_download(repo, path, repo_type="dataset", token=token))
                 if local.stat().st_size != shard["bytes"] or sha256_file(local) != shard["sha256"]:
                     raise RuntimeError(f"first-pass census shard corrupt: {path}")
-                with gzip.open(local, "rt", encoding="utf-8") as source:
-                    for line in source:
-                        row = json.loads(line)
-                        identifier = str(row["record_id"])
-                        if not identifier.startswith("elibrary_ls_question_") or identifier in seen:
-                            raise RuntimeError(f"duplicate or non-eLibrary ID in {path}")
-                        seen.add(identifier)
-                        output.write(line)
+                for line in verified_shard_lines(local, shard):
+                    row = json.loads(line)
+                    identifier = str(row["record_id"])
+                    if not identifier.startswith("elibrary_ls_question_") or identifier in seen:
+                        raise RuntimeError(f"duplicate or non-eLibrary ID in {path}")
+                    seen.add(identifier)
+                    output.write(line)
         if len(seen) != current_count + target_count:
             raise RuntimeError("full census unique-ID count mismatch")
         new_ids = sum(identifier not in previous_ids for identifier in seen
