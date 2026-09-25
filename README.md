@@ -380,6 +380,17 @@ schedule works as an incremental scheduler. See
 [docs/CLOUD_PIPELINE.md](docs/CLOUD_PIPELINE.md) for the corpus map,
 prerequisites, resume semantics, and limits.
 
+The selected LiteParse local layer is route-dependent: strong native pages do
+not receive image OCR during ordinary extraction. For a separate OCR transcript
+of **every** page, `.github/workflows/full-ocr-layer.yml` restores a stable
+scope checkpoint and runs LiteParse on an image-only rasterization of each
+page. It writes immutable 100-page shards under `layers/full-ocr/<scope>/` on
+Hugging Face, verifies their page keys and hashes on resume, and never changes
+the selected local or Space Bunny text. Dispatch it only after acquisition and
+extraction for the scope are complete; if the inventory changes, a new
+inventory-addressed sidecar is created. This sidecar is an independent
+comparison layer, not a correction or accuracy certificate.
+
 ## Tests and benchmark
 
 ```bash
