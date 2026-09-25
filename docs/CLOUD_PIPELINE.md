@@ -1091,6 +1091,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   and 292 all different. The model was prompted with local text, so the 925
   local/model matches are not independent corroboration; all four disagreement
   groups remain source-image review queues.
+  Cloud audit `36096084059` published the first three-way report at
+  `audits/full-ocr-model-visual/lok_sabha-p17-s15/`
+  `ocr-pages-00003300-d0bb25478052a190.json`. Its independently downloaded
+  SHA-256 matches the filename prefix. At 3,300 verified OCR pages, 3,220
+  pages had numeric content in all three text layers: 1,570 all equal, 993
+  local/model equal only, 323 local/OCR equal only, 34 model/OCR equal only,
+  and 300 all different. Blank-page and empty-model-on-visible findings
+  remained 33 and zero respectively.
 
 ## Provenance and formats
 
