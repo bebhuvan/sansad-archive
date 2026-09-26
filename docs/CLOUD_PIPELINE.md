@@ -1327,6 +1327,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   Separate all-page LiteParse OCR/visual run `36208839072` was dispatched;
   completion and independent audit are pending.
 
+- Historical LS 01/VI batch `36184013828` inventoried all 3,070 attachments,
+  retained 2,236 distinct PDFs, extracted 3,237 pages and durably checkpointed
+  599 zero-cost model transcripts. Its runner was then marked failed while the
+  model step still appeared `in_progress`; GitHub supplied no completed step
+  or job-log blob, so the immediate cause remains unverified. Scheduled
+  successor `36201677621` resumed the same scope from HF. The unfinished
+  batch is not treated as a published session.
+
 ## Provenance and formats
 
 Each publication tranche contains:
