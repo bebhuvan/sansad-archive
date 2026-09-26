@@ -1369,6 +1369,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `ocr-pages-00017293-24694cb39ab07d69.json`, downloaded SHA-256
   `24694cb39ab07d694c23ebb55ae2abf2b98a616fa4de44422986b4cb5206727c`.
 
+- A read-only monitor of LS 01/VII briefly saw a checkpoint manifest/state
+  size mismatch while the writer was publishing a new mutable checkpoint;
+  the next read verified the newer state. The monitor now resolves one HF
+  dataset commit and pins both downloads to that revision, preventing a mixed
+  manifest/archive read without weakening SHA-256 verification. The pinned
+  monitor passed a live LS 01/VII checkpoint check and all 150 tests. This
+  was a monitor consistency issue, not evidence of a lost original or model
+  transcript.
+
 - Historical LS 01/VI published in resumed batch `36201677621`. Independent
   checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
   original PDFs and 3,448 model transcript artifacts, with zero missing or

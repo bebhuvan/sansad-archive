@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import zstandard
@@ -62,7 +63,8 @@ class CheckpointMonitorTests(unittest.TestCase):
             self.assertEqual(legacy["attachment_inventory_status"], "not_recorded")
 
     def test_missing_checkpoint_is_reported_without_hiding_other_hub_errors(self):
-        with patch("huggingface_hub.hf_hub_download",
+        with patch("huggingface_hub.HfApi.repo_info",
+                   return_value=SimpleNamespace(sha="a" * 40)), patch("huggingface_hub.hf_hub_download",
                    side_effect=RemoteEntryNotFoundError(
                        "missing", response=httpx.Response(
                            404, request=httpx.Request("GET", "https://example.test/missing")))):
@@ -70,7 +72,8 @@ class CheckpointMonitorTests(unittest.TestCase):
                              max_db_bytes=1024 * 1024)
         self.assertEqual(result["checkpoint_status"], "not_found")
         self.assertIsNone(result["checkpoint_at"])
-        with patch("huggingface_hub.hf_hub_download",
+        with patch("huggingface_hub.HfApi.repo_info",
+                   return_value=SimpleNamespace(sha="a" * 40)), patch("huggingface_hub.hf_hub_download",
                    side_effect=RuntimeError("hub unavailable")):
             with self.assertRaisesRegex(RuntimeError, "hub unavailable"):
                 inspect("test/corpus", "elibrary-lok_sabha-p01-sIII",
@@ -172,9 +175,11 @@ class CheckpointMonitorTests(unittest.TestCase):
             }), encoding="utf-8")
             locations = []
 
-            def fake_download(repo, filename, *, repo_type, local_dir, force_download):
+            def fake_download(repo, filename, *, repo_type, revision, local_dir,
+                              force_download):
                 self.assertEqual(repo, "test/corpus")
                 self.assertEqual(repo_type, "dataset")
+                self.assertEqual(revision, "a" * 40)
                 self.assertTrue(force_download)
                 locations.append(Path(local_dir))
                 source = manifest if filename.endswith("checkpoint.json") else state
@@ -183,7 +188,9 @@ class CheckpointMonitorTests(unittest.TestCase):
                 shutil.copyfile(source, destination)
                 return str(destination)
 
-            with patch("huggingface_hub.hf_hub_download", side_effect=fake_download):
+            with patch("huggingface_hub.HfApi.repo_info",
+                       return_value=SimpleNamespace(sha="a" * 40)), patch(
+                           "huggingface_hub.hf_hub_download", side_effect=fake_download):
                 result = inspect("test/corpus", "lok_sabha-p18-s8", max_db_bytes=1024 * 1024)
                 audited = inspect("test/corpus", "lok_sabha-p18-s8",
                                   max_db_bytes=1024 * 1024, audit_transcripts=True)

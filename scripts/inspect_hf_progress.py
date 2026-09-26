@@ -276,18 +276,23 @@ def summarize_database(path: Path, scope: str) -> dict:
 def inspect(repo: str, scope: str, *, max_db_bytes: int,
             max_state_bytes: int = 512 * 1024 * 1024,
             audit_transcripts: bool = False) -> dict:
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import HfApi, hf_hub_download
     from huggingface_hub.errors import RemoteEntryNotFoundError
 
     if not SCOPE.fullmatch(scope):
         raise ValueError(f"invalid checkpoint scope: {scope}")
     root = f"state/checkpoints/{scope}"
+    # The checkpoint manifest and state archive share mutable paths. Pin both
+    # reads to one repository commit so a concurrent save cannot mix versions.
+    revision = HfApi().repo_info(repo, repo_type="dataset").sha
+    if not revision:
+        raise RuntimeError("HF dataset has no revision for checkpoint inspection")
     with tempfile.TemporaryDirectory(prefix="sansad-hf-monitor-") as directory:
         temporary = Path(directory)
         try:
             manifest_path = Path(hf_hub_download(
                 repo, f"{root}/checkpoint.json", repo_type="dataset",
-                local_dir=temporary, force_download=True,
+                revision=revision, local_dir=temporary, force_download=True,
             ))
         except RemoteEntryNotFoundError:
             return {"repo": repo, "scope": scope,
@@ -300,7 +305,8 @@ def inspect(repo: str, scope: str, *, max_db_bytes: int,
         if not isinstance(state.get("bytes"), int) or state["bytes"] > max_state_bytes:
             raise RuntimeError("checkpoint state archive exceeds monitor disk limit")
         state_path = Path(hf_hub_download(
-            repo, state_name, repo_type="dataset", local_dir=temporary,
+            repo, state_name, repo_type="dataset", revision=revision,
+            local_dir=temporary,
             force_download=True,
         ))
         verify_archive(state_path, state)
