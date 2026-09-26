@@ -1384,7 +1384,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   missing or invalid artifact and every call reporting zero cost. The
   publication marker and checksummed `pages.parquet` agree on 2,393 unique
   page keys across the 1,590 PDFs. Separate all-page LiteParse OCR/visual run
-  `36237804679` was dispatched; completion and independent audit are pending.
+  `36237804679` completed. Independent replay verified all 2,393 OCR page
+  keys and visual measurements, with zero unprocessed pages, blank-page
+  conflicts or empty text on visibly marked pages. All 2,393 OCR rows reuse
+  selected-local rasterized OCR, so local/OCR agreement is not independent
+  evidence of accuracy. OCR/model visible-number differences on 2,264 pages
+  remain a source-image review queue, not an error-rate estimate. The cloud
+  report is `audits/full-ocr-model-visual/lok_sabha-p01-sVII/`
+  `ocr-pages-00002393-5bf2eae265129eef.json`, downloaded SHA-256
+  `5bf2eae265129eef3e5a2f00380840d264c27eec017e6253953ab9f6fbf1cf1e`.
 
 - Historical LS 01/VI published in resumed batch `36201677621`. Independent
   checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
