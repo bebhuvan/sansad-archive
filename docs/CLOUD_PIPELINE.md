@@ -1275,6 +1275,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   retry fix and checkpointed the audit pass through page 5,399/11,588.
   Continuation `36225572945` was dispatched from that boundary; a completed
   reconciled snapshot is still pending.
+  Subsequent run `36230873490` checkpointed the second pass through page
+  9,999/11,588 and succeeded. Its queued successor `36246518411` is active;
+  the final normalized-page-hash agreement and dated snapshot publication
+  remain pending.
 
 - Historical batch `36145853002` completed LS 01/IV, then LS 01/V acquired
   all 2,114 inventoried attachments (1,378 distinct original PDFs), extracted
