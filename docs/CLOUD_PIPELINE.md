@@ -1404,7 +1404,23 @@ checkpoint (22:12 and 22:10 UTC respectively).
   missing or invalid artifact and every call reporting zero cost. The
   publication marker and checksummed `pages.parquet` agree on 2,397 unique
   page keys across the 1,586 PDFs. Separate all-page LiteParse OCR/visual run
-  `36257629153` was dispatched; completion and independent audit are pending.
+  `36257629153` completed. Independent replay verified all 2,397 OCR page
+  keys and visual measurements, with zero unprocessed pages and zero
+  blank-page conflicts. All 2,397 OCR rows reuse selected-local rasterized
+  OCR. One visibly inked page had empty LiteParse OCR: original SHA-256
+  `000398a4bb03d00b8beac8515de4a1802ece067b97064ceb393dd96061654011`,
+  page 2 of `01_VIII_06-12-1954_p41_p42_u572.pdf` (written answers, table,
+  questions 573–574). Direct image review confirmed substantive text;
+  Tesseract on that page yielded text, and the separately retained Space Bunny
+  transcript covered the page, but neither is silently promoted into the
+  immutable LiteParse layer. The model's table cell for sanitation cost reads
+  `10,800`, matching the image, while Tesseract reads `19,800`; this is a
+  concrete reason to keep provenance and image-based adjudication. OCR/model
+  visible-number differences on 2,306 pages remain a source-image review
+  queue, not an error-rate estimate. The cloud audit report is
+  `audits/full-ocr-model-visual/lok_sabha-p01-sVIII/`
+  `ocr-pages-00002397-5a37b2367f97d3ad.json`, downloaded SHA-256
+  `5a37b2367f97d3ad02ac6e9ad3ed09e9370d7a0dc59cbedf1b1676387e4b5e2f`.
 
 - Historical LS 01/VI published in resumed batch `36201677621`. Independent
   checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
