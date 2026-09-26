@@ -1324,8 +1324,19 @@ checkpoint (22:12 and 22:10 UTC respectively).
   OpenRouter calls, 17,359 reported zero cost, one omitted the cost field and
   none reported a nonzero charge. The publication marker and checksummed
   `pages.parquet` agree on 17,306 unique page keys across the 4,500 PDFs.
-  Separate all-page LiteParse OCR/visual run `36208839072` was dispatched;
-  completion and independent audit are pending.
+  Separate all-page LiteParse OCR/visual run `36208839072` completed.
+  Independent replay verified all 17,306 OCR page keys and visual measurements
+  with zero unprocessed pages. Of the OCR rows, 663 reuse selected-local OCR
+  and 16,643 are separate same-method sidecar executions. Visual evidence
+  identified 79 exactly blank raster pages: the model returned nonempty text
+  on 77 (all with zero dark pixels), while two had verified blank responses.
+  Local canonical text and OCR remain empty on all 79, and the 77 model
+  hallucinations are explicitly flagged. Thirteen visibly marked pages with
+  empty OCR are flagged separately. OCR/model visible-number differences on
+  9,150 pages are a source-image review queue, not an error-rate estimate.
+  The cloud report is `audits/full-ocr-model-visual/lok_sabha-p18-s8/`
+  `ocr-pages-00017306-b600d422091c6031.json`, downloaded SHA-256
+  `b600d422091c603148485ee247a15135f32dab8b012a1cdeb9e281d67c681bb2`.
 
 - Historical LS 01/VI batch `36184013828` inventoried all 3,070 attachments,
   retained 2,236 distinct PDFs, extracted 3,237 pages and durably checkpointed
