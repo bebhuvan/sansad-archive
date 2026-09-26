@@ -1398,6 +1398,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   `ocr-pages-00002393-5bf2eae265129eef.json`, downloaded SHA-256
   `5bf2eae265129eef3e5a2f00380840d264c27eec017e6253953ab9f6fbf1cf1e`.
 
+- Historical LS 01/VIII published in resumed batch `36245019406`.
+  Independent checkpoint replay verified all 2,598 attachment inventories,
+  1,586 distinct original PDFs and 2,397 saved model transcripts, with no
+  missing or invalid artifact and every call reporting zero cost. The
+  publication marker and checksummed `pages.parquet` agree on 2,397 unique
+  page keys across the 1,586 PDFs. Separate all-page LiteParse OCR/visual run
+  `36257629153` was dispatched; completion and independent audit are pending.
+
 - Historical LS 01/VI published in resumed batch `36201677621`. Independent
   checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
   original PDFs and 3,448 model transcript artifacts, with zero missing or
