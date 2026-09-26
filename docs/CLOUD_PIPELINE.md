@@ -1378,6 +1378,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   was a monitor consistency issue, not evidence of a lost original or model
   transcript.
 
+- Historical LS 01/VII published in resumed batch `36221169932`.
+  Independent checkpoint replay verified all 2,502 attachment inventories,
+  1,590 distinct original PDFs and 2,393 saved model transcripts, with no
+  missing or invalid artifact and every call reporting zero cost. The
+  publication marker and checksummed `pages.parquet` agree on 2,393 unique
+  page keys across the 1,590 PDFs. Separate all-page LiteParse OCR/visual run
+  `36237804679` was dispatched; completion and independent audit are pending.
+
 - Historical LS 01/VI published in resumed batch `36201677621`. Independent
   checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
   original PDFs and 3,448 model transcript artifacts, with zero missing or
