@@ -1335,6 +1335,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   successor `36201677621` resumed the same scope from HF. The unfinished
   batch is not treated as a published session.
 
+- Current-API LS 18/5 published in resumed batch `36183343927`. Independent
+  checkpoint replay verified 5,248 retained original PDFs, 17,293 pages and
+  all 17,293 model transcript artifacts, with zero missing or invalid files
+  and every call reporting zero cost. The publication marker and checksummed
+  `pages.parquet` agree on 17,293 unique page keys across the 5,248 PDFs.
+  Separate all-page LiteParse OCR/visual run `36221171563` was dispatched;
+  completion and independent audit are pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
