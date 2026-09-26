@@ -1271,6 +1271,10 @@ checkpoint (22:12 and 22:10 UTC respectively).
   retry fix. The first pass alone is not a reconciled census, and the final
   snapshot must not replace the dated ingestion inventory until the full
   second pass and normalized-page-hash comparison succeed.
+  Later bounded continuation `36209954208` succeeded on the truncated-HTTP
+  retry fix and checkpointed the audit pass through page 5,399/11,588.
+  Continuation `36225572945` was dispatched from that boundary; a completed
+  reconciled snapshot is still pending.
 
 - Historical batch `36145853002` completed LS 01/IV, then LS 01/V acquired
   all 2,114 inventoried attachments (1,378 distinct original PDFs), extracted
