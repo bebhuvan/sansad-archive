@@ -1343,6 +1343,14 @@ checkpoint (22:12 and 22:10 UTC respectively).
   Separate all-page LiteParse OCR/visual run `36221171563` was dispatched;
   completion and independent audit are pending.
 
+- Historical LS 01/VI published in resumed batch `36201677621`. Independent
+  checkpoint replay verified all 3,070 attachment inventories, 2,236 distinct
+  original PDFs and 3,448 model transcript artifacts, with zero missing or
+  invalid files and every call reporting zero cost. The publication marker and
+  checksummed `pages.parquet` agree on 3,448 unique page keys across those
+  2,236 PDFs. Separate full-page LiteParse OCR/visual run `36222619488` was
+  dispatched; completion and independent audit are pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
