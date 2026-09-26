@@ -1318,6 +1318,15 @@ checkpoint (22:12 and 22:10 UTC respectively).
   same-method sidecar executions. OCR/model visible-number differences on
   1,864 pages remain a review queue, not an error-rate estimate.
 
+- Current-API LS 18/8 published after resumed batch `36183343927`. An
+  independent HF checkpoint check found 4,500 retained original PDFs,
+  17,306 extracted pages and 17,306 saved model transcripts. Of 17,360
+  OpenRouter calls, 17,359 reported zero cost, one omitted the cost field and
+  none reported a nonzero charge. The publication marker and checksummed
+  `pages.parquet` agree on 17,306 unique page keys across the 4,500 PDFs.
+  Separate all-page LiteParse OCR/visual run `36208839072` was dispatched;
+  completion and independent audit are pending.
+
 ## Provenance and formats
 
 Each publication tranche contains:
